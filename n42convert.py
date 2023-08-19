@@ -137,7 +137,6 @@ def make_instrument_info(data):
         {serial_number}
         <RadInstrumentModelName>{data["device_name"]}</RadInstrumentModelName>
         <RadInstrumentClassCode>Spectroscopic Personal Radiation Detector</RadInstrumentClassCode>
-        <RadInstrumentDescription>Pocket-sized spectrometer with usb and bluetooth connectivity</RadInstrumentDescription>
       
         <!-- I have a feature request to include firmware and app version in the exported xml files. -->
         <RadInstrumentVersion>
@@ -150,7 +149,7 @@ def make_instrument_info(data):
         </RadInstrumentVersion>
         <RadInstrumentVersion>
             <RadInstrumentComponentName>Converter</RadInstrumentComponentName>
-            <RadInstrumentComponentVersion>0.0.1</RadInstrumentComponentVersion>
+            <RadInstrumentComponentVersion>0.0.2</RadInstrumentComponentVersion>
         </RadInstrumentVersion>
     </RadInstrumentInformation>
     """
@@ -174,9 +173,6 @@ def format_output(**kwargs) -> str:
 
     <!-- What detection technology is used? -->
     {detector_info}
-
-    <!-- Full Width Half Maximum at various energy levels -->
-    {fwhm_cal}
 
     <!-- Calibration factors, mapping channel/bin to energy level. Foreground and background may have separate calibrations-->
     {fg_cal}

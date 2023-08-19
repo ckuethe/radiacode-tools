@@ -78,8 +78,10 @@ In cases where two separate spectra have been recorded, they can be combined to 
 a recording with included background. Consider a basement lab with a smoke detector;
 the background radiation may be influenced by the concrete foundation made with an
 aggregate containing a relatively large amount of thorium and uranium, there may be
-elevated level of radon due to poor ventilation, and the smoke detector contains an
-americium source. A recording of this ambient radiation can be saved as `lab.xml`.
+elevated levels of radon due to poor ventilation, and the smoke detector contains an
+americium source.
+
+A recording of this ambient radiation can be saved as `lab.xml`.
 When a new sample arrives, perhaps a container of sodium-free salt substitute (`KCl`)
 or a crate of bananas for scale, it is measured in the same location as the lab
 reference measurement, and the recording may be saved as `k40.xml`. These two files
@@ -88,7 +90,3 @@ may be merged by running `n42convert.py -f k40.xml -b lab.xml -o banana.n42`.
 If the background RC file has both foreground and background spectra, the background
 spectrum will be copied into the output N42 file. If no background spectrum exists,
 the foreground data from the background file will be copied into the output N42 file.
-
-**BUGS** The output N42 does not yet validate with 
-[xmlschema](https://xmlschema.readthedocs.io/en/latest/) though InterSpec accepts the
-output of this utility without issue. This will be fixed soon.
