@@ -50,3 +50,45 @@ data range: (122, 295) - (802, 2204)
 x^0 .. x^2: [-2.45705927, 2.39432185, 0.00044401]
 R^2: 0.99998
 ```
+
+### n42convert.py
+This tool converts a RadiaCode ("RC") spectrum XML file into
+[ANSI N42](https://www.nist.gov/pml/radiation-physics/ansiieee-n4242-2020-version)
+format for analysis with other tooling such as
+[InterSpec](https://github.com/sandialabs/InterSpec)
+
+```
+usage: n42convert.py [-h] -f FILE [-b FILE] [-o FILE] [--overwrite] [-u UUID]
+
+options:
+  -h, --help                    show this help message and exit
+  -f FILE, --foreground FILE    primary source data file
+  -b FILE, --background FILE    Retrieve background from this file, using the background series if it exists or the main series otherwise.
+  -o FILE, --output FILE        [<foreground>.n42]
+  --overwrite                   allow existing file to be overwritten
+  -u UUID, --uuid UUID          specify a UUID for the generated document. [<random>]
+```
+
+Only a single `-f` or `--foreground` argument is required. This will convert the
+contents of an RC spectrum file into an N42 file named similarly to the source file.
+If the RC file contains an included background spectrum it will be included in the
+output.
+
+In cases where two separate spectra have been recorded, they can be combined to form
+a recording with included background. Consider a basement lab with a smoke detector;
+the background radiation may be influenced by the concrete foundation made with an
+aggregate containing a relatively large amount of thorium and uranium, there may be
+elevated level of radon due to poor ventilation, and the smoke detector contains an
+americium source. A recording of this ambient radiation can be saved as `lab.xml`.
+When a new sample arrives, perhaps a container of sodium-free salt substitute (`KCl`)
+or a crate of bananas for scale, it is measured in the same location as the lab
+reference measurement, and the recording may be saved as `k40.xml`. These two files
+may be merged by running `n42convert.py -f k40.xml -b lab.xml -o banana.n42`.
+
+If the background RC file has both foreground and background spectra, the background
+spectrum will be copied into the output N42 file. If no background spectrum exists,
+the foreground data from the background file will be copied into the output N42 file.
+
+**BUGS** The output N42 does not yet validate with 
+[xmlschema](https://xmlschema.readthedocs.io/en/latest/) though InterSpec accepts the
+output of this utility without issue. This will be fixed soon.
