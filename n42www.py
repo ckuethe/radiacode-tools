@@ -22,7 +22,7 @@ def handle_index():
     <h2>Radiacode to N42 Converter</h2>
 
 
-    <form action="/convert" method="POST" enctype="multipart/form-data">
+    <form action="convert" method="POST" enctype="multipart/form-data">
         <label for="{input_name}"> Select a Radiacode XML spectrum file to convert to N42<br></label>
         <input id="{input_name}" name="{input_name}" type="file" />
         <button id="upload-button">Upload</button>
