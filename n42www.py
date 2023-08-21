@@ -68,10 +68,31 @@ def get_args() -> Namespace:
             return i
         raise ValueError("invalid port number")
 
-    ap.add_argument("-b", "--bind-addr", type=str, default="0.0.0.0")
-    ap.add_argument("-m", "--max-size", type=int, default=128 * 1024)
-    ap.add_argument("-p", "--port", default=6853, type=_port_num)  # spells "NUKE" on a phone keypad
-    ap.add_argument("-v", "--verbose", action="count", default=0)
+    ap.add_argument(
+        "-b",
+        "--bind-addr",
+        type=str,
+        metavar="IP",
+        default="127.0.0.1",
+        help="IP address on which to listen [%(default)s]",
+    )
+    ap.add_argument(
+        "-m",
+        "--max-size",
+        type=int,
+        metavar="NUM",
+        default=128 * 1024,
+        help="Maximum upload file size in bytes [%(default)s]",
+    )
+    ap.add_argument(
+        "-p",
+        "--port",
+        default=6853,  # spells "NUKE" on a phone keypad
+        metavar="PORT",
+        type=_port_num,
+        help="Port on which to listen [%(default)s]",
+    )
+    ap.add_argument("-v", "--verbose", action="count", default=0, help="increase verbosity for debugging")
 
     return ap.parse_args()
 

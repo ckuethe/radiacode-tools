@@ -97,3 +97,27 @@ may be merged by running `n42convert.py -f k40.xml -b lab.xml -o banana.n42`.
 If the background RC file has both foreground and background spectra, the background
 spectrum will be copied into the output N42 file. If no background spectrum exists,
 the foreground data from the background file will be copied into the output N42 file.
+
+### n42www.py
+
+```
+usage: n42www.py [-h] [-b IP] [-m NUM] [-p PORT] [-v]
+
+options:
+  -h, --help                show this help message and exit
+  -b IP, --bind-addr IP     IP address on which to listen [127.0.0.1]
+  -m NUM, --max-size NUM    Maximum upload file size in bytes [131072]
+  -p PORT, --port PORT      Port on which to listen [6853]
+  -v, --verbose             increase verbosity for debugging
+```
+
+This program is a simple web server which allows an RC XML file to be `POST`ed
+to its `/convert` endpoint, returning an N42 file. This enables radiation analysis
+to be conducted using just an RC detector, and a phone or tablet running the
+[RadiaCode](https://play.google.com/store/apps/details?id=com.almacode.radiacode)
+and
+[InterSpec](https://play.google.com/store/apps/details?id=gov.sandia.interspec)
+apps.
+
+Configuring a reverse proxy and `WSGI` server for safe deployment of this server
+is beyond the scope of this document.
