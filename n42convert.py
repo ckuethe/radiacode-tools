@@ -6,8 +6,9 @@ from textwrap import dedent
 import xmltodict
 from argparse import ArgumentParser, Namespace
 import os
+from io import TextIOWrapper
 
-__version__ = "0.0.3"
+__version__ = "0.0.4"
 
 
 def parse_spectrum(spectrum, check: bool = True):
@@ -31,9 +32,17 @@ def parse_spectrum(spectrum, check: bool = True):
     return rv
 
 
-def load_radiacode_spectrum(fn):
-    with open(fn) as ifd:
-        sp = xmltodict.parse(ifd.read(), dict_constructor=dict)["ResultDataFile"]["ResultDataList"]["ResultData"]
+def load_radiacode_spectrum(filename: str = None, fileobj: TextIOWrapper = None):
+    if filename and fileobj:
+        raise ValueError("Only one of filename or fileobj may be given")
+    if filename:
+        ifd = open(filename)
+    elif fileobj:
+        ifd = fileobj
+    else:
+        raise ValueError("One of filename or fileobj are required")
+
+    sp = xmltodict.parse(ifd.read(), dict_constructor=dict)["ResultDataFile"]["ResultDataList"]["ResultData"]
 
     fg = sp.get("EnergySpectrum")
     fg = parse_spectrum(fg)
@@ -253,13 +262,34 @@ def get_args() -> Namespace:
     return ap.parse_args()
 
 
+def process_single_fileobj(fileobj: TextIOWrapper) -> str:
+    """
+    wrapper to allow conversion from a file object
+
+    this is used by the conversion server
+    """
+    fg_data = load_radiacode_spectrum(fileobj=fileobj)
+
+    n42data = format_output(
+        uuid=None,
+        instrument_info=make_instrument_info(fg_data),
+        detector_info=make_detector_info(),
+        fg_cal=format_calibration(fg_data),
+        bg_cal=format_calibration(fg_data, fg=False),
+        fg_spectrum=format_spectrum(fg_data),
+        bg_spectrum=format_spectrum(fg_data, fg=False),
+    )
+
+    return n42data
+
+
 def process_single_file(fg_file=None, bg_file=None, out_file=None, uuid=None, overwrite=False) -> None:
     if os.path.exists(out_file) and overwrite is False:
         return  # shortcut for recursive mode
 
-    fg_data = load_radiacode_spectrum(fg_file)
+    fg_data = load_radiacode_spectrum(filename=fg_file)
     if bg_file:
-        bg_data = load_radiacode_spectrum(bg_file)
+        bg_data = load_radiacode_spectrum(filename=bg_file)
     else:
         bg_data = fg_data
 
