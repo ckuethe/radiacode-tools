@@ -98,6 +98,29 @@ If the background RC file has both foreground and background spectra, the backgr
 spectrum will be copied into the output N42 file. If no background spectrum exists,
 the foreground data from the background file will be copied into the output N42 file.
 
+### n42validate.py
+```
+usage: n42validate.py [-h] [-r] [-q] [-v] [-V] [-s XSD] [-u URL] [-x EXT] FILE [FILE ...]
+
+positional arguments:
+  FILE                  source data file
+
+options:
+  -h, --help                  show this help message and exit
+  -r, --recursive             treat the input path as a directory to process recursively [False]
+  -q, --quiet                 don't display the invalid XML element
+  -v, --verbose               display valid files too, by default only invalid files are reported
+  -V, --valid-only            only display valid files
+  -s XSD, --schema-file XSD   Default: ~/.cache/n42.xsd
+  -u URL, --schema-url URL    Default: https://www.nist.gov/document/n42xsd
+  -x EXT, --extension EXT     Default: .n42
+```
+
+Some programs are more tolerant than others when processing potentially invalid
+N42 inputs. This utility can be used to check data file compliance with the N42
+specification. Output can be constrained to valid or invalid files only, with
+optional detailed information about which elements of the file are incorrect.
+
 ### n42www.py
 
 ```
