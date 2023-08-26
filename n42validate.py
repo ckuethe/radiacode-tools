@@ -35,10 +35,25 @@ def get_args() -> Namespace:
         help="treat the input path as a directory to process recursively [%(default)s]",
     )
     ap.add_argument(
+        "-q",
+        "--quiet",
+        default=False,
+        action="store_true",
+        help="don't display the invalid XML element",
+    )
+    ap.add_argument(
         "-v",
         "--verbose",
         default=False,
         action="store_true",
+        help="display valid files too, by default only invalid files are reported",
+    )
+    ap.add_argument(
+        "-V",
+        "--valid-only",
+        default=False,
+        action="store_true",
+        help="only display valid files",
     )
     ap.add_argument(
         "-s",
@@ -79,14 +94,28 @@ def main() -> None:
     args = get_args()
 
     schema = fetch_or_load_xsd(schema_file=args.schema_file, schema_url=args.schema_url)
-    for f in args.files:
+
+    workqueue = []
+    if args.recursive:
+        for f in args.files:
+            for dirpath, _, filenames in os.walk(f):
+                for filename in filter(lambda x: x.endswith(args.extension), filenames):
+                    workqueue.append(os.path.join(dirpath, filename))
+    else:
+        workqueue = args.files
+
+    for f in workqueue:
         xml_doc = ET.parse(f)
         v = "OK"
         if schema.is_valid(xml_doc):
-            if args.verbose:
+            if args.verbose or args.valid_only:
                 print(f"[VALID] {f}")
         else:
+            if args.valid_only:
+                continue
             print(f"[ERROR] {f}")
+            if args.quiet:
+                continue
             try:
                 schema.validate(xml_doc)
             except Exception as e:
