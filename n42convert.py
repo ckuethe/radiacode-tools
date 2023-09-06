@@ -171,6 +171,38 @@ def make_instrument_info(data):
     return dedent(rv).strip()
 
 
+def make_fwhm_cal() -> str:
+    # These were taken from a single device, and a small number of sources.
+    # If this calibration is valid at all (and I'm not sure about that), it
+    # is probably only valid for my device
+    cal_items = [
+        (60, 17),
+        (77, 19),
+        (239, 43),
+        (357, 47),
+        (511, 56),
+        (609, 58),
+        (911, 102),
+        (1275, 90),
+        (1449, 96),
+        (1588, 113),
+        (2204, 120),
+        (2614, 114),
+    ]
+
+    e, f = zip(*cal_items)
+    e = " ".join([str(x) for x in e])
+    f = " ".join([str(x) for x in f])
+
+    rv = f"""
+    <FWHMCalibration id="ec-fwhm">
+        <EnergyValues> {e} </EnergyValues>
+        <FWHMValues> {f} </FWHMValues>
+    </FWHMCalibration>
+    """
+    return dedent(rv)
+
+
 def format_output(
     uuid="",
     instrument_info="",
