@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-import matplotlib.pyplot as plt
 from uuid import uuid4, UUID
 from textwrap import dedent
 import xmltodict
@@ -8,7 +7,8 @@ from argparse import ArgumentParser, Namespace
 import os
 from io import TextIOWrapper
 
-__version__ = "0.0.4"
+__version__ = "0.0.5"
+__creator__ = "https://github.com/ckuethe/radiacode-tools"
 
 
 def parse_spectrum(spectrum, check: bool = True):
@@ -99,14 +99,17 @@ def format_spectrum(spectrum, fg=True):
         layer = mclass.lower()
         time_index = 0 if fg else 1
 
+        timestamp = spectrum["start_time"]
+        if isinstance(timestamp, list):
+            timestamp = timestamp[time_index]
+
         rv = f"""
         <RadMeasurement id="rm-{tag}">
             <Remark>{spectrum[layer]['name']}</Remark>
             <MeasurementClassCode>{mclass}</MeasurementClassCode>
-            <StartDateTime>{spectrum["start_time"][time_index]}</StartDateTime>
+            <StartDateTime>{timestamp}</StartDateTime>
             <RealTimeDuration>PT{spectrum[layer]["duration"]}S</RealTimeDuration>
             <Spectrum id="rm-{tag}-sp" radDetectorInformationReference="rdi-1" energyCalibrationReference="ec-{tag}"> 
-                <LiveTimeDuration>PT{spectrum[layer]["duration"]}S</LiveTimeDuration>
                 <ChannelData compressionCode="None">
                     {stringify(spectrum[layer]["spectrum"])}
                 </ChannelData> 
@@ -126,6 +129,10 @@ def make_detector_info():
         <RadDetectorCategoryCode>Gamma</RadDetectorCategoryCode>
         <RadDetectorKindCode>CsI</RadDetectorKindCode>
         <RadDetectorDescription>CsI:Tl scintillator, coupled to SiPM</RadDetectorDescription>
+        <RadDetectorLengthValue units="mm">6</RadDetectorLengthValue>
+        <RadDetectorWidthValue units="mm">6</RadDetectorWidthValue>
+        <RadDetectorDepthValue units="mm">6</RadDetectorDepthValue>
+        <RadDetectorVolumeValue units="cc">2.16E-1</RadDetectorVolumeValue>
     </RadDetectorInformation>
     """
     return dedent(rv).strip()
@@ -153,7 +160,7 @@ def make_instrument_info(data):
         </RadInstrumentVersion>
         <RadInstrumentVersion>
             <RadInstrumentComponentName>App</RadInstrumentComponentName>
-            <RadInstrumentComponentVersion>1.41.00</RadInstrumentComponentVersion>
+            <RadInstrumentComponentVersion>1.42.00</RadInstrumentComponentVersion>
         </RadInstrumentVersion>
         <RadInstrumentVersion>
             <RadInstrumentComponentName>Converter</RadInstrumentComponentName>
@@ -172,6 +179,7 @@ def format_output(
     fg_spectrum="",
     bg_cal="",
     bg_spectrum="",
+    fwhm_cal="",
 ) -> str:
     if uuid is None:
         uuid = uuid4()
@@ -184,7 +192,7 @@ def format_output(
                    n42DocUUID="{uuid}">
 
     <!-- What created this file? -->
-    <RadInstrumentDataCreatorName>https://github.com/ckuethe/radiacode-tools</RadInstrumentDataCreatorName>
+    <RadInstrumentDataCreatorName>{__creator__}</RadInstrumentDataCreatorName>
 
     <!-- What product was used to gather the data? -->
     {instrument_info}
@@ -195,6 +203,7 @@ def format_output(
     <!-- Calibration factors, mapping channel/bin to energy level. Foreground and background may have separate calibrations-->
     {fg_cal}
     {bg_cal}
+    {fwhm_cal}
 
     <!-- Primary spectrum in this file-->
     {fg_spectrum}
@@ -284,7 +293,8 @@ def process_single_fileobj(fileobj: TextIOWrapper) -> str:
 
 
 def process_single_file(fg_file=None, bg_file=None, out_file=None, uuid=None, overwrite=False) -> None:
-    if os.path.exists(out_file) and overwrite is False:
+    "Read a data file and convert it"
+    if out_file and os.path.exists(out_file) and overwrite is False:
         return  # shortcut for recursive mode
 
     fg_data = load_radiacode_spectrum(filename=fg_file)
