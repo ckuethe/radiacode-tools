@@ -110,6 +110,7 @@ def format_spectrum(spectrum, fg=True):
             <StartDateTime>{timestamp}</StartDateTime>
             <RealTimeDuration>PT{spectrum[layer]["duration"]}S</RealTimeDuration>
             <Spectrum id="rm-{tag}-sp" radDetectorInformationReference="rdi-1" energyCalibrationReference="ec-{tag}"> 
+                <LiveTimeDuration>PT{spectrum[layer]["duration"]}S</LiveTimeDuration>
                 <ChannelData compressionCode="None">
                     {stringify(spectrum[layer]["spectrum"])}
                 </ChannelData> 
