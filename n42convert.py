@@ -7,7 +7,7 @@ from argparse import ArgumentParser, Namespace
 import os
 from io import TextIOWrapper
 
-__version__ = "0.0.5"
+__version__ = "0.0.6"
 __creator__ = "https://github.com/ckuethe/radiacode-tools"
 
 
@@ -105,7 +105,7 @@ def format_spectrum(spectrum, fg=True):
 
         rv = f"""
         <RadMeasurement id="rm-{tag}">
-            <Remark>{spectrum[layer]['name']}</Remark>
+            <Remark>Title: {spectrum[layer]['name']}</Remark>
             <MeasurementClassCode>{mclass}</MeasurementClassCode>
             <StartDateTime>{timestamp}</StartDateTime>
             <RealTimeDuration>PT{spectrum[layer]["duration"]}S</RealTimeDuration>
@@ -130,10 +130,10 @@ def make_detector_info():
         <RadDetectorCategoryCode>Gamma</RadDetectorCategoryCode>
         <RadDetectorKindCode>CsI</RadDetectorKindCode>
         <RadDetectorDescription>CsI:Tl scintillator, coupled to SiPM</RadDetectorDescription>
-        <RadDetectorLengthValue units="mm">6</RadDetectorLengthValue>
-        <RadDetectorWidthValue units="mm">6</RadDetectorWidthValue>
-        <RadDetectorDepthValue units="mm">6</RadDetectorDepthValue>
-        <RadDetectorVolumeValue units="cc">2.16E-1</RadDetectorVolumeValue>
+        <RadDetectorLengthValue units="mm">10</RadDetectorLengthValue>
+        <RadDetectorWidthValue units="mm">10</RadDetectorWidthValue>
+        <RadDetectorDepthValue units="mm">10</RadDetectorDepthValue>
+        <RadDetectorVolumeValue units="cc">1</RadDetectorVolumeValue>
     </RadDetectorInformation>
     """
     return dedent(rv).strip()
