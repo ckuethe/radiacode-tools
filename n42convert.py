@@ -7,7 +7,7 @@ from argparse import ArgumentParser, Namespace
 import os
 from io import TextIOWrapper
 
-__version__ = "0.0.6"
+__version__ = "0.0.7"
 __creator__ = "https://github.com/ckuethe/radiacode-tools"
 
 
@@ -109,7 +109,7 @@ def format_spectrum(spectrum, fg=True):
             <MeasurementClassCode>{mclass}</MeasurementClassCode>
             <StartDateTime>{timestamp}</StartDateTime>
             <RealTimeDuration>PT{spectrum[layer]["duration"]}S</RealTimeDuration>
-            <Spectrum id="rm-{tag}-sp" radDetectorInformationReference="rdi-1" energyCalibrationReference="ec-{tag}"> 
+            <Spectrum id="rm-{tag}-sp" radDetectorInformationReference="radiacode-csi-sipm" energyCalibrationReference="ec-{tag}"> 
                 <LiveTimeDuration>PT{spectrum[layer]["duration"]}S</LiveTimeDuration>
                 <ChannelData compressionCode="None">
                     {stringify(spectrum[layer]["spectrum"])}
@@ -123,10 +123,10 @@ def format_spectrum(spectrum, fg=True):
 
 
 def make_detector_info():
-    "Hard-coded information about the RC-101 and RC-102"
+    "Hard-coded information about the RC-101 and RC-102, id is fixed to 'radiacode-csi-sipm'"
     # Category and Kind are from N42, Description is free text
     rv = """
-    <RadDetectorInformation id="rdi-1">
+    <RadDetectorInformation id="radiacode-csi-sipm">
         <RadDetectorCategoryCode>Gamma</RadDetectorCategoryCode>
         <RadDetectorKindCode>CsI</RadDetectorKindCode>
         <RadDetectorDescription>CsI:Tl scintillator, coupled to SiPM</RadDetectorDescription>

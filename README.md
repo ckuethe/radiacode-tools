@@ -144,3 +144,31 @@ apps.
 
 Configuring a reverse proxy and `WSGI` server for safe deployment of this server
 is beyond the scope of this document.
+
+### radiacode_poll.py
+
+```
+usage: radiacode_poll.py [-h] [-b MAC] [--accumulate-time TIME] [--accumulate] [-R] [--reset-dose]
+
+options:
+  -h, --help              show this help message and exit
+  -b MAC, --btaddr MAC    Bluetooth address of device; leave blank to use USB
+  --accumulate            Measure until interrupted with ^C
+  --accumulate-time TIME  Measure for a given amount of time (hh:mm:ss)
+  --reset-spectrum        Reset accumulated spectrum. Dangerous.
+  --reset-dose            Reset accumulated spectrum. Very Dangerous.
+```
+
+Poll a spectrum from a RadiaCode device. This script depends on the
+[radiacode](https://github.com/cdump/radiacode) python module, but should work with
+both bluetooth and USB connections. I've only tested this over USB though.
+
+When run without accumulation, the current, in-memory, spectrum will be downloaded.
+If either of the accumulation options are given, an initial spectrum will be captured
+and the script will delay. At the end of the delay, another spectrum will be captured
+and the intial spectrum will be subtracted. This will not reset the device state.
+
+Two options are given to reset the in-memory spectrum and the total accumulated dose.
+I'm calling them dangerous since they will delete data from device memory.
+
+NB. Dose accumulation doesn't work yet.
