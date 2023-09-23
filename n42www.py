@@ -112,7 +112,7 @@ def main() -> None:
 
     basicConfig(level=loglevel)
     n42srv.config["MAX_CONTENT_LENGTH"] = args.max_size
-    n42srv.run(host=args.bind_addr, port=args.port, load_dotenv=False, debug=wwwdebug)
+    n42srv.run(host=args.bind_addr, port=args.port, load_dotenv=False, debug=wwwdebug)  # codeql[py/flask-debug]
 
 
 if __name__ == "__main__":
