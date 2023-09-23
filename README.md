@@ -56,6 +56,10 @@ This tool converts a RadiaCode ("RC") spectrum XML file into
 [ANSI N42](https://www.nist.gov/pml/radiation-physics/ansiieee-n4242-2020-version)
 format for analysis with other tools such as
 [InterSpec](https://github.com/sandialabs/InterSpec).
+For my main use case - InterSpec interoperability - this tool has been
+somewhat superseded by [sandialabs/SpecUtils#15], but not everyone will
+be able to update their copy of InterSpec, and there are other tools for
+gamma spectroscopy so it's not completely useless.
 
 ```
 usage: n42convert.py [-h] -i NAME [-b NAME] [-o NAME | -r] [--overwrite] [-u UUID]
@@ -148,13 +152,20 @@ is beyond the scope of this document.
 ### radiacode_poll.py
 
 ```
-usage: radiacode_poll.py [-h] [-b MAC] [--accumulate-time TIME] [--accumulate] [-R] [--reset-dose]
+usage: radiacode_poll.py [-h] [-b MAC] [--accumulate | --accumulate-time TIME | --accumulate-dose DOSE] [--bgsub]  [--reset-spectrum] [--reset-dose] [outfile]
 
 options:
   -h, --help              show this help message and exit
   -b MAC, --btaddr MAC    Bluetooth address of device; leave blank to use USB
   --accumulate            Measure until interrupted with ^C
   --accumulate-time TIME  Measure for a given amount of time (hh:mm:ss)
+  --accumulate-dose DOSE  Measure until a certain dose has been accumulated (uSv)
+  -B, --bgsub             Produce a single spectrum measurement file containing only
+                          the difference between the initial spectrum and the final
+                          spectrum. The start time will be thetime the intial spectrum
+                          was captured. If not specified, the output file will contain
+                          the intial and final spectra, which can be subtracted in other
+                          tools.
   --reset-spectrum        Reset accumulated spectrum. Dangerous.
   --reset-dose            Reset accumulated spectrum. Very Dangerous.
 ```
@@ -164,11 +175,11 @@ Poll a spectrum from a RadiaCode device. This script depends on the
 both bluetooth and USB connections. I've only tested this over USB though.
 
 When run without accumulation, the current, in-memory, spectrum will be downloaded.
-If either of the accumulation options are given, an initial spectrum will be captured
-and the script will delay. At the end of the delay, another spectrum will be captured
-and the intial spectrum will be subtracted. This will not reset the device state.
+If any of the accumulation options are given, an initial spectrum will be captured
+and the script will delay. After the delay, another spectrum will be captured. If
+the `--bgsub` flag is given, the initial spectrum will be subtracted from the final
+spectrum and the result will be saved as Foreground; if not, the initial spectrum is
+included as a Background measurement, with the final spectrum as a Foreground.
 
 Two options are given to reset the in-memory spectrum and the total accumulated dose.
 I'm calling them dangerous since they will delete data from device memory.
-
-NB. Dose accumulation doesn't work yet.

@@ -4,5 +4,6 @@ matplotlib
 numpy
 radiacode
 requests
+tqdm
 xmlschema
 xmltodict
