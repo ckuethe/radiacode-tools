@@ -1,0 +1,8 @@
+defusedxml
+flask
+matplotlib
+numpy
+radiacode
+requests
+xmlschema
+xmltodict
