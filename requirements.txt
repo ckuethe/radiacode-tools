@@ -1,7 +1,6 @@
 defusedxml
 flask
-matplotlib
-numpy
+numpy>=1.22.2
 radiacode
 requests
 tqdm
