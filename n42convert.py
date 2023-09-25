@@ -20,7 +20,10 @@ def parse_spectrum(spectrum, check: bool = True):
         "name": spectrum["SpectrumName"],
         "device_serial_number": spectrum.get("SerialNumber", None),
         "calibration_order": int(spectrum["EnergyCalibration"]["PolynomialOrder"]),
-        "calibration_values": [float(f) for f in spectrum["EnergyCalibration"]["Coefficients"]["Coefficient"]],
+        "calibration_values": [
+            float(f)
+            for f in spectrum["EnergyCalibration"]["Coefficients"]["Coefficient"]
+        ],
         "duration": int(spectrum["MeasurementTime"]),
         "channels": int(spectrum["NumberOfChannels"]),
         "spectrum": [int(i) for i in spectrum["Spectrum"]["DataPoint"]],
@@ -45,7 +48,9 @@ def load_radiacode_spectrum(filename: str = None, fileobj: TextIOWrapper = None)
     else:
         raise ValueError("One of filename or fileobj are required")
 
-    sp = xmltodict.parse(ifd.read(), dict_constructor=dict)["ResultDataFile"]["ResultDataList"]["ResultData"]
+    sp = xmltodict.parse(ifd.read(), dict_constructor=dict)["ResultDataFile"][
+        "ResultDataList"
+    ]["ResultData"]
 
     fg = sp.get("EnergySpectrum")
     fg = parse_spectrum(fg)
@@ -145,8 +150,12 @@ def make_detector_info():
 def make_instrument_info(data):
     try:
         # Extract the serial number from the data file
-        serial_number = data.get("foreground", data.get("background"))["device_serial_number"]
-        serial_number = f"<RadInstrumentIdentifier>{serial_number}</RadInstrumentIdentifier>"
+        serial_number = data.get("foreground", data.get("background"))[
+            "device_serial_number"
+        ]
+        serial_number = (
+            f"<RadInstrumentIdentifier>{serial_number}</RadInstrumentIdentifier>"
+        )
     except KeyError:
         serial_number = ""
 
@@ -328,7 +337,9 @@ def process_single_fileobj(fileobj: TextIOWrapper) -> str:
     return n42data
 
 
-def process_single_file(fg_file=None, bg_file=None, out_file=None, uuid=None, overwrite=False) -> None:
+def process_single_file(
+    fg_file=None, bg_file=None, out_file=None, uuid=None, overwrite=False
+) -> None:
     "Read a data file and convert it"
     if out_file and os.path.exists(out_file) and overwrite is False:
         return  # shortcut for recursive mode

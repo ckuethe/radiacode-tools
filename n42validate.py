@@ -11,7 +11,9 @@ from xmlschema import XMLSchema
 from tempfile import mkstemp
 
 
-def fetch_or_load_xsd(schema_file="~/.cache/n42.xsd", schema_url="https://www.nist.gov/document/n42xsd") -> XMLSchema:
+def fetch_or_load_xsd(
+    schema_file="~/.cache/n42.xsd", schema_url="https://www.nist.gov/document/n42xsd"
+) -> XMLSchema:
     schema_file = os.path.expanduser(schema_file)
     schema_dir = os.path.dirname(schema_file)
     os.makedirs(schema_dir, exist_ok=True)

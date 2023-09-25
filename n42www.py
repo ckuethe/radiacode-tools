@@ -95,7 +95,13 @@ def get_args() -> Namespace:
         type=_port_num,
         help="Port on which to listen [%(default)s]",
     )
-    ap.add_argument("-v", "--verbose", action="count", default=0, help="increase verbosity for debugging")
+    ap.add_argument(
+        "-v",
+        "--verbose",
+        action="count",
+        default=0,
+        help="increase verbosity for debugging",
+    )
 
     return ap.parse_args()
 
@@ -110,12 +116,16 @@ def main() -> None:
             loglevel = INFO
         else:
             loglevel = DEBUG
-            args.bind_addr = "127.0.0.1"  # Only listen on localhost if debug mode is enabled
+            args.bind_addr = (
+                "127.0.0.1"  # Only listen on localhost if debug mode is enabled
+            )
             wwwdebug = True
 
     basicConfig(level=loglevel)
     n42srv.config["MAX_CONTENT_LENGTH"] = args.max_size
-    n42srv.run(host=args.bind_addr, port=args.port, load_dotenv=False, debug=wwwdebug)  # codeql[py/flask-debug]
+    n42srv.run(
+        host=args.bind_addr, port=args.port, load_dotenv=False, debug=wwwdebug
+    )  # codeql[py/flask-debug]
 
 
 if __name__ == "__main__":

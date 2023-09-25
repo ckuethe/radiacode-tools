@@ -35,7 +35,9 @@ def get_args() -> Namespace:
         metavar="MAC",
         help="Bluetooth address of device; leave blank to use USB",
     )
-    mx = ap.add_mutually_exclusive_group()  # only one way of accumulation may be selected
+    mx = (
+        ap.add_mutually_exclusive_group()
+    )  # only one way of accumulation may be selected
     mx.add_argument(
         "--accumulate",
         default=False,
@@ -212,7 +214,11 @@ def main() -> None:
                     t.close()
         elif args.accumulate_time:  # yep, for a fixed duration
             tx = dp(args.accumulate_time).time()
-            tx = int(timedelta(hours=tx.hour, minutes=tx.minute, seconds=tx.second).total_seconds())
+            tx = int(
+                timedelta(
+                    hours=tx.hour, minutes=tx.minute, seconds=tx.second
+                ).total_seconds()
+            )
 
             with tqdm(desc="Integration time", unit="s", total=tx) as t:
                 try:
