@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# coding: utf-8
+# vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syn=python
+# SPDX-License-Identifier: MIT
 
 from uuid import uuid4, UUID
 from textwrap import dedent
@@ -7,7 +10,7 @@ from argparse import ArgumentParser, Namespace
 import os
 from io import TextIOWrapper
 
-__version__ = "0.0.7"
+__version__ = "0.0.8"
 __creator__ = "https://github.com/ckuethe/radiacode-tools"
 
 
