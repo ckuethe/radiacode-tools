@@ -18,6 +18,7 @@ from typing import Dict
 from uuid import uuid4
 import sys
 import os
+import re
 
 
 def get_args() -> Namespace:
@@ -35,9 +36,7 @@ def get_args() -> Namespace:
         metavar="MAC",
         help="Bluetooth address of device; leave blank to use USB",
     )
-    mx = (
-        ap.add_mutually_exclusive_group()
-    )  # only one way of accumulation may be selected
+    mx = ap.add_mutually_exclusive_group()  # only one way of accumulation may be selected
     mx.add_argument(
         "--accumulate",
         default=False,
@@ -90,11 +89,30 @@ def get_args() -> Namespace:
 def get_device_id(dev: RadiaCode) -> Dict[str, str]:
     "Poll the device for all its identifiers"
     rv = {
-        "model": dev.fw_signature().split("=")[-1].replace('"', ""),
-        "fw_ver": dev.fw_version().split(" | ")[1].split()[2],
+        "fw": dev.fw_signature(),
+        "fv": dev.fw_version(),
         "hw_num": dev.hw_serial_number(),
         "sernum": dev.serial_number(),
     }
+    try:
+        f = re.search(
+            'Signature: (?P<fw_signature>[0-9A-F]{8}), FileName="(?P<fw_file>.+?)", IdString="(?P<product>.+?)"',
+            rv["fw"],
+        ).groupdict()
+        rv.update(f)
+        rv.pop("fw")
+    except (AttributeError, TypeError):
+        pass
+
+    try:
+        f = re.search(
+            "Boot version: (?P<boot_ver>[0-9.]+) (?P<boot_date>[A-Z].+?:\d{2}) [|] Target version: (?P<fw_ver>[0-9.]+) (?P<fw_date>[A-Z].+?:\d{2})",
+            rv["fv"],
+        ).groupdict()
+        rv.update(f)
+        rv.pop("fv")
+    except (AttributeError, TypeError):
+        pass
     return rv
 
 
@@ -214,11 +232,7 @@ def main() -> None:
                     t.close()
         elif args.accumulate_time:  # yep, for a fixed duration
             tx = dp(args.accumulate_time).time()
-            tx = int(
-                timedelta(
-                    hours=tx.hour, minutes=tx.minute, seconds=tx.second
-                ).total_seconds()
-            )
+            tx = int(timedelta(hours=tx.hour, minutes=tx.minute, seconds=tx.second).total_seconds())
 
             with tqdm(desc="Integration time", unit="s", total=tx) as t:
                 try:
