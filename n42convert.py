@@ -10,7 +10,7 @@ from argparse import ArgumentParser, Namespace
 import os
 from io import TextIOWrapper
 
-__version__ = "0.0.8"
+__version__ = "0.0.9"
 __creator__ = "https://github.com/ckuethe/radiacode-tools"
 
 
@@ -51,6 +51,9 @@ def load_radiacode_spectrum(filename: str = None, fileobj: TextIOWrapper = None)
     sp = xmltodict.parse(ifd.read(), dict_constructor=dict)["ResultDataFile"][
         "ResultDataList"
     ]["ResultData"]
+
+    if filename:
+        ifd.close()
 
     fg = sp.get("EnergySpectrum")
     fg = parse_spectrum(fg)
