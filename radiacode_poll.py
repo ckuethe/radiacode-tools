@@ -66,6 +66,13 @@ def get_args() -> Namespace:
         + "contain the intial and final spectra, which can be subtracted in other tools.",
     )
     ap.add_argument(
+        "-q",
+        "--qrcode",
+        default=False,
+        action="store_true",
+        help="Generate a RADDATA QR code. See Sandia Report SAND2023-10003 for more details",
+    )
+    ap.add_argument(
         "--reset-spectrum",
         default=False,
         action="store_true",

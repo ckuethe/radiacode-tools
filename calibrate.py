@@ -162,9 +162,7 @@ def get_args() -> Namespace:
     return ap.parse_args()
 
 
-def rsquared(
-    xlist: Iterable[Numeric], ylist: Iterable[Numeric], coeffs: Iterable[Numeric]
-) -> float:
+def rsquared(xlist: Iterable[Numeric], ylist: Iterable[Numeric], coeffs: Iterable[Numeric]) -> float:
     """
     Compute R^2 for the fit model
 
@@ -199,9 +197,7 @@ def main() -> None:
 
     print(f"data range: {data[0]} - {data[-1]}")
 
-    pf = Polynomial.fit(
-        chan, energy, deg=args.order, window=[min(chan), max(chan)]
-    ).coef
+    pf = Polynomial.fit(chan, energy, deg=args.order, window=[min(chan), max(chan)]).coef
     pf = [round(f, args.precision) for f in pf]
     print(f"x^0 .. x^{args.order}: {pf}")
     rsquared(chan, energy, pf)

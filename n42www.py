@@ -116,9 +116,7 @@ def main() -> None:
             loglevel = INFO
         else:
             loglevel = DEBUG
-            args.bind_addr = (
-                "127.0.0.1"  # Only listen on localhost if debug mode is enabled
-            )
+            args.bind_addr = "127.0.0.1"  # Only listen on localhost if debug mode is enabled
             wwwdebug = True
 
     basicConfig(level=loglevel)
