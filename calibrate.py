@@ -10,6 +10,7 @@ from tempfile import mkstemp
 import os
 from typing import NoReturn, List, Tuple, Union, Iterable
 import json
+from sys import exit
 
 Numeric = Union[int, float]
 
