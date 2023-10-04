@@ -1,6 +1,7 @@
 defusedxml
 flask
 numpy>=1.22.2
+qrcode
 radiacode
 requests
 tqdm

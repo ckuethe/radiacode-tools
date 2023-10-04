@@ -4,6 +4,7 @@
 # SPDX-License-Identifier: MIT
 
 import n42convert
+import radqr
 import importlib.metadata
 import warnings
 from argparse import ArgumentParser, Namespace
@@ -16,6 +17,9 @@ from time import sleep
 from tqdm.auto import tqdm
 from typing import Dict
 from uuid import uuid4
+from urllib.parse import quote_plus
+from zlib import compress as deflate
+import qrcode
 import sys
 import os
 import re
@@ -89,6 +93,8 @@ def get_args() -> Namespace:
 
     # post-processing stages.
     rv.a = any([rv.accumulate, rv.accumulate_time, rv.accumulate_dose])
+    if rv.qrcode:
+        rv.bgsub = True
 
     return rv
 
@@ -134,7 +140,7 @@ def make_instrument_info(dev_id: Dict[str, str]):
     <RadInstrumentInformation id="rii-{dev_id["hw_num"]}">
         <RadInstrumentManufacturerName>Radiacode</RadInstrumentManufacturerName>
         <RadInstrumentIdentifier>{dev_id["sernum"]}</RadInstrumentIdentifier>
-        <RadInstrumentModelName>{dev_id["model"]}</RadInstrumentModelName>
+        <RadInstrumentModelName>{dev_id["product"]}</RadInstrumentModelName>
         <RadInstrumentClassCode>Spectroscopic Personal Radiation Detector</RadInstrumentClassCode>
       
         <RadInstrumentVersion>
@@ -225,7 +231,7 @@ def main() -> None:
 
     dev_id = get_device_id(dev)
     measurement = dev.spectrum()  # Always grab a spectrum to start
-
+    obs_start = datetime.utcnow()
     if args.a:  # are we accumulating measurements over time?
         # suppress tqdm warnings when we exceed the expected maximum
         warnings.filterwarnings("ignore", module="tqdm")
@@ -317,9 +323,27 @@ def main() -> None:
     if args.outfile:
         tfd, tfn = mkstemp(dir=".")
         os.close(tfd)
-        ofd = open(tfn, "w")
 
-    print(data, file=ofd)
+    if args.qrcode:
+        enc_opts = radqr.OPT_CSV_SPECTRUM
+        enc_opts, msg = radqr.make_qr_payload(
+            lr_times=[measurement.duration.total_seconds()] * 2,
+            spectrum=measurement.counts,
+            calibration=[measurement.a0, measurement.a1, measurement.a2],
+            detector_model=f"{dev_id['product']} {dev_id['sernum']}",
+            mclass="F",
+            timestamp=obs_start,
+            options=enc_opts,
+        )
+        qbody = quote_plus(radqr.b45_encode(deflate(msg)))
+        url = f"RADDATA://G0/{enc_opts:02x}00/{qbody}"
+        qc = qrcode.QRCode()
+        qc.add_data(url)
+        ofd = open(tfn, "wb")
+        qc.make_image().save(ofd)
+    else:
+        ofd = open(tfn, "w")
+        print(data, file=ofd)
 
     if args.outfile:
         ofd.close()
