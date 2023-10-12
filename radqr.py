@@ -127,6 +127,12 @@ def vbyte_encode(numbers: List[int]) -> bytes:
                 raise RuntimeError("something impossible happened")
 
         control_bytes.append(struct.pack("<B", cb))
+        # Documentation of vbyte is pretty bad about dealing with partial blocks. There isn't any
+        # in-band length indication so [0 0] doesn't tell me if there is a single zero or the data
+        # got truncated in transit. It would be nicer if one could rely on having a multiple of
+        # four encoded ints in the data stream.
+        if npad:
+            data_bytes = data_bytes[:payload_len]
     return b"".join([struct.pack("<H", payload_len), b"".join(control_bytes), b"".join(data_bytes)])
 
 
