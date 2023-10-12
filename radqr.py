@@ -96,7 +96,7 @@ def rle0_decode(l: List[int]) -> List[int]:
 
 def vbyte_encode(numbers: List[int]) -> bytes:
     "Compress a list of ints using variable length encoding. Much smaller than encoding everything as uint32 or strings"
-    if all([0 <= i < 0xFFFFFFFF for i in numbers]) is False:
+    if all([0 <= i <= 0xFFFFFFFF for i in numbers]) is False:
         raise ValueError("All values must fit into unsigned 32-bit integer")
 
     payload_len = len(numbers)
