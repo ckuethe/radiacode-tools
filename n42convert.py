@@ -45,12 +45,17 @@ def load_radiacode_spectrum(filename: str = None, fileobj: TextIOWrapper = None)
     else:
         raise ValueError("One of filename or fileobj are required")
 
-    sp = xmltodict.parse(ifd.read(), dict_constructor=dict)["ResultDataFile"]["ResultDataList"]["ResultData"]
+    try:
+        sp = xmltodict.parse(ifd.read(), dict_constructor=dict)["ResultDataFile"]["ResultDataList"]["ResultData"]
+    except Exception:  # something went wrong
+        if filename:  # don't leak the fd
+            ifd.close()
+        raise  # let the caller figure out what to do next
 
     if filename:
         ifd.close()
 
-    fg = sp.get("EnergySpectrum")
+    fg = sp["EnergySpectrum"]  # let this raise if the spectrum is missing. No foreground = not useful
     fg = parse_spectrum(fg)
     try:
         bg = sp.get("BackgroundEnergySpectrum")
