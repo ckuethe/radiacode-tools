@@ -14,7 +14,7 @@ from typing import Union, List, Dict, Tuple, Optional, Any
 
 Number = Union[float, int]
 
-B45C = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ $%*+-./:"
+_B45C = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ $%*+-./:"
 OPT_NO_DEFLATE = 0x01
 OPT_NO_BASE_X = 0x02
 OPT_USE_BASE64 = 0x10
@@ -23,6 +23,7 @@ OPT_NO_SPEC_RLE0 = 0x08
 
 
 def b45_encode(s: Union[str, bytearray]) -> str:
+    "Encode a string or bytearray into a base45 ASCII *string*"
     rv = []
     if isinstance(s, str):
         s = bytearray(s, "utf-8")
@@ -37,7 +38,7 @@ def b45_encode(s: Union[str, bytearray]) -> str:
         r, x = divmod(intval, 45)
         z, y = divmod(r, 45)
 
-        rv.extend([B45C[c] for c in (x, y, z)])
+        rv.extend([_B45C[c] for c in (x, y, z)])
 
     if padded:
         rv.pop(-1)
@@ -45,10 +46,14 @@ def b45_encode(s: Union[str, bytearray]) -> str:
 
 
 def b45_decode(s: str) -> bytes:
+    """
+    Decode a base45 ASCII string into bytes; original content may have been bytes.
+    This will raise if an input character is not found in the _B45C character set.
+    """
     rv = []
     padded = False
     for i in range(0, len(s), 3):
-        v = [B45C.index(c) for c in s[i : i + 3]]
+        v = [_B45C.index(c) for c in s[i : i + 3]]
         if len(v) < 3:
             v.extend([0] * (3 - len(v)))
             padded = True
@@ -95,7 +100,10 @@ def rle0_decode(l: List[int]) -> List[int]:
 
 
 def vbyte_encode(numbers: List[int]) -> bytes:
-    "Compress a list of ints using variable length encoding. Much smaller than encoding everything as uint32 or strings"
+    """
+    Compress a list of uint32 using variable length encoding. Much smaller than encoding everything as
+    four byte ints or strings (up to 9 characters each). To be clear: every value must fit into uint32.
+    """
     if all([0 <= i <= 0xFFFFFFFF for i in numbers]) is False:
         raise ValueError("All values must fit into unsigned 32-bit integer")
 
@@ -120,11 +128,9 @@ def vbyte_encode(numbers: List[int]) -> bytes:
             elif n <= 0xFFFFFF:
                 cb |= 2 << (2 * k)
                 data_bytes.append(struct.pack("<I", n)[0:3])
-            elif n <= 0xFFFFFFFF:
+            else:  # don't need to explicitly check that n <= 0xFFFFFFFF
                 cb |= 3 << (2 * k)
                 data_bytes.append(struct.pack("<I", n))
-            else:
-                raise RuntimeError("something impossible happened")
 
         control_bytes.append(struct.pack("<B", cb))
         # Documentation of vbyte is pretty bad about dealing with partial blocks. There isn't any
@@ -148,8 +154,8 @@ def vbyte_decode(vbz: bytes) -> List[int]:
     ctl_bytes = vbz[hl : hl + nctl]
     data_bytes = vbz[hl + nctl :] + b"\0\0\0\0"
 
-    for i, b in enumerate(ctl_bytes):
-        nb = [((b >> (2 * k)) & 0x03) + 1 for k in range(4)]
+    for cb in ctl_bytes:
+        nb = [((cb >> (2 * k)) & 0x03) + 1 for k in range(4)]
         for bl in nb:
             if bl == 1:
                 rv.append(data_bytes[nn])
@@ -160,18 +166,26 @@ def vbyte_decode(vbz: bytes) -> List[int]:
             if bl == 4:
                 rv.append(struct.unpack("<I", data_bytes[nn : nn + bl])[0])
             nn += bl
+
     return rv[:payload_len]
 
 
-def extract_metadata(s: str, debug=False) -> Dict[str, Any]:
+def extract_metadata(uri: str, debug=False) -> Dict[str, Any]:
     "Given a RADDATA URL, produce a dict of metadata and the payload"
     rv = re.match(
-        "^RADDATA://G(?P<specver>\d)/(?P<options>[0-9a-f]{1,2})(?P<n_uris>\d)(?P<n_spectra>\d)/(?P<data>.+)",
-        s,
+        "^(RADDATA|INTERSPEC)://G(?P<specver>\d)/(?P<options>[0-9a-f]{1,2})(?P<n_uris>[0-9a-f])(?P<n_spectra>[0-9a-f])/(?P<data>.+)",
+        uri,
         re.I | re.S | re.M,
     ).groupdict()
     for f in ["specver", "n_uris", "n_spectra", "options"]:
         rv[f] = int(rv[f], 16)
+
+    if rv["specver"] not in [0]:
+        raise ValueError("Unsupported Version")
+
+    valid_opts = 0x1F
+    if rv["options"] & 0xFF > valid_opts:
+        raise ValueError("Undefined option bits set")
 
     rv["deflated"] = False if rv["options"] & OPT_NO_DEFLATE else True
     rv["base_x_encoded"] = False if rv["options"] & OPT_NO_BASE_X else True
@@ -187,7 +201,7 @@ def extract_metadata(s: str, debug=False) -> Dict[str, Any]:
     return rv
 
 
-def parse_payload_fields(s: bytes, debug=False) -> Dict[str, Any]:
+def parse_payload_fields(msg: bytes, debug=False) -> Dict[str, Any]:
     """
     The payload can have a variable number of fields - k:v pairs - only two of which are
     required: live/real times (T) and the actual spectrum (S) data. The spectrum must be
@@ -195,7 +209,7 @@ def parse_payload_fields(s: bytes, debug=False) -> Dict[str, Any]:
 
     This function does no quality checks, it just tries to
     """
-    fields_data, spec_data = re.search(b"^([A-Z]:.*?)(?: S:)(.*)$", s, re.M | re.I | re.S | re.DOTALL).groups()
+    fields_data, spec_data = re.search(b"^([A-Z]:.*?)(?: S:)(.*)$", msg, re.M | re.I | re.S | re.DOTALL).groups()
     rv = dict()
 
     if debug:
@@ -231,7 +245,7 @@ def parse_payload_fields(s: bytes, debug=False) -> Dict[str, Any]:
         elif "O" == k:
             rv["comment"] = v.strip()
         else:
-            print(f"Unknown field: {k}")
+            raise ValueError(f"Unknown field: {k}")
 
     rv["spec_data"] = spec_data
     return rv
@@ -368,7 +382,7 @@ def make_qr_payload(
             fields.append(f"C:{cx}".encode())
 
     if (isinstance(lr_times, tuple) or isinstance(lr_times, list)) and len(lr_times) == 2:
-        _ = float(lr_times[0]) / float(lr_times[1])  # cause an exception unless these are both numeric
+        _ = float(lr_times[0]) ** float(lr_times[1])  # cause an exception unless these are both numeric
         if lr_times[0] > lr_times[1]:
             raise ValueError("live time cannot be greater than real time")
     else:
