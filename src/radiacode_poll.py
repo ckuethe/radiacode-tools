@@ -10,7 +10,7 @@ import warnings
 from argparse import ArgumentParser, Namespace
 from dateutil.parser import parse as dp
 from datetime import timedelta, datetime
-from radiacode import RadiaCode, Spectrum
+import radiacode
 from tempfile import mkstemp
 from textwrap import dedent
 from time import sleep
@@ -69,7 +69,15 @@ def get_args() -> Namespace:
         + "time the intial spectrum was captured. If not specified, the output file will"
         + "contain the intial and final spectra, which can be subtracted in other tools.",
     )
-    ap.add_argument(
+    ux = ap.add_mutually_exclusive_group()
+    ux.add_argument(
+        "-u",
+        "--url",
+        default=False,
+        action="store_true",
+        help="Generate a RADDATA url. See Sandia Report SAND2023-10003 for more details",
+    )
+    ux.add_argument(
         "-q",
         "--qrcode",
         default=False,
@@ -99,7 +107,7 @@ def get_args() -> Namespace:
     return rv
 
 
-def get_device_id(dev: RadiaCode) -> Dict[str, str]:
+def get_device_id(dev: radiacode.RadiaCode) -> Dict[str, str]:
     "Poll the device for all its identifiers"
     rv = {
         "fw": dev.fw_signature(),
@@ -109,7 +117,7 @@ def get_device_id(dev: RadiaCode) -> Dict[str, str]:
     }
     try:
         f = re.search(
-            'Signature: (?P<fw_signature>[0-9A-F]{8}), FileName="(?P<fw_file>.+?)", IdString="(?P<product>.+?)"',
+            r'Signature: (?P<fw_signature>[0-9A-F]{8}), FileName="(?P<fw_file>.+?)", IdString="(?P<product>.+?)"',
             rv["fw"],
         ).groupdict()
         rv.update(f)
@@ -119,7 +127,7 @@ def get_device_id(dev: RadiaCode) -> Dict[str, str]:
 
     try:
         f = re.search(
-            "Boot version: (?P<boot_ver>[0-9.]+) (?P<boot_date>[A-Z].+?:\d{2}) [|] Target version: (?P<fw_ver>[0-9.]+) (?P<fw_date>[A-Z].+?:\d{2})",
+            r"Boot version: (?P<boot_ver>[0-9.]+) (?P<boot_date>[A-Z].+?:\d{2}) [|] Target version: (?P<fw_ver>[0-9.]+) (?P<fw_date>[A-Z].+?:\d{2})",
             rv["fv"],
         ).groupdict()
         rv.update(f)
@@ -131,10 +139,7 @@ def get_device_id(dev: RadiaCode) -> Dict[str, str]:
 
 def make_instrument_info(dev_id: Dict[str, str]):
     "Create the N42 RadInstrumentInformation element"
-    try:
-        radiacode_ver = importlib.metadata.version("radiacode")
-    except importlib.metadata.PackageNotFoundError:
-        radiacode_ver = "Unknown"
+    radiacode_ver = importlib.metadata.version("radiacode")
 
     rv = f"""
     <RadInstrumentInformation id="rii-{dev_id["hw_num"]}">
@@ -160,7 +165,7 @@ def make_instrument_info(dev_id: Dict[str, str]):
     return dedent(rv).strip()
 
 
-def format_spectrum(hw_num: str, res: Spectrum, bg: bool = False):
+def format_spectrum(hw_num: str, res: radiacode.Spectrum, bg: bool = False):
     "format a radiacode.Spectrum to be printed by n42convert"
     md = res.duration.total_seconds()
     count_str = " ".join([str(i) for i in res.counts])
@@ -197,7 +202,7 @@ def format_spectrum(hw_num: str, res: Spectrum, bg: bool = False):
     return dedent(cal_str), dedent(spec_str)
 
 
-def spec_dose(s: Spectrum) -> float:
+def spec_dose(s: radiacode.Spectrum) -> float:
     "Given a Spectrum, return an estimate of the total absorbed dose in uSv"
     # According to the Health Physics Society:
     #     Radiation absorbed dose and effective dose in the international system
@@ -223,7 +228,7 @@ def spec_dose(s: Spectrum) -> float:
 
 def main() -> None:
     args = get_args()
-    dev = RadiaCode(args.btaddr)
+    dev = radiacode.RadiaCode(args.btaddr)
     if args.reset_spectrum:
         dev.spectrum_reset()
     if args.reset_dose:
@@ -280,7 +285,7 @@ def main() -> None:
             # Subtract initial measurement to get just the accumulated data
             dt = measurement1.duration - measurement.duration
             dc = [x[1] - x[0] for x in zip(measurement.counts, measurement1.counts)]
-            dm = Spectrum(
+            dm = radiacode.Spectrum(
                 duration=dt,
                 a0=measurement1.a0,
                 a1=measurement1.a1,
@@ -323,8 +328,10 @@ def main() -> None:
     if args.outfile:
         tfd, tfn = mkstemp(dir=".")
         os.close(tfd)
+    else:
+        tfn = "/dev/stdout"
 
-    if args.qrcode:
+    if args.url or args.qrcode:
         enc_opts = radqr.OPT_CSV_SPECTRUM
         enc_opts, msg = radqr.make_qr_payload(
             lr_times=[measurement.duration.total_seconds()] * 2,
@@ -336,11 +343,16 @@ def main() -> None:
             options=enc_opts,
         )
         qbody = quote_plus(radqr.b45_encode(deflate(msg)))
-        url = f"RADDATA://G0/{enc_opts:02x}00/{qbody}"
-        qc = qrcode.QRCode()
-        qc.add_data(url)
-        ofd = open(tfn, "wb")
-        qc.make_image().save(ofd)
+        url = f"RADDATA://G0/{enc_opts:02X}00/{qbody}"
+        if args.qrcode:
+            qc = qrcode.QRCode()
+            qc.add_data(url)
+            ofd = open(tfn, "wb")
+            qc.make_image().save(ofd)
+        else:
+            ofd = open(tfn, "w")
+            print(url, file=ofd)
+
     else:
         ofd = open(tfn, "w")
         print(data, file=ofd)

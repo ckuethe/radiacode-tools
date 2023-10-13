@@ -3,7 +3,7 @@
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syn=python
 # SPDX-License-Identifier: MIT
 
-from flask import Flask, request, abort, send_file
+from flask import Flask, request, abort, Response, send_file
 from argparse import ArgumentParser, Namespace
 from logging import Logger, getLogger, DEBUG, INFO, WARNING, basicConfig
 from n42convert import process_single_fileobj
@@ -57,17 +57,17 @@ def handle_convert():
     return send_file(
         BytesIO(converted.encode()),
         mimetype="application/octet-stream",
-        attachment_filename=filename,
-        cache_timeout=1,
+        download_name=filename,
+        max_age=1,
     )
 
 
 def get_args() -> Namespace:
     ap = ArgumentParser()
 
-    def _port_num(x):
+    def _port_num(x) -> int:
         i = int(x)
-        if 0 < x < 65535:
+        if 0 < i < 65536:
             return i
         raise ValueError("invalid port number")
 

@@ -173,7 +173,7 @@ def vbyte_decode(vbz: bytes) -> List[int]:
 def extract_metadata(uri: str, debug=False) -> Dict[str, Any]:
     "Given a RADDATA URL, produce a dict of metadata and the payload"
     rv = re.match(
-        "^(RADDATA|INTERSPEC)://G(?P<specver>\d)/(?P<options>[0-9a-f]{1,2})(?P<n_uris>[0-9a-f])(?P<n_spectra>[0-9a-f])/(?P<data>.+)",
+        r"^(RADDATA|INTERSPEC)://G(?P<specver>\d)/(?P<options>[0-9a-f]{1,2})(?P<n_uris>[0-9a-f])(?P<n_spectra>[0-9a-f])/(?P<data>.+)",
         uri,
         re.I | re.S | re.M,
     ).groupdict()
@@ -358,7 +358,7 @@ def make_qr_payload(
             raise ValueError("neutron count cannot be negative")
 
     if deviations:
-        if isinstance(deviations, tuple):
+        if isinstance(deviations, list) or isinstance(deviations, tuple):
             dx = []
             for i in deviations:
                 if len(i) != 2:
@@ -382,7 +382,7 @@ def make_qr_payload(
             fields.append(f"C:{cx}".encode())
 
     if (isinstance(lr_times, tuple) or isinstance(lr_times, list)) and len(lr_times) == 2:
-        _ = float(lr_times[0]) ** float(lr_times[1])  # cause an exception unless these are both numeric
+        _ = float(lr_times[0]) - float(lr_times[1])  # cause an exception unless these are both numeric
         if lr_times[0] > lr_times[1]:
             raise ValueError("live time cannot be greater than real time")
     else:

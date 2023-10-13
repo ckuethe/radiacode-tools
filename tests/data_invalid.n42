@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<?xml-model href="http://physics.nist.gov/N42/2011/schematron/n42.sch" type="application/xml" schematypens="http://purl.oclc.org/dsdl/schematron"?>
+<!-- this file should not validate. elements are missing or out of order  -->
+<RadInstrumentData xmlns="http://physics.nist.gov/N42/2011/N42" 
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+                   xsi:schemaLocation="http://physics.nist.gov/N42/2011/N42 http://physics.nist.gov/N42/2011/n42.xsd" 
+                   n42DocUUID="3903bd1f-948e-4d36-85b4-fc1bc2420bfc">
+
+    <RadInstrumentInformation id="rii">
+        <RadInstrumentManufacturerName>Radiacode</RadInstrumentManufacturerName>
+        <RadInstrumentModelName>RadiaCode-102</RadInstrumentModelName>
+        <RadInstrumentClassCode>Spectroscopic Personal Radiation Detector</RadInstrumentClassCode>
+	</RadInstrumentInformation>
+    <RadMeasurement id="rm"> <Remark>Bogus</Remark> </RadMeasurement>
+    <EnergyCalibration id="ec"> <CoefficientValues>-1.0 2.0 </CoefficientValues> </EnergyCalibration>
+
+</RadInstrumentData>

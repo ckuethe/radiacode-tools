@@ -1,0 +1,69 @@
+<?xml version="1.0"?>
+    <?xml-model href="http://physics.nist.gov/N42/2011/schematron/n42.sch" type="application/xml" schematypens="http://purl.oclc.org/dsdl/schematron"?>
+    <RadInstrumentData xmlns="http://physics.nist.gov/N42/2011/N42" 
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+                   xsi:schemaLocation="http://physics.nist.gov/N42/2011/N42 http://physics.nist.gov/N42/2011/n42.xsd" 
+                   n42DocUUID="3903bd1f-948e-4d36-85b4-fc1bc2420bfc">
+
+    <!-- What created this file? -->
+    <RadInstrumentDataCreatorName>https://github.com/ckuethe/radiacode-tools</RadInstrumentDataCreatorName>
+
+    <!-- What product was used to gather the data? -->
+    <RadInstrumentInformation id="rii-1">
+    <RadInstrumentManufacturerName>Radiacode</RadInstrumentManufacturerName>
+    <RadInstrumentIdentifier>RC-102-000115</RadInstrumentIdentifier>
+    <RadInstrumentModelName>RadiaCode-102</RadInstrumentModelName>
+    <RadInstrumentClassCode>Spectroscopic Personal Radiation Detector</RadInstrumentClassCode>
+
+    <!-- I have a feature request to include firmware and app version in the exported xml files. -->
+    <RadInstrumentVersion>
+        <RadInstrumentComponentName>Firmware</RadInstrumentComponentName>
+        <RadInstrumentComponentVersion>4.06</RadInstrumentComponentVersion>
+    </RadInstrumentVersion>
+    <RadInstrumentVersion>
+        <RadInstrumentComponentName>App</RadInstrumentComponentName>
+        <RadInstrumentComponentVersion>1.42.00</RadInstrumentComponentVersion>
+    </RadInstrumentVersion>
+    <RadInstrumentVersion>
+        <RadInstrumentComponentName>Converter</RadInstrumentComponentName>
+        <RadInstrumentComponentVersion>0.0.9</RadInstrumentComponentVersion>
+    </RadInstrumentVersion>
+</RadInstrumentInformation>
+
+    <!-- What detection technology is used? -->
+    <RadDetectorInformation id="radiacode-csi-sipm">
+    <RadDetectorCategoryCode>Gamma</RadDetectorCategoryCode>
+    <RadDetectorKindCode>CsI</RadDetectorKindCode>
+    <RadDetectorDescription>CsI:Tl scintillator, coupled to SiPM</RadDetectorDescription>
+    <RadDetectorLengthValue units="mm">10</RadDetectorLengthValue>
+    <RadDetectorWidthValue units="mm">10</RadDetectorWidthValue>
+    <RadDetectorDepthValue units="mm">10</RadDetectorDepthValue>
+    <RadDetectorVolumeValue units="cc">1</RadDetectorVolumeValue>
+</RadDetectorInformation>
+
+    <!-- Calibration factors, mapping channel/bin to energy level. Foreground and background may have separate calibrations-->
+    <EnergyCalibration id="ec-fg">
+    <CoefficientValues>-6.2832313 2.4383054 0.0003818 </CoefficientValues>
+</EnergyCalibration>
+
+
+
+    <!-- Primary spectrum in this file-->
+    <RadMeasurement id="rm-fg">
+    <Remark>Title: Am-241</Remark>
+    <MeasurementClassCode>Foreground</MeasurementClassCode>
+    <StartDateTime>2023-06-07T05:52:00</StartDateTime>
+    <RealTimeDuration>PT613S</RealTimeDuration>
+    <Spectrum id="rm-fg-sp" radDetectorInformationReference="radiacode-csi-sipm" energyCalibrationReference="ec-fg"> 
+        <LiveTimeDuration>PT613S</LiveTimeDuration>
+        <ChannelData compressionCode="None">
+            1429 2607 915 803 1977 3245 5057 5331 14273 15139 13384 11571 10508 8284 6243 3884 2471 1371 961 987 1659 2576 4986 7495 11906 17573 23557 23506 25887 23220 18503 12885 8137 4956 2812 1092 638 306 182 127 124 108 101 86 103 96 105 83 77 92 71 66 67 62 65 50 64 55 50 59 47 41 33 36 35 29 48 34 18 37 25 28 33 29 32 25 31 31 35 23 32 19 25 25 25 20 20 28 21 22 14 10 21 12 19 11 15 16 24 12 16 17 21 11 15 9 12 13 12 10 8 15 8 12 6 7 4 13 13 12 7 7 9 8 7 12 8 6 8 12 9 6 6 6 9 9 8 8 8 7 9 11 5 6 5 6 3 7 5 5 7 7 5 5 6 1 1 3 5 5 2 4 6 1 4 3 5 3 4 3 6 6 4 3 4 2 3 6 2 0 7 2 5 5 3 1 1 1 5 4 0 2 2 1 2 0 3 1 1 3 2 3 3 1 2 2 2 2 1 1 1 1 3 2 2 1 2 1 1 1 5 0 3 0 2 1 3 1 2 3 3 1 2 2 1 1 2 2 2 4 2 3 0 3 4 3 3 2 3 3 4 0 3 4 1 3 1 3 2 0 3 2 1 1 1 2 1 0 0 1 1 1 0 4 2 0 2 2 0 0 2 1 0 0 3 0 3 0 1 0 0 1 2 0 1 2 1 2 0 1 2 3 0 3 2 0 2 1 1 1 0 1 3 0 1 0 1 0 1 1 2 2 0 0 2 0 0 2 0 0 1 0 1 1 1 1 1 0 1 1 1 1 0 0 1 0 2 0 0 0 1 3 2 1 0 2 2 1 0 1 0 1 0 1 0 0 0 0 2 0 0 0 2 1 1 1 1 0 2 0 0 1 2 0 0 1 0 0 0 3 3 1 1 1 1 0 0 0 0 2 0 0 1 0 1 0 0 0 1 1 0 2 0 2 1 0 2 1 0 0 0 2 2 0 0 1 1 1 0 0 0 2 0 1 0 0 0 0 0 1 0 0 0 0 0 1 0 1 1 1 2 0 0 0 0 0 2 1 0 0 0 1 0 0 1 0 0 1 0 1 1 0 1 2 0 0 1 0 0 1 0 1 1 1 0 0 0 1 1 1 1 1 1 0 1 0 0 1 0 0 0 0 0 0 1 2 0 0 1 1 0 2 0 2 0 0 0 3 1 0 0 0 1 1 0 2 0 0 0 0 0 0 0 0 0 0 1 0 1 0 0 0 0 1 0 2 0 0 1 0 1 0 0 1 0 1 1 1 0 0 0 0 0 0 0 0 1 0 0 0 0 1 1 1 0 0 0 0 2 0 0 0 0 0 0 0 0 0 0 0 1 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 1 0 0 0 0 1 1 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 1 0 0 1 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 1 0 1 1 0 0 0 0 1 1 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 2 0 0 0 0 0 0 0 0 0 1 1 0 1 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+        </ChannelData> 
+    </Spectrum>
+</RadMeasurement>
+
+    <!-- N42 can transport multiple spectra; If present, this will be used as background -->
+
+
+    <!-- All done! -->
+    </RadInstrumentData>

@@ -15,15 +15,18 @@ def fetch_or_load_xsd(schema_file="~/.cache/n42.xsd", schema_url="https://www.ni
     schema_file = os.path.expanduser(schema_file)
     schema_dir = os.path.dirname(schema_file)
     os.makedirs(schema_dir, exist_ok=True)
-    if not os.path.exists(schema_file):
+    if not os.path.exists(schema_file) or 0 == os.path.getsize(schema_file):
         resp = requests.get(schema_url, timeout=10)
         if resp.ok:
-            tfd, tfn = mkstemp(dir=schema_dir)
+            tfd, tfn = mkstemp(prefix="schema_", dir=schema_dir)
             print(tfn)
             os.close(tfd)
             with open(tfn, "w") as ofd:
                 ofd.write(resp.text)
             os.rename(tfn, schema_file)
+        else:
+            raise RuntimeError("Unable to fetch schema")
+
     return XMLSchema(schema_file)
 
 

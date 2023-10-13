@@ -9,6 +9,7 @@ import xmltodict
 from argparse import ArgumentParser, Namespace
 import os
 from io import TextIOWrapper
+from typing import List, Any
 
 __version__ = "0.0.9"
 __creator__ = "https://github.com/ckuethe/radiacode-tools"
@@ -28,6 +29,9 @@ def parse_spectrum(spectrum, check: bool = True):
 
     if check and (len(rv["spectrum"]) != rv["channels"]):
         raise ValueError("spectrum length != number of channels")
+
+    if check and (2 != rv["calibration_order"]):
+        raise ValueError("invalid calibration order")
 
     if check and (len(rv["calibration_values"]) != rv["calibration_order"] + 1):
         raise ValueError("Inconsistent calibration polynomial")
@@ -74,8 +78,10 @@ def load_radiacode_spectrum(filename: str = None, fileobj: TextIOWrapper = None)
     return rv
 
 
-def squareformat(a, columns=16):
-    "reformat the a long list of numbers as some nice lines"
+def squareformat(a: List[Any], columns: int = 16):
+    "reformat the a long list of numbers (any elements, actually) as some nice lines"
+    if columns < 1:
+        raise ValueError("Columns must be greater than zero")
     rv = []
     for x in range(columns):
         line = " ".join([f"{i:5}" for i in a[x * columns : (x + 1) * columns]])
@@ -83,8 +89,9 @@ def squareformat(a, columns=16):
     return "\n".join(rv)
 
 
-def stringify(a):
-    return " ".join([f"{x}" for x in a])
+def stringify(a: List[Any], c: str = " ") -> str:
+    "Make a string out of a list of things, nicer than str(list(...))"
+    return c.join([f"{x}" for x in a])
 
 
 def format_calibration(spectrum, fg=True):
@@ -181,38 +188,6 @@ def make_instrument_info(data):
     </RadInstrumentInformation>
     """
     return dedent(rv).strip()
-
-
-def make_fwhm_cal() -> str:
-    # These were taken from a single device, and a small number of sources.
-    # If this calibration is valid at all (and I'm not sure about that), it
-    # is probably only valid for my device
-    cal_items = [
-        (60, 17),
-        (77, 19),
-        (239, 43),
-        (357, 47),
-        (511, 56),
-        (609, 58),
-        (911, 102),
-        (1275, 90),
-        (1449, 96),
-        (1588, 113),
-        (2204, 120),
-        (2614, 114),
-    ]
-
-    e, f = zip(*cal_items)
-    e = " ".join([str(x) for x in e])
-    f = " ".join([str(x) for x in f])
-
-    rv = f"""
-    <FWHMCalibration id="ec-fwhm">
-        <EnergyValues> {e} </EnergyValues>
-        <FWHMValues> {f} </FWHMValues>
-    </FWHMCalibration>
-    """
-    return dedent(rv)
 
 
 def format_output(

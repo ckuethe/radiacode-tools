@@ -1,0 +1,47 @@
+<?xml version="1.0"?>
+<ResultDataFile xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <FormatVersion>120920</FormatVersion>
+  <ResultDataList>
+    <ResultData>
+      <DeviceConfigReference>
+        <Name>RadiaCode-102</Name>
+      </DeviceConfigReference>
+      <BackgroundSpectrumFile></BackgroundSpectrumFile>
+
+       <StartTime>2023-06-07T05:52:00</StartTime>
+ <EndTime>2023-06-07T06:02:13</EndTime>
+
+ <EnergySpectrum>
+  <NumberOfChannels>1024</NumberOfChannels>
+  <ChannelPitch>1</ChannelPitch>
+  <SpectrumName>Am-241</SpectrumName>
+  <SerialNumber>RC-102-000115</SerialNumber>
+  <EnergyCalibration>
+    <PolynomialOrder>2</PolynomialOrder>
+    <Coefficients>
+      <Coefficient>-6.2832313</Coefficient>
+      <Coefficient>2.4383054</Coefficient>
+      <Coefficient>3.818E-4</Coefficient>
+    </Coefficients>
+  </EnergyCalibration>
+  <MeasurementTime>613</MeasurementTime>
+  <Spectrum>
+<DataPoint>0</DataPoint>
+<DataPoint>0</DataPoint>
+<DataPoint>0</DataPoint>
+<DataPoint>0</DataPoint>
+
+  </Spectrum>
+ </EnergySpectrum>
+
+
+      
+
+      <Visible>true</Visible>
+      <PulseCollection>
+        <Format>Base64 encoded binary</Format>
+        <Pulses />
+      </PulseCollection>
+    </ResultData>
+  </ResultDataList>
+</ResultDataFile>

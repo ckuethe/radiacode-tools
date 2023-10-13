@@ -110,13 +110,11 @@ def load_calibration(args: Namespace) -> List[Tuple[Numeric, Numeric]]:
 
 def get_args() -> Namespace:
     def _positive_int(s) -> int:
-        f = float(s)
-        i = int(s)
-        if f < 1:
-            # catch non-numeric
+        f = float(s)  # catch non-numeric
+        i = int(f)
+        if f < 1:  # catch non-positive
             raise ValueError
-        if f - i != 0:
-            # catch fractional part != 0
+        if f - i != 0:  # catch fractional part != 0
             raise ValueError
         return i
 
@@ -179,6 +177,13 @@ def rsquared(xlist: Iterable[Numeric], ylist: Iterable[Numeric], coeffs: Iterabl
     return r_squared
 
 
+def make_fit(chan, energy, args) -> List[float]:
+    pf = Polynomial.fit(chan, energy, deg=args.order, window=[min(chan), max(chan)]).coef
+    pf = [round(f, args.precision) for f in pf]
+    print(f"x^0 .. x^{args.order}: {pf}")
+    return pf
+
+
 def main() -> None:
     args = get_args()
 
@@ -190,16 +195,13 @@ def main() -> None:
     except FileNotFoundError:
         print(f"Calibration file '{args.cal_file}' does not exist")
         exit(1)
-    except TypeError:
+    except (TypeError, json.JSONDecodeError):
         print(f"Data format error loading calibration file")
         exit(1)
     chan, energy = zip(*data)
 
     print(f"data range: {data[0]} - {data[-1]}")
-
-    pf = Polynomial.fit(chan, energy, deg=args.order, window=[min(chan), max(chan)]).coef
-    pf = [round(f, args.precision) for f in pf]
-    print(f"x^0 .. x^{args.order}: {pf}")
+    pf = make_fit(chan, energy, args)
     rsquared(chan, energy, pf)
 
 
