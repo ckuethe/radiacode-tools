@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "radiacode_tools"
+dynamic = ['version']
+authors = [
+  { name="Chris Kuethe", email="chris.kuethe@gmail.com" },
+]
+description = "Interfacing RadiaCode PSRDs to other gamma ray spectroscopy tools"
+readme = "README.md"
+license = {file = "LICENSE"}
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX",
+    "Development Status :: 4 - Beta",
+    "Topic :: Scientific/Engineering :: Physics",
+    "Topic :: Utilities"
+]
+
+[project.urls]
+"Homepage" = "https://github.com/ckuethe/radiacode-tools"
+"Bug Tracker" = "https://github.com/ckuethe/radiacode-tools/issues"
+
+[project.scripts]
+rccalibrate = "calibrate:main"
+n42www = "n42www:main"
+n42convert = "n42convert:main"
+n42validate = "n42validate:main"
+radiacode-poll = "radiacode_poll:main"
+
+[tool.black]
+line-length = 120
