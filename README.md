@@ -2,7 +2,20 @@
 
 Just some things for working with my RadiaCode-102 from Scan-Electronics.
 
-### calibrate.py
+## Quick start
+
+```
+$ git clone https://github.com/ckuethe/radiacode-tools
+$ cd radiacode-tools
+$ python -m venv venv
+$ . venv/bin/activate
+$ pip install -e .
+```
+
+Some convenience scripts will be installed along with the python code,
+eg. `rccalibrate` to go along with `calibrate.py`.
+
+### calibrate.py / rccalibrate
 This tool computes calibration factors for mapping the channel to detected
 photon energy. 
 
@@ -51,7 +64,7 @@ x^0 .. x^2: [-2.45705927, 2.39432185, 0.00044401]
 R^2: 0.99998
 ```
 
-### n42convert.py
+### n42convert.py / n42convert
 This tool converts a RadiaCode ("RC") spectrum XML file into
 [ANSI N42](https://www.nist.gov/pml/radiation-physics/ansiieee-n4242-2020-version)
 format for analysis with other tools such as
@@ -102,7 +115,7 @@ If the background RC file has both foreground and background spectra, the backgr
 spectrum will be copied into the output N42 file. If no background spectrum exists,
 the foreground data from the background file will be copied into the output N42 file.
 
-### n42validate.py
+### n42validate.py / n42validate
 ```
 usage: n42validate.py [-h] [-r] [-q] [-v] [-V] [-s XSD] [-u URL] [-x EXT] FILE [FILE ...]
 
@@ -125,8 +138,7 @@ N42 inputs. This utility can be used to check data file compliance with the N42
 specification. Output can be constrained to valid or invalid files only, with
 optional detailed information about which elements of the file are incorrect.
 
-### n42www.py
-
+### n42www.py / n42www
 ```
 usage: n42www.py [-h] [-b IP] [-m NUM] [-p PORT] [-v]
 
@@ -149,8 +161,7 @@ apps.
 Configuring a reverse proxy and `WSGI` server for safe deployment of this server
 is beyond the scope of this document.
 
-### radiacode_poll.py
-
+### radiacode_poll.py / radiacode-poll
 ```
 usage: radiacode_poll.py [-h] [-b MAC] [--accumulate | --accumulate-time TIME | --accumulate-dose DOSE] [--bgsub]  [--reset-spectrum] [--reset-dose] [outfile]
 
