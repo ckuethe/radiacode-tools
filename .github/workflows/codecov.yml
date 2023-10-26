@@ -6,6 +6,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     name: Test python API
+    env:
+      PYTHON: '3.10'
     steps:
     - uses: actions/checkout@master
     - name: Setup Python
