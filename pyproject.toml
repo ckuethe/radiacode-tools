@@ -27,6 +27,7 @@ classifiers = [
 
 [project.scripts]
 rccalibrate = "calibrate:main"
+rcdeadtime = "deadtime:main"
 n42www = "n42www:main"
 n42convert = "n42convert:main"
 n42validate = "n42validate:main"

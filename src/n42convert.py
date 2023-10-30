@@ -9,7 +9,7 @@ import xmltodict
 from argparse import ArgumentParser, Namespace
 import os
 from io import TextIOWrapper
-from typing import List, Any
+from typing import List, Dict, Any
 
 __version__ = "0.0.9"
 __creator__ = "https://github.com/ckuethe/radiacode-tools"
@@ -39,7 +39,7 @@ def parse_spectrum(spectrum, check: bool = True):
     return rv
 
 
-def load_radiacode_spectrum(filename: str = None, fileobj: TextIOWrapper = None):
+def load_radiacode_spectrum(filename: str = None, fileobj: TextIOWrapper = None) -> Dict[str, Any]:
     if filename and fileobj:
         raise ValueError("Only one of filename or fileobj may be given")
     if filename:
