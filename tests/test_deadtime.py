@@ -42,7 +42,7 @@ class TestDeadTime(unittest.TestCase):
         count_rates = deadtime.load_spectra(args)
         self.assertIn("bg", count_rates)
         dt = deadtime.compute_deadtime(count_rates)
-        self.assertAlmostEqual(dt, 2.635e-3, delta=1e-5)
+        self.assertAlmostEqual(dt, 7.0e-6, delta=1e-7)
 
     def test_get_args_nobg(self):
         with patch("sys.argv", [__file__, "-a", self.a, "-b", self.b, "-c", self.c]):

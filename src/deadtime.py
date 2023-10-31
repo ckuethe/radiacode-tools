@@ -34,7 +34,7 @@ def load_spectra(args) -> Dict[str, float]:
     rv["ab"] = sum(s["foreground"]["spectrum"]) / s["foreground"]["duration"]
 
     if args.background:
-        s = n42convert.load_radiacode_spectrum(args.combined)
+        s = n42convert.load_radiacode_spectrum(args.background)
         rv["bg"] = sum(s["foreground"]["spectrum"]) / s["foreground"]["duration"]
     else:
         rv["bg"] = 0
