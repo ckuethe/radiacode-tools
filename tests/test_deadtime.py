@@ -57,6 +57,18 @@ class TestDeadTime(unittest.TestCase):
         dt = deadtime.compute_deadtime(count_rates)
         self.assertAlmostEqual(dt, 66.28e-6, delta=1e-5)
 
+    def test_get_args_numeric(self):
+        with patch("sys.argv", [__file__, "-a", f"{self.r_Ba}", "-b", f"{self.r_Eu}", "-c", f"{self.r_Ba_Eu}", "-g", f"{self.r_bg}"]):
+            args = deadtime.get_args()
+            self.assertAlmostEqual(float(args.first), self.r_Ba)
+            self.assertAlmostEqual(float(args.second), self.r_Eu)
+            self.assertAlmostEqual(float(args.combined), self.r_Ba_Eu)
+            self.assertAlmostEqual(float(args.background), self.r_bg)
+
+        count_rates = deadtime.load_spectra(args)
+        dt = deadtime.compute_deadtime(count_rates)
+        self.assertAlmostEqual(dt, self.dt_w_bg, delta=1e-5)
+
     def test_get_args_fail(self):
         with patch("sys.argv", [__file__, "-a", self.a, "-b", self.b, "-g", self.g]):
             with self.assertRaises(SystemExit):

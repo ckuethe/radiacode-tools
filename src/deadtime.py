@@ -7,6 +7,7 @@ from argparse import ArgumentParser, Namespace
 from math import pow, sqrt
 from typing import Union, Dict, Any
 from sys import exit
+from os.path import isfile
 import n42convert
 
 Number = Union[int, float]
@@ -14,28 +15,41 @@ Number = Union[int, float]
 
 def get_args() -> Namespace:
     ap = ArgumentParser()
-    ap.add_argument("-a", "--first", type=str, required=True, metavar="RCXML", help="path to Radiacode XML spectrum")
-    ap.add_argument("-b", "--second", type=str, required=True, metavar="RCXML")
-    ap.add_argument("-c", "--combined", type=str, required=True, metavar="RCXML")
-    ap.add_argument("-g", "--background", type=str, required=False, metavar="RCXML")
+    ap.add_argument("-a", "--first", type=str, required=True, metavar="RCXML_OR_NUM", help="path to Radiacode XML spectrum")
+    ap.add_argument("-b", "--second", type=str, required=True, metavar="RCXML_OR_NUM")
+    ap.add_argument("-c", "--combined", type=str, required=True, metavar="RCXML_OR_NUM")
+    ap.add_argument("-g", "--background", type=str, required=False, metavar="RCXML_OR_NUM")
+    ap.add_argument("-i", "--interval", type=float, required=False, default=1.0)
     return ap.parse_args()
 
 
 def load_spectra(args) -> Dict[str, float]:
     rv = {}
 
-    s = n42convert.load_radiacode_spectrum(args.first)
-    rv["a"] = sum(s["foreground"]["spectrum"]) / s["foreground"]["duration"]
+    if isfile(args.first):
+        s = n42convert.load_radiacode_spectrum(args.first)
+        rv["a"] = sum(s["foreground"]["spectrum"]) / s["foreground"]["duration"]
+    else:
+        rv["a"] = float(args.first) / args.interval
 
-    s = n42convert.load_radiacode_spectrum(args.second)
-    rv["b"] = sum(s["foreground"]["spectrum"]) / s["foreground"]["duration"]
+    if isfile(args.second):
+        s = n42convert.load_radiacode_spectrum(args.second)
+        rv["b"] = sum(s["foreground"]["spectrum"]) / s["foreground"]["duration"]
+    else:
+        rv["b"] = float(args.second) / args.interval
 
-    s = n42convert.load_radiacode_spectrum(args.combined)
-    rv["ab"] = sum(s["foreground"]["spectrum"]) / s["foreground"]["duration"]
+    if isfile(args.combined):
+        s = n42convert.load_radiacode_spectrum(args.combined)
+        rv["ab"] = sum(s["foreground"]["spectrum"]) / s["foreground"]["duration"]
+    else:
+        rv["ab"] = float(args.combined) / args.interval
 
-    if args.background:
-        s = n42convert.load_radiacode_spectrum(args.background)
-        rv["bg"] = sum(s["foreground"]["spectrum"]) / s["foreground"]["duration"]
+    if args.background is not None:
+        if isfile(args.background):
+            s = n42convert.load_radiacode_spectrum(args.background)
+            rv["bg"] = sum(s["foreground"]["spectrum"]) / s["foreground"]["duration"]
+        else:
+            rv["bg"] = float(args.background) / args.interval
     else:
         rv["bg"] = 0
 
