@@ -202,30 +202,6 @@ def format_spectrum(hw_num: str, res: radiacode.Spectrum, bg: bool = False):
     return dedent(cal_str), dedent(spec_str)
 
 
-def spec_dose(s: radiacode.Spectrum) -> float:
-    "Given a Spectrum, return an estimate of the total absorbed dose in uSv"
-    # According to the Health Physics Society:
-    #     Radiation absorbed dose and effective dose in the international system
-    #     of units (SI system) for radiation measurement uses "gray" (Gy) and
-    #     "sievert" (Sv), respectively.
-    #     [...]
-    #     For practical purposes with gamma and x rays, these units of measure
-    #     for exposure or dose are considered equal.
-    # via https://hps.org/publicinformation/ate/faqs/radiationdoses.html
-
-    kev2j = 1.60218e-16
-    mass = 4.51e-3  # kg, CsI:Tl density is 4.51g/cm^3, crystal is 1cm^3
-    a0, a1, a2 = s.a0, s.a1, s.a2
-
-    def _ce(c):
-        return a0 + a1 * c + a2 * c**2
-
-    keVz = sum([_ce(ch) * n for ch, n in enumerate(s.counts)])
-    gray = keVz * kev2j / mass
-    uSv = gray * 1e6
-    return uSv
-
-
 def main() -> None:
     args = get_args()
     dev = radiacode.RadiaCode(args.btaddr)
@@ -260,7 +236,7 @@ def main() -> None:
                 except KeyboardInterrupt:
                     t.close()
         elif args.accumulate_dose:  # yep, until a set dose is reached
-            e0 = spec_dose(measurement)
+            e0 = n42convert.get_dose_from_spectrum(measurement)
             with tqdm(
                 desc=f"Target Dose ({args.accumulate_dose:.3f}uSv)",
                 unit="uSv",
@@ -270,7 +246,7 @@ def main() -> None:
                     waiting = True
                     while waiting:
                         sleep(1)
-                        recv_dose = spec_dose(dev.spectrum()) - e0
+                        recv_dose = n42convert.get_dose_from_spectrum(dev.spectrum()) - e0
                         t.n = round(recv_dose, 3)
                         t.display()
                         if recv_dose >= args.accumulate_dose:
@@ -324,6 +300,7 @@ def main() -> None:
             uuid=uuid4(),
         )
 
+    print(f"Total dose: {n42convert.get_dose_from_spectrum(measurement):.2f}uSv", file=sys.stderr)
     ofd = sys.stdout
     if args.outfile:
         tfd, tfn = mkstemp(dir=".")

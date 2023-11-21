@@ -5,51 +5,54 @@
 
 from argparse import ArgumentParser, Namespace
 from math import pow, sqrt
-from typing import Union, Dict, Any
-from sys import exit
-from os.path import isfile
-import n42convert
+from typing import Union, Dict
+from n42convert import get_rate_from_spectrum
+from collections import namedtuple
 
 Number = Union[int, float]
+DTstats = namedtuple("DTstats", ["lost_cps", "loss_fraction", "dt_us", "dt_cps"])
 
 
 def get_args() -> Namespace:
     ap = ArgumentParser()
-    ap.add_argument("-a", "--first", type=str, required=True, metavar="RCXML_OR_NUM", help="path to Radiacode XML spectrum")
+    ap.add_argument(
+        "-a",
+        "--first",
+        type=str,
+        required=True,
+        metavar="RCXML_OR_NUM",
+        help="path to spectrum file; counts-per-interval; counts-per-second",
+    )
     ap.add_argument("-b", "--second", type=str, required=True, metavar="RCXML_OR_NUM")
     ap.add_argument("-c", "--combined", type=str, required=True, metavar="RCXML_OR_NUM")
     ap.add_argument("-g", "--background", type=str, required=False, metavar="RCXML_OR_NUM")
-    ap.add_argument("-i", "--interval", type=float, required=False, default=1.0)
+    ap.add_argument("-i", "--interval", type=float, required=False, default=1.0, metavar="TIME", help="[%(default)ss]")
     return ap.parse_args()
 
 
 def load_spectra(args) -> Dict[str, float]:
     rv = {}
 
-    if isfile(args.first):
-        s = n42convert.load_radiacode_spectrum(args.first)
-        rv["a"] = sum(s["foreground"]["spectrum"]) / s["foreground"]["duration"]
-    else:
+    try:
         rv["a"] = float(args.first) / args.interval
+    except ValueError:
+        rv["a"] = get_rate_from_spectrum(args.first)
 
-    if isfile(args.second):
-        s = n42convert.load_radiacode_spectrum(args.second)
-        rv["b"] = sum(s["foreground"]["spectrum"]) / s["foreground"]["duration"]
-    else:
+    try:
         rv["b"] = float(args.second) / args.interval
+    except ValueError:
+        rv["b"] = get_rate_from_spectrum(args.second)
 
-    if isfile(args.combined):
-        s = n42convert.load_radiacode_spectrum(args.combined)
-        rv["ab"] = sum(s["foreground"]["spectrum"]) / s["foreground"]["duration"]
-    else:
+    try:
         rv["ab"] = float(args.combined) / args.interval
+    except ValueError:
+        rv["ab"] = get_rate_from_spectrum(args.combined)
 
     if args.background is not None:
-        if isfile(args.background):
-            s = n42convert.load_radiacode_spectrum(args.background)
-            rv["bg"] = sum(s["foreground"]["spectrum"]) / s["foreground"]["duration"]
-        else:
+        try:
             rv["bg"] = float(args.background) / args.interval
+        except ValueError:
+            rv["bg"] = get_rate_from_spectrum(args.background)
     else:
         rv["bg"] = 0
 
@@ -64,7 +67,7 @@ def load_spectra(args) -> Dict[str, float]:
 # pp. 122-123, Eq. (4.32) and (4.33)
 
 
-def compute_tau(a: Number, b: Number, ab: Number, bg: Number = 0) -> float:
+def compute_deadtime(*, a: Number, b: Number, ab: Number, bg: Number = 0) -> DTstats:
     """
     compute the deadtime of a detector using the two source method.
     a: count rate of the first source measured alone
@@ -82,27 +85,25 @@ def compute_tau(a: Number, b: Number, ab: Number, bg: Number = 0) -> float:
     Y = a * b * (ab + bg) - bg * ab * (a + b)
     Z = Y * (a + b - ab - bg) / pow(X, 2)
     tau = X * (1 - sqrt(1 - Z)) / Y
-    return tau
+
+    lost_counts = a + b - ab
+    loss_fraction = 1 - ab / (a + b)
+    return DTstats(lost_counts, loss_fraction, tau, ab)
 
 
-def compute_loss(spectra: Dict[str, Number]) -> float:
-    lost_counts = spectra["a"] + spectra["b"] - spectra["ab"]
-    loss_fraction = 1 - spectra["ab"] / (spectra["a"] + spectra["b"])
-    print(f"lost count/sec: {lost_counts:.1f} loss_fraction: {100*loss_fraction:.1f}%")
-    return loss_fraction
-
-
-def compute_deadtime(spectra: Dict[str, Number]) -> float:
-    tau = compute_tau(spectra["a"], spectra["b"], spectra["ab"], spectra["bg"])
-    print(f"dead time at {spectra['ab']:.1f}cps: {tau*1e6:.1f}us")
-    return tau
+def print_deadtime(rates: Dict[str, Number]) -> DTstats:
+    "Given a dict of a,b,ab,bg rates, print the computed deadtime."
+    dt = compute_deadtime(**rates)
+    # print(rates)
+    print(f"dead time at {dt.dt_cps:.1f}cps: {dt.dt_us*1e6:.1f}us")
+    print(f"lost count/sec: {dt.lost_cps:.1f} loss_fraction: {100*dt.loss_fraction:.1f}%")
+    return dt
 
 
 def main():
     args = get_args()
-    spectra = load_spectra(args)
-    compute_loss(spectra)
-    compute_deadtime(spectra)
+    rates = load_spectra(args)
+    print_deadtime(rates)
 
 
 if __name__ == "__main__":

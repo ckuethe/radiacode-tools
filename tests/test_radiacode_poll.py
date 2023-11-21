@@ -6,7 +6,7 @@
 import sys
 import datetime
 from radiacode.types import Spectrum
-from n42convert import load_radiacode_spectrum
+from n42convert import load_radiacode_spectrum, get_dose_from_spectrum
 from os.path import dirname, join as pathjoin
 import radiacode_poll
 import unittest
@@ -115,7 +115,7 @@ class TestRadiaCodePoll(unittest.TestCase):
             a2=dev.a2,
             counts=dev.th232,
         )
-        self.assertAlmostEqual(303.20, radiacode_poll.spec_dose(s), delta=0.01)
+        self.assertAlmostEqual(303.20, get_dose_from_spectrum(s), delta=0.01)
 
     def test_main(self):
         with patch("sys.stdout", new_callable=StringIO):
