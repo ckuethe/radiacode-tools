@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "radiacode_tools"
-dynamic = ['version']
+dynamic = ['version', 'dependencies']
 authors = [
   { name="Chris Kuethe", email="chris.kuethe@gmail.com" },
 ]
@@ -32,6 +32,7 @@ n42www = "n42www:main"
 n42convert = "n42convert:main"
 n42validate = "n42validate:main"
 radiacode-poll = "radiacode_poll:main"
+spectrogram-energy = "spectrogram_energy:main"
 
 [tool.black]
 line-length = 120

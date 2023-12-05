@@ -4,7 +4,7 @@ with open("README.md", "r") as ifd:
     long_description = ifd.read()
 
 setup(
-    name="radiacode-toools",
+    name="radiacode-tools",
     version="0.1.0",
     description="radiacode interface to the larger gamma spectrometry ecosystem",
     long_description=long_description,
@@ -13,12 +13,7 @@ setup(
     author_email="chris.kuethe@gmail.com",
     url="https://github.com/ckuethe/radiacode-tools",
     py_modules=["radqr", "n42convert"],
-    extras_require={
-        "dev": [
-            "pytest>=3.7",
-            "twine",
-        ]
-    },
+    # extras_require={ "dev": [ "pytest>=3.7", "twine", ] },
     install_requires=[
         "radiacode>=0.2.1",
         "flask",
