@@ -15,7 +15,7 @@ setup(
     py_modules=["radqr", "n42convert"],
     # extras_require={ "dev": [ "pytest>=3.7", "twine", ] },
     install_requires=[
-        "radiacode>=0.2.1",
+        "radiacode>=0.3.1",
         "flask",
         "numpy>=1.22.2",
         "tqdm",
