@@ -5,7 +5,7 @@ with open("README.md", "r") as ifd:
 
 setup(
     name="radiacode-tools",
-    version="0.1.0",
+    version="0.1.1",
     description="radiacode interface to the larger gamma spectrometry ecosystem",
     long_description=long_description,
     long_description_content_type="text/markdown",
