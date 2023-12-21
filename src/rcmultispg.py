@@ -18,12 +18,14 @@ from re import sub as re_sub
 from typing import List, Union
 from datetime import datetime
 from json import dump as jdump
+from signal import signal, SIGUSR1
 import sys
 
 Number = Union[int, float]
 SpecData = namedtuple("SpecData", ["time", "spectrum"])
 
 RUNNING: bool = True  # Signal when it's time for the threads to exit
+USR1FLAG: bool = False  # Signal when SIGUSR1 is caught, to trigger a snapshot
 STDIO_LOCK: Lock = Lock()  # Prevent stdio corruption
 THREAD_BARRIER: Barrier = Barrier(0)  # intialized to 0 to shut up static type checking
 
@@ -37,6 +39,12 @@ def tbar(wait_time=None) -> None:
     """
     if 0 == THREAD_BARRIER.wait(wait_time):
         THREAD_BARRIER.reset()
+
+
+def handle_sigusr1(_signum=None, _stackframe=None):
+    """Set a flag when SIGUSR1 is received, to trigger a state dump"""
+    global USR1FLAG
+    USR1FLAG = True
 
 
 # The spectrogram format uses FileTime, the number of 100ns intervals since the
@@ -66,7 +74,7 @@ def DateTime2FileTime(dt: datetime) -> int:
 
 def find_radiacode_devices() -> List[str]:
     "List all the radiacode devices detected"
-    return [
+    return [  # No error handling. Caller can deal with any errors.
         d.serial_number
         for d in usb.core.find(idVendor=0x0483, idProduct=0xF123, find_all=True)
         if d.serial_number.startswith("RC-")
@@ -259,7 +267,7 @@ def rc_worker(args: Namespace, serial_number: str, start_time: Number) -> None:
     accumulates data, and generates the output file
     """
 
-    global RUNNING
+    global RUNNING, USR1FLAG
     try:
         rc = RadiaCode(serial_number=serial_number)
     except (usb.core.USBTimeoutError, usb.core.USBError, DeviceNotFound) as e:
@@ -291,7 +299,7 @@ def rc_worker(args: Namespace, serial_number: str, start_time: Number) -> None:
         print(f"{serial_number} sampling")
 
     i = 0
-    while RUNNING:
+    while RUNNING:  # IO loop
         try:
             data.append(SpecData(time(), rc.spectrum()))
             with STDIO_LOCK:
@@ -303,6 +311,19 @@ def rc_worker(args: Namespace, serial_number: str, start_time: Number) -> None:
             THREAD_BARRIER.abort()
             RUNNING = False
 
+        if USR1FLAG:  # handle request to snapshot state
+            save_data(
+                data=data,
+                prefix=args.prefix,
+                serial_number=serial_number,
+                use_pickle=args.pickle,
+            )
+            with STDIO_LOCK:
+                print(f"{serial_number} snapshot")
+            tbar()
+            USR1FLAG = False
+
+    # loop complete, print summary, save data
     with STDIO_LOCK:
         nd = len(data) - 2
         print(f"{serial_number} data collection stop - {nd} records, {nd*args.interval:.1f}s")
@@ -319,11 +340,14 @@ def main() -> None:
     global RUNNING
 
     args = get_args()
-    dev_names = find_radiacode_devices()
-
-    if not dev_names:
-        print("No devices Found")
-        sys.exit(1)
+    try:
+        dev_names = find_radiacode_devices()
+    except Exception:
+        dev_names = None
+    finally:
+        if not dev_names:
+            print("No devices Found")
+            sys.exit(1)
 
     missing = set(args.devs).difference(set(dev_names))
     if missing:
@@ -349,6 +373,8 @@ def main() -> None:
         )
         for serial_number in args.devs
     ]
+
+    signal(SIGUSR1, handle_sigusr1)
 
     # Start the readers
     [t.start() for t in threads]
