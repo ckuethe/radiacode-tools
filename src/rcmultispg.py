@@ -227,7 +227,6 @@ def save_data(
         return rec
 
     if use_pickle:
-        # pickle bad, json, csv?
         with open(f"{fn}.json", "w") as ofd:
             jdump([make_rec(d) for d in data], ofd, indent=2)
 

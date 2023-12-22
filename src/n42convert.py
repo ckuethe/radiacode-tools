@@ -7,7 +7,6 @@ from uuid import uuid4, UUID
 from textwrap import dedent
 import xmltodict
 from argparse import ArgumentParser, Namespace
-from radiacode.types import Spectrum
 from rcutils import stringify
 import os
 from io import TextIOWrapper

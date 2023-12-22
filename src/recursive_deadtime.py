@@ -2,7 +2,6 @@
 
 from argparse import ArgumentParser, Namespace
 import deadtime
-from glob import glob
 import os
 
 

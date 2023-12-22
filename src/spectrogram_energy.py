@@ -6,7 +6,6 @@
 """compute the energy in a radiacode spectrogram (or list of spectrograms)"""
 
 from argparse import ArgumentParser, Namespace
-import datetime
 from collections import namedtuple
 from binascii import unhexlify
 from rcutils import get_dose_from_spectrum, FileTime2DateTime
