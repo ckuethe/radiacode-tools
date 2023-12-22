@@ -7,7 +7,6 @@ import spectrogram_energy
 import unittest
 from unittest.mock import patch
 from io import StringIO
-from argparse import Namespace
 from os.path import dirname, join as pathjoin
 
 test_dir = dirname(__file__)

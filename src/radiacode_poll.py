@@ -5,6 +5,7 @@
 
 import n42convert
 import radqr
+from rcutils import get_dose_from_spectrum
 import importlib.metadata
 import warnings
 from argparse import ArgumentParser, Namespace
@@ -236,7 +237,7 @@ def main() -> None:
                 except KeyboardInterrupt:
                     t.close()
         elif args.accumulate_dose:  # yep, until a set dose is reached
-            e0 = n42convert.get_dose_from_spectrum(measurement)
+            e0 = get_dose_from_spectrum(measurement.counts, measurement.a0, measurement.a1, measurement.a2)
             with tqdm(
                 desc=f"Target Dose ({args.accumulate_dose:.3f}uSv)",
                 unit="uSv",
@@ -246,7 +247,8 @@ def main() -> None:
                     waiting = True
                     while waiting:
                         sleep(1)
-                        recv_dose = n42convert.get_dose_from_spectrum(dev.spectrum()) - e0
+                        s = dev.spectrum()
+                        recv_dose = get_dose_from_spectrum(s.counts, s.a0, s.a1, s.a2) - e0
                         t.n = round(recv_dose, 3)
                         t.display()
                         if recv_dose >= args.accumulate_dose:
@@ -300,7 +302,10 @@ def main() -> None:
             uuid=uuid4(),
         )
 
-    print(f"Total dose: {n42convert.get_dose_from_spectrum(measurement):.2f}uSv", file=sys.stderr)
+    print(
+        f"Total dose: {get_dose_from_spectrum(measurement.counts, measurement.a0, measurement.a1, measurement.a2):.2f}uSv",
+        file=sys.stderr,
+    )
     ofd = sys.stdout
     if args.outfile:
         tfd, tfn = mkstemp(dir=".")

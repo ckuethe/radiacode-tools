@@ -3,12 +3,6 @@
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syn=python
 # SPDX-License-Identifier: MIT
 
-# ick
-import sys
-from os.path import dirname
-
-sys.path.insert(0, dirname(dirname(__file__)))
-
 import radqr
 import unittest
 import datetime
@@ -291,7 +285,3 @@ class TestRadqr(unittest.TestCase):
         with self.assertRaises(ValueError) as cm:
             radqr.parse_payload_fields(b"T:0,0 Z:INVALID S:0")
         self.assertEqual(cm.exception.args[0], "Unknown field: Z")
-
-
-if __name__ == "__main__":
-    unittest.main()

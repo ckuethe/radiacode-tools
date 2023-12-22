@@ -8,6 +8,7 @@ from textwrap import dedent
 import xmltodict
 from argparse import ArgumentParser, Namespace
 from radiacode.types import Spectrum
+from rcutils import stringify
 import os
 from io import TextIOWrapper
 from typing import List, Dict, Any
@@ -84,30 +85,6 @@ def get_rate_from_spectrum(filename: str) -> float:
     return sum(s["foreground"]["spectrum"]) / s["foreground"]["duration"]
 
 
-def get_dose_from_spectrum(s: Spectrum) -> float:
-    "Given a Spectrum, return an estimate of the total absorbed dose in uSv"
-    # According to the Health Physics Society:
-    #     Radiation absorbed dose and effective dose in the international system
-    #     of units (SI system) for radiation measurement uses "gray" (Gy) and
-    #     "sievert" (Sv), respectively.
-    #     [...]
-    #     For practical purposes with gamma and x rays, these units of measure
-    #     for exposure or dose are considered equal.
-    # via https://hps.org/publicinformation/ate/faqs/radiationdoses.html
-
-    kev2j = 1.60218e-16
-    mass = 4.51e-3  # kg, CsI:Tl density is 4.51g/cm^3, crystal is 1cm^3
-    a0, a1, a2 = s.a0, s.a1, s.a2
-
-    def _chan2kev(c):
-        return a0 + a1 * c + a2 * c**2
-
-    keVz = sum([_chan2kev(ch) * n for ch, n in enumerate(s.counts)])
-    gray = keVz * kev2j / mass
-    uSv = gray * 1e6
-    return uSv
-
-
 def squareformat(a: List[Any], columns: int = 16):
     "reformat the a long list of numbers (any elements, actually) as some nice lines"
     if columns < 1:
@@ -117,11 +94,6 @@ def squareformat(a: List[Any], columns: int = 16):
         line = " ".join([f"{i:5}" for i in a[x * columns : (x + 1) * columns]])
         rv.append(line)
     return "\n".join(rv)
-
-
-def stringify(a: List[Any], c: str = " ") -> str:
-    "Make a string out of a list of things, nicer than str(list(...))"
-    return c.join([f"{x}" for x in a])
 
 
 def format_calibration(spectrum, fg=True):

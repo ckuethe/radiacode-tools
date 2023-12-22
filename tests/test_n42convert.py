@@ -60,6 +60,13 @@ class TestN42Convert(unittest.TestCase):
         spec = data["foreground"].pop("spectrum")
         self.assertDictEqual(data, self.am241_expected)
 
+    def test_load_spectrum_no_serial_number(self):
+        data = n42convert.load_radiacode_spectrum(filename=pathjoin(testdir, "data_am241.xml"))
+
+        data["foreground"].pop("device_serial_number", None)
+        fmt_instr = n42convert.make_instrument_info(data)
+        self.assertNotIn("<RadInstrumentIdentifier>", fmt_instr)
+
     def test_load_spectrum_fail_bad_spectrum_length(self):
         with self.assertRaises(ValueError) as cm:
             n42convert.load_radiacode_spectrum(filename=pathjoin(testdir, "data_invalid_spectrum.xml"))
@@ -113,13 +120,6 @@ class TestN42Convert(unittest.TestCase):
     def test_squareformat_fail0(self):
         with self.assertRaises(ValueError):
             n42convert.squareformat([0], 0)
-
-    def test_stringify(self):
-        testcases = [([], ""), ([0], "0"), ([0, 1, 2, 3], "0 1 2 3")]
-
-        for t in testcases:
-            self.assertEqual(n42convert.stringify(t[0]), t[1])
-            self.assertEqual(n42convert.stringify(t[0], ","), t[1].replace(" ", ","))
 
     def test_argparse_no_uuid(self):
         with patch("sys.argv", [__file__, "-i", self.i, "-b", self.b, "-o", self.o]):

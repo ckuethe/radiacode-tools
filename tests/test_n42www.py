@@ -3,12 +3,10 @@
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syn=python
 # SPDX-License-Identifier: MIT
 
-import sys
 import n42www
 from n42www import n42srv
 import unittest
-from unittest.mock import patch, MagicMock
-from io import StringIO
+from unittest.mock import patch
 import os
 
 testdir = os.path.dirname(__file__)
@@ -70,3 +68,8 @@ class TestN42Www(unittest.TestCase):
         with open("/dev/null", "rb") as am241:
             response = self.client.post("/convert", data={"file-input": (am241, fn)})
             self.assertEqual(response.status_code, 400)
+
+    def test_main(self):
+        with patch("sys.argv", [__file__, "-vvv", "-b", "255.255.255.255"]):
+            with self.assertRaises(SystemExit):
+                n42www.main()

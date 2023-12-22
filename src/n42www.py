@@ -3,7 +3,7 @@
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syn=python
 # SPDX-License-Identifier: MIT
 
-from flask import Flask, request, abort, Response, send_file
+from flask import Flask, request, abort, send_file
 from argparse import ArgumentParser, Namespace
 from logging import Logger, getLogger, DEBUG, INFO, WARNING, basicConfig
 from n42convert import process_single_fileobj
@@ -37,7 +37,6 @@ def handle_index():
 
 @n42srv.route("/convert", methods=["POST"])
 def handle_convert():
-
     uploads = list(request.files.keys())
     if uploads != [input_name]:
         abort(400)

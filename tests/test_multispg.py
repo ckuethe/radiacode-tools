@@ -4,29 +4,12 @@
 # SPDX-License-Identifier: MIT
 
 import datetime
-
 from collections import namedtuple
 from argparse import Namespace
-from os.path import dirname, join as pathjoin
 import rcmultispg
 from rcmultispg import SpecData, Spectrum
 import unittest
 from unittest.mock import patch, mock_open
-from io import StringIO
-
-test_epoch = datetime.datetime(2023, 12, 20, 12, 34, 56, 987654)
-# gonna need to fake time of day for sleep and stuff.
-fake_clock: float = test_epoch.timestamp()
-testdir = dirname(__file__)
-
-
-def fake_sleep(seconds: float):
-    global fake_clock
-    fake_clock += seconds
-
-
-def fake_time_time():
-    return fake_clock
 
 
 class TestRadiaCodePoll(unittest.TestCase):

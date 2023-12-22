@@ -10,6 +10,7 @@ from argparse import ArgumentParser, Namespace
 from radiacode import RadiaCode, Spectrum
 from radiacode.transports.usb import DeviceNotFound
 from threading import Barrier, BrokenBarrierError, Thread, Lock
+from rcutils import UnixTime2FileTime
 from time import sleep, time, strftime, gmtime
 from binascii import hexlify
 from collections import namedtuple
@@ -45,31 +46,6 @@ def handle_sigusr1(_signum=None, _stackframe=None):
     """Set a flag when SIGUSR1 is received, to trigger a state dump"""
     global USR1FLAG
     USR1FLAG = True
-
-
-# The spectrogram format uses FileTime, the number of 100ns intervals since the
-# beginning of 1600 CE. On a linux/unix/bsd host, we get the number of (fractional)
-# seconds since the beginning of 1970 CE. Here are some conversions, which, If I use
-# them one more time are getting moved into a utility file...
-
-jiffy = 1e-7
-epoch_offset_jiffies = 116444736000000000
-
-
-def FileTime2UnixTime(x: Number) -> float:
-    return (float(x) - epoch_offset_jiffies) * jiffy
-
-
-def FileTime2DateTime(x: Number) -> datetime:
-    return datetime.fromtimestamp(FileTime2UnixTime(x))
-
-
-def UnixTime2FileTime(x: Number) -> int:
-    return int(float(x) / jiffy + epoch_offset_jiffies)
-
-
-def DateTime2FileTime(dt: datetime) -> int:
-    return UnixTime2FileTime(dt.timestamp())
 
 
 def find_radiacode_devices() -> List[str]:
