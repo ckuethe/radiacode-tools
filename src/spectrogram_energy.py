@@ -9,6 +9,7 @@ from argparse import ArgumentParser, Namespace
 import datetime
 from collections import namedtuple
 from binascii import unhexlify
+from rcutils import get_dose_from_spectrum, FileTime2DateTime
 import struct
 import sys
 import os
@@ -27,14 +28,6 @@ def get_args() -> Namespace:
     rv = ap.parse_args()
 
     return rv
-
-
-def FileTime2DateTime(x):
-    """Convert a Microsoft FileTime into a datetime.datetime"""
-    epoch_offset_jiffies = 116444736000000000
-    timescale = 10000000
-
-    return datetime.datetime.fromtimestamp((float(x) - epoch_offset_jiffies) / timescale)
 
 
 def parse_header(s: str) -> SGHeader:
@@ -64,14 +57,6 @@ def extract_calibration_from_spectrum(s: str) -> EnergyCalibration:
     return EnergyCalibration(*tmp[1:])
 
 
-def keV_to_uSv(keV: float) -> float:
-    """handwavy conversion of kiloelectronvolts to microsieverts, assuming full dose absorption and Gray ~= Sievert"""
-    kev2j = 1.60218e-16
-    mass = 4.51e-3  # kg, CsI:Tl density is 4.51g/cm^3, crystal is 1cm^3
-    gray = keV * kev2j / mass
-    return gray * 1e6
-
-
 def load_spectrogram(fn: str) -> SpecEnergy:
     """Open a spectrogram"""
     cal: EnergyCalibration = None
@@ -91,11 +76,11 @@ def load_spectrogram(fn: str) -> SpecEnergy:
                 counts = [int(c) for c in counts]
                 if len(counts) < header.channels:  # pad to the right number of channels
                     counts.extend([0] * (header.channels - len(counts)))
-                keVz = sum([n * (cal.a0 + c * cal.a1 + c * c * cal.a2) for c, n in enumerate(counts)])
-                peak_dose_rate = max(peak_dose_rate, keVz / acc_time)
-                total_energy += keVz
+                dose = get_dose_from_spectrum(counts, *cal)
+                peak_dose_rate = max(peak_dose_rate, dose / acc_time)
+                total_energy += dose
 
-        return SpecEnergy(keV_to_uSv(total_energy), header.duration, keV_to_uSv(peak_dose_rate))
+        return SpecEnergy(total_energy, header.duration, peak_dose_rate)
 
 
 def main() -> None:

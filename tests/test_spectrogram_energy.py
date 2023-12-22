@@ -49,12 +49,6 @@ class TestSpectrogramEnergy(unittest.TestCase):
         self.assertAlmostEqual(ec.a1, 2.3659, delta=0.001)
         self.assertAlmostEqual(ec.a2, 4.4e-5, delta=0.001)
 
-    def test_kev_to_gray(self):
-        e = spectrogram_energy.keV_to_uSv(0)
-        self.assertEqual(e, 0)
-        e = spectrogram_energy.keV_to_uSv(1e12)
-        self.assertAlmostEqual(e, 35525, delta=0.1)
-
     def test_parse_header(self):
         parsed = spectrogram_energy.parse_header("\t".join(self.header_fields))
         self.assertEqual(parsed.name, "unittest")
