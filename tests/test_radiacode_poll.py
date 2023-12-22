@@ -18,7 +18,7 @@ from io import StringIO
 test_epoch = datetime.datetime(2023, 10, 13, 13, 13, 13)
 # gonna need to fake time of day for sleep and stuff.
 fake_clock: float = test_epoch.timestamp()
-testdir = dirname(__file__)
+testdir = pathjoin(dirname(__file__), "data")
 
 
 class MockRadiaCode:

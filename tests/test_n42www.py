@@ -7,9 +7,9 @@ import n42www
 from n42www import n42srv
 import unittest
 from unittest.mock import patch
-import os
+from os.path import dirname, join as pathjoin
 
-testdir = os.path.dirname(__file__)
+testdir = pathjoin(dirname(__file__), "data")
 
 
 class TestN42Www(unittest.TestCase):
@@ -51,7 +51,7 @@ class TestN42Www(unittest.TestCase):
     def test_convert(self):
         fn = "data_am241.xml"
         dfn = f"filename={fn.replace('xml', 'n42')}"
-        with open(os.path.join(testdir, fn), "rb") as am241:
+        with open(pathjoin(testdir, fn), "rb") as am241:
             response = self.client.post("/convert", data={"file-input": (am241, fn)})
             self.assertEqual(response.status_code, 200)
             self.assertIn(dfn, str(response.headers))

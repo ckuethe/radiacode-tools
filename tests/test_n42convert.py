@@ -11,7 +11,7 @@ from io import StringIO
 from os.path import dirname, join as pathjoin
 
 
-testdir = dirname(__file__)
+testdir = pathjoin(dirname(__file__), "data")
 
 
 class TestN42Convert(unittest.TestCase):

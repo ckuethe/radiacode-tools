@@ -9,7 +9,7 @@ from unittest.mock import patch
 from io import StringIO
 from os.path import dirname, join as pathjoin
 
-test_dir = dirname(__file__)
+test_dir = pathjoin(dirname(__file__), "data")
 
 
 class TestSpectrogramEnergy(unittest.TestCase):

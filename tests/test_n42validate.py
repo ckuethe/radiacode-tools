@@ -8,15 +8,16 @@ import n42validate
 import unittest
 from unittest.mock import patch
 from tempfile import mkstemp
+from os.path import dirname, join as pathjoin
 import os
 
-testdir = os.path.dirname(__file__)
+testdir = pathjoin(dirname(__file__), "data")
 
 
 class TestN42Validate(unittest.TestCase):
-    schema_file = os.path.join(testdir, "n42.xsd")
-    n42_file = os.path.join(testdir, "data_am241.n42")
-    bad_file = os.path.join(testdir, "data_invalid.n42")
+    schema_file = pathjoin(testdir, "n42.xsd")
+    n42_file = pathjoin(testdir, "data_am241.n42")
+    bad_file = pathjoin(testdir, "data_invalid.n42")
 
     def test_schema_load(self):
         schema = n42validate.fetch_or_load_xsd(schema_file=self.schema_file)
