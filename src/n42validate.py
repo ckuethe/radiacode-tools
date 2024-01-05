@@ -105,7 +105,7 @@ def main() -> None:
     if args.recursive:
         for f in args.files:
             for dirpath, _, filenames in os.walk(f):
-                for filename in filter(lambda x: x.endswith(args.extension), filenames):
+                for filename in [fn for fn in filenames if fn.endswith(args.extension)]:
                     workqueue.append(os.path.join(dirpath, filename))
     else:
         workqueue = args.files
