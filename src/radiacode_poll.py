@@ -4,7 +4,6 @@
 # SPDX-License-Identifier: MIT
 
 import n42convert
-import radqr
 from rcutils import get_dose_from_spectrum
 import importlib.metadata
 import warnings
@@ -20,7 +19,6 @@ from typing import Dict
 from uuid import uuid4
 from urllib.parse import quote_plus
 from zlib import compress as deflate
-import qrcode
 import sys
 import os
 import re
@@ -314,6 +312,7 @@ def main() -> None:
         tfn = "/dev/stdout"
 
     if args.url or args.qrcode:
+        import radqr
         enc_opts = radqr.OPT_CSV_SPECTRUM
         enc_opts, msg = radqr.make_qr_payload(
             lr_times=[measurement.duration.total_seconds()] * 2,
@@ -327,6 +326,7 @@ def main() -> None:
         qbody = quote_plus(radqr.b45_encode(deflate(msg)))
         url = f"RADDATA://G0/{enc_opts:02X}00/{qbody}"
         if args.qrcode:
+            import qrcode
             qc = qrcode.QRCode()
             qc.add_data(url)
             ofd = open(tfn, "wb")
