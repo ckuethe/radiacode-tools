@@ -24,6 +24,7 @@ setup(
         "xmlschema",
         "xmltodict",
         "defusedxml",
+        "dateutils",
     ],
     classifiers=[
         "Programming Language :: Python :: 3",
