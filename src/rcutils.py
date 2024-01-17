@@ -6,7 +6,8 @@ utility library, rather than being imported from and between scripts.
 """
 
 from datetime import datetime
-from typing import Union, List, Any
+from typing import Union, List, Any, Dict
+import re
 
 Number = Union[int, float]
 
@@ -71,3 +72,54 @@ def get_dose_from_spectrum(
     gray = total_keV * joules_per_keV / mass
     uSv = gray * 1e6
     return uSv
+
+
+def find_radiacode_devices() -> List[str]:
+    "List all the radiacode devices detected"
+    import usb.core # defer import until someone calls this function
+    return [  # No error handling. Caller can deal with any errors.
+        d.serial_number
+        for d in usb.core.find(idVendor=0x0483, idProduct=0xF123, find_all=True)
+        if d.serial_number.startswith("RC-")
+    ]
+
+def get_device_id(dev) -> Dict[str, str]:
+    "Poll the device for all its identifiers"
+    rv = {
+        "fw": dev.fw_signature(),
+        "fv": dev.fw_version(),
+        "hw_num": dev.hw_serial_number(),
+        "sernum": dev.serial_number(),
+    }
+    try:
+        f = re.search(
+            r'Signature: (?P<fw_signature>[0-9A-F]{8}), FileName="(?P<fw_file>.+?)", IdString="(?P<product>.+?)"',
+            rv["fw"],
+        ).groupdict()
+        rv.update(f)
+        rv.pop("fw")
+    except (AttributeError, TypeError):
+        pass
+
+
+    bv, fv = rv.pop("fv")
+    rv["boot_ver"] = f"{bv[0]}.{bv[1]}"
+    rv["boot_date"] = bv[2]
+    rv["fw_ver"] = f"{fv[0]}.{fv[1]}"
+    rv["fw_date"] = fv[2].strip('\x00')
+    return rv
+
+
+def probe_radiacode_devices():
+    import radiacode
+
+    for dev_id in find_radiacode_devices():
+        rc = radiacode.RadiaCode(serial_number=dev_id)
+        d= get_device_id(dev=rc)
+        print(
+            "Found {product}\n"
+            "Serial Number: {sernum}\n"
+            "Boot {boot_ver} ({boot_date})\n"
+            "Firmware {fw_ver} {fw_signature} ({fw_date}) \n"
+            "HW ID {hw_num}".format_map(d), end="\n\n")
+        

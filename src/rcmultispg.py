@@ -10,7 +10,7 @@ from argparse import ArgumentParser, Namespace
 from radiacode import RadiaCode, Spectrum
 from radiacode.transports.usb import DeviceNotFound
 from threading import Barrier, BrokenBarrierError, Thread, Lock
-from rcutils import UnixTime2FileTime
+from rcutils import UnixTime2FileTime, find_radiacode_devices
 from time import sleep, time, strftime, gmtime
 from binascii import hexlify
 from collections import namedtuple
@@ -47,14 +47,6 @@ def handle_sigusr1(_signum=None, _stackframe=None):
     global USR1FLAG
     USR1FLAG = True
 
-
-def find_radiacode_devices() -> List[str]:
-    "List all the radiacode devices detected"
-    return [  # No error handling. Caller can deal with any errors.
-        d.serial_number
-        for d in usb.core.find(idVendor=0x0483, idProduct=0xF123, find_all=True)
-        if d.serial_number.startswith("RC-")
-    ]
 
 
 def get_args() -> Namespace:

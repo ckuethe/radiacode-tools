@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: MIT
 
 import n42convert
-from rcutils import get_dose_from_spectrum
+from rcutils import get_dose_from_spectrum, probe_radiacode_devices, get_device_id
 import importlib.metadata
 import warnings
 from argparse import ArgumentParser, Namespace
@@ -38,6 +38,13 @@ def get_args() -> Namespace:
         type=str,
         metavar="MAC",
         help="Bluetooth address of device; leave blank to use USB",
+    )
+    ap.add_argument(
+        "-l",
+        "--list-devices",
+        default=False,
+        action="store_true",
+        help="List connected devices and exit",
     )
     mx = ap.add_mutually_exclusive_group()  # only one way of accumulation may be selected
     mx.add_argument(
@@ -106,34 +113,6 @@ def get_args() -> Namespace:
     return rv
 
 
-def get_device_id(dev: radiacode.RadiaCode) -> Dict[str, str]:
-    "Poll the device for all its identifiers"
-    rv = {
-        "fw": dev.fw_signature(),
-        "fv": dev.fw_version(),
-        "hw_num": dev.hw_serial_number(),
-        "sernum": dev.serial_number(),
-    }
-    try:
-        f = re.search(
-            r'Signature: (?P<fw_signature>[0-9A-F]{8}), FileName="(?P<fw_file>.+?)", IdString="(?P<product>.+?)"',
-            rv["fw"],
-        ).groupdict()
-        rv.update(f)
-        rv.pop("fw")
-    except (AttributeError, TypeError):
-        pass
-
-    try:
-        f = re.search(
-            r"Boot version: (?P<boot_ver>[0-9.]+) (?P<boot_date>[A-Z].+?:\d{2}) [|] Target version: (?P<fw_ver>[0-9.]+) (?P<fw_date>[A-Z].+?:\d{2})",
-            rv["fv"],
-        ).groupdict()
-        rv.update(f)
-        rv.pop("fv")
-    except (AttributeError, TypeError):
-        pass
-    return rv
 
 
 def make_instrument_info(dev_id: Dict[str, str]):
@@ -203,6 +182,11 @@ def format_spectrum(hw_num: str, res: radiacode.Spectrum, bg: bool = False):
 
 def main() -> None:
     args = get_args()
+
+    if args.list_devices:
+        probe_radiacode_devices()
+        return
+
     dev = radiacode.RadiaCode(args.btaddr)
     if args.reset_spectrum:
         dev.spectrum_reset()
