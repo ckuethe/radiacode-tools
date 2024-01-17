@@ -292,8 +292,6 @@ def main() -> None:
     if args.outfile:
         tfd, tfn = mkstemp(dir=".")
         os.close(tfd)
-    else:
-        tfn = "/dev/stdout"
 
     if args.url or args.qrcode:
         import radqr
@@ -313,14 +311,17 @@ def main() -> None:
             import qrcode
             qc = qrcode.QRCode()
             qc.add_data(url)
-            ofd = open(tfn, "wb")
+            if args.outfile:
+                ofd = open(tfn, "wb")
             qc.make_image().save(ofd)
         else:
-            ofd = open(tfn, "w")
+            if args.outfile:
+                ofd = open(tfn, "w")
             print(url, file=ofd)
 
     else:
-        ofd = open(tfn, "w")
+        if args.outfile:
+            ofd = open(tfn, "w")
         print(data, file=ofd)
 
     if args.outfile:
