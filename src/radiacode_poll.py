@@ -21,7 +21,6 @@ from urllib.parse import quote_plus
 from zlib import compress as deflate
 import sys
 import os
-import re
 
 
 def get_args() -> Namespace:
@@ -282,11 +281,9 @@ def main() -> None:
             uuid=uuid4(),
         )
 
-    print(
-        f"Total dose: {get_dose_from_spectrum(measurement.counts, measurement.a0, measurement.a1, measurement.a2):.2f}uSv",
-        file=sys.stderr,
-    )
-    ofd = sys.stdout
+    dose = get_dose_from_spectrum(measurement.counts, measurement.a0, measurement.a1, measurement.a2)
+    print(f"Total dose: {dose:.2f}uSv ({dev_id['sernum']})", file=sys.stderr)
+    ofd = None
     if args.outfile:
         tfd, tfn = mkstemp(dir=".")
         os.close(tfd)
