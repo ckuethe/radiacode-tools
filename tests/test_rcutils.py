@@ -6,6 +6,7 @@
 import datetime
 import unittest
 import rcutils
+from .test_radiacode_poll import MockRadiaCode
 
 
 class TestRadiaCodeUtils(unittest.TestCase):
@@ -30,3 +31,8 @@ class TestRadiaCodeUtils(unittest.TestCase):
         for t in testcases:
             self.assertEqual(rcutils.stringify(t[0]), t[1])
             self.assertEqual(rcutils.stringify(t[0], ","), t[1].replace(" ", ","))
+
+    def test_get_device_info(self):
+        dev = MockRadiaCode()
+        devinfo = rcutils.get_device_id(dev=dev)
+        self.assertIn("RC-102", devinfo["sernum"])

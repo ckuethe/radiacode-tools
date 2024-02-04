@@ -10,6 +10,7 @@ from n42convert import load_radiacode_spectrum
 from rcutils import get_dose_from_spectrum
 from os.path import dirname, join as pathjoin
 import radiacode_poll
+from rcutils import get_device_id
 import unittest
 from unittest.mock import patch
 from io import StringIO
@@ -23,7 +24,7 @@ testdir = pathjoin(dirname(__file__), "data")
 
 class MockRadiaCode:
     fw_sig = 'Signature: 57353F42, FileName="rc-102.bin", IdString="RadiaCode RC-102"'
-    fw_ver = "Boot version: 4.0 Feb  6 2023 15:49:14 | Target version: 4.7 Sep 21 2023 10:56:58\x00"
+    fw_ver = ((4, 0, "Feb  6 2023 15:49:14"), (4, 9, "Jan 25 2024 14:49:00\x00"))
     hsn = "0035001C-464B5009-20393153"
     conn_time = test_epoch
 
@@ -97,7 +98,7 @@ class TestRadiaCodePoll(unittest.TestCase):
     def test_format_spectrum(self):
         dev = MockRadiaCode()
 
-        devid = radiacode_poll.get_device_id(dev)
+        devid = get_device_id(dev)
         self.assertIn("RC-102", devid["sernum"])
 
         instrument_info = radiacode_poll.make_instrument_info(devid)
