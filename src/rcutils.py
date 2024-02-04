@@ -93,15 +93,12 @@ def get_device_id(dev) -> Dict[str, str]:
         "hw_num": dev.hw_serial_number(),
         "sernum": dev.serial_number(),
     }
-    try:
-        f = re.search(
-            r'Signature: (?P<fw_signature>[0-9A-F]{8}), FileName="(?P<fw_file>.+?)", IdString="(?P<product>.+?)"',
-            rv["fw"],
-        ).groupdict()
-        rv.update(f)
-        rv.pop("fw")
-    except (AttributeError, TypeError):
-        pass
+    f = re.search(
+        r'Signature: (?P<fw_signature>[0-9A-F]{8}), FileName="(?P<fw_file>.+?)", IdString="(?P<product>.+?)"',
+        rv["fw"],
+    ).groupdict()
+    rv.update(f)
+    rv.pop("fw")
 
     bv, fv = rv.pop("fv")
     rv["boot_ver"] = f"{bv[0]}.{bv[1]}"
