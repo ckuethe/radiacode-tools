@@ -70,11 +70,15 @@ def load_radiacode_spectrum(filename: str = None, fileobj: TextIOWrapper = None)
 
     rv = {
         "device_name": sp["DeviceConfigReference"]["Name"],
-        "start_time": sp["StartTime"],
-        "end_time": sp["EndTime"],
         "foreground": fg,
         "background": bg,
     }
+
+    # older versions of data files don't have start and end times
+    if "StartTime" in sp:
+        rv["start_time"] = sp["StartTime"]
+    if "EndTime" in sp:
+        rv["end_time"] = sp["EndTime"]
 
     return rv
 
@@ -118,15 +122,21 @@ def format_spectrum(spectrum, fg=True):
         layer = mclass.lower()
         time_index = 0 if fg else 1
 
-        timestamp = spectrum["start_time"]
-        if isinstance(timestamp, list):
-            timestamp = timestamp[time_index]
+        try:
+            # old versions may not have timestamps.
+            timestamp = spectrum["start_time"]
+            if isinstance(timestamp, list):
+                timestamp = timestamp[time_index]
+            timestamp_commment = ""
+        except KeyError:
+            timestamp = "1970-01-01T00:00:00"
+            timestamp_commment = "<!-- WARNING, no datetime was present in source file -->"
 
         rv = f"""
         <RadMeasurement id="rm-{tag}">
             <Remark>Title: {spectrum[layer]['name']}</Remark>
             <MeasurementClassCode>{mclass}</MeasurementClassCode>
-            <StartDateTime>{timestamp}</StartDateTime>
+            <StartDateTime>{timestamp}</StartDateTime> {timestamp_commment}
             <RealTimeDuration>PT{spectrum[layer]["duration"]}S</RealTimeDuration>
             <Spectrum id="rm-{tag}-sp" radDetectorInformationReference="radiacode-csi-sipm" energyCalibrationReference="ec-{tag}"> 
                 <LiveTimeDuration>PT{spectrum[layer]["duration"]}S</LiveTimeDuration>
@@ -299,6 +309,10 @@ def process_single_fileobj(fileobj: TextIOWrapper) -> str:
     """
     fg_data = load_radiacode_spectrum(fileobj=fileobj)
 
+    try:
+        bg_spectrum = (format_spectrum(fg_data, fg=False),)
+    except:
+        bg_spectrum = ""
     n42data = format_output(
         uuid=None,
         instrument_info=make_instrument_info(fg_data),
@@ -306,7 +320,7 @@ def process_single_fileobj(fileobj: TextIOWrapper) -> str:
         fg_cal=format_calibration(fg_data),
         bg_cal=format_calibration(fg_data, fg=False),
         fg_spectrum=format_spectrum(fg_data),
-        bg_spectrum=format_spectrum(fg_data, fg=False),
+        bg_spectrum=bg_spectrum,
     )
 
     return n42data
@@ -323,6 +337,10 @@ def process_single_file(fg_file=None, bg_file=None, out_file=None, uuid=None, ov
     else:
         bg_data = fg_data
 
+    try:
+        bg_spectrum = format_spectrum(bg_data, fg=False)
+    except:
+        bg_spectrum = ""
     n42data = format_output(
         uuid=uuid,
         instrument_info=make_instrument_info(fg_data),
@@ -330,7 +348,7 @@ def process_single_file(fg_file=None, bg_file=None, out_file=None, uuid=None, ov
         fg_cal=format_calibration(fg_data),
         bg_cal=format_calibration(bg_data, fg=False),
         fg_spectrum=format_spectrum(fg_data),
-        bg_spectrum=format_spectrum(bg_data, fg=False),
+        bg_spectrum=bg_spectrum,
     )
 
     if out_file is None:
