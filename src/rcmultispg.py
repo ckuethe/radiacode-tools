@@ -17,7 +17,6 @@ from collections import namedtuple
 from struct import pack as struct_pack
 from re import sub as re_sub
 from typing import List, Union
-from datetime import datetime
 from json import dump as jdump
 from signal import signal, SIGUSR1
 import sys
