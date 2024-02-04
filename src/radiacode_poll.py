@@ -113,8 +113,6 @@ def get_args() -> Namespace:
     return rv
 
 
-
-
 def make_instrument_info(dev_id: Dict[str, str]):
     "Create the N42 RadInstrumentInformation element"
     radiacode_ver = importlib.metadata.version("radiacode")
@@ -295,6 +293,7 @@ def main() -> None:
 
     if args.url or args.qrcode:
         import radqr
+
         enc_opts = radqr.OPT_CSV_SPECTRUM
         enc_opts, msg = radqr.make_qr_payload(
             lr_times=[measurement.duration.total_seconds()] * 2,
@@ -309,6 +308,7 @@ def main() -> None:
         url = f"RADDATA://G0/{enc_opts:02X}00/{qbody}"
         if args.qrcode:
             import qrcode
+
             qc = qrcode.QRCode()
             qc.add_data(url)
             if args.outfile:

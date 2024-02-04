@@ -48,7 +48,6 @@ def handle_sigusr1(_signum=None, _stackframe=None):
     USR1FLAG = True
 
 
-
 def get_args() -> Namespace:
     "The usual argparse stuff"
 

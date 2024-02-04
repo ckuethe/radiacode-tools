@@ -76,12 +76,14 @@ def get_dose_from_spectrum(
 
 def find_radiacode_devices() -> List[str]:
     "List all the radiacode devices detected"
-    import usb.core # defer import until someone calls this function
+    import usb.core  # defer import until someone calls this function
+
     return [  # No error handling. Caller can deal with any errors.
         d.serial_number
         for d in usb.core.find(idVendor=0x0483, idProduct=0xF123, find_all=True)
         if d.serial_number.startswith("RC-")
     ]
+
 
 def get_device_id(dev) -> Dict[str, str]:
     "Poll the device for all its identifiers"
@@ -101,12 +103,11 @@ def get_device_id(dev) -> Dict[str, str]:
     except (AttributeError, TypeError):
         pass
 
-
     bv, fv = rv.pop("fv")
     rv["boot_ver"] = f"{bv[0]}.{bv[1]}"
     rv["boot_date"] = bv[2]
     rv["fw_ver"] = f"{fv[0]}.{fv[1]}"
-    rv["fw_date"] = fv[2].strip('\x00')
+    rv["fw_date"] = fv[2].strip("\x00")
     return rv
 
 
@@ -115,11 +116,12 @@ def probe_radiacode_devices():
 
     for dev_id in find_radiacode_devices():
         rc = radiacode.RadiaCode(serial_number=dev_id)
-        d= get_device_id(dev=rc)
+        d = get_device_id(dev=rc)
         print(
             "Found {product}\n"
             "Serial Number: {sernum}\n"
             "Boot {boot_ver} ({boot_date})\n"
             "Firmware {fw_ver} {fw_signature} ({fw_date}) \n"
-            "HW ID {hw_num}".format_map(d), end="\n\n")
-        
+            "HW ID {hw_num}".format_map(d),
+            end="\n\n",
+        )
