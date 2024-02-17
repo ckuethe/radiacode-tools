@@ -111,9 +111,10 @@ def get_args() -> Namespace:
     )
 
     rv = ap.parse_args()
-    if rv.interval < 0.2:
-        print("increasing poll interval to 0.2")
-        rv.interval = 0.2
+    min_poll = 0.5
+    if rv.interval < min_poll:
+        print(f"increasing poll interval to {min_poll}s")
+        rv.interval = min_poll
 
     # post-processing stages.
     rv.devs = list(set(rv.devs))
