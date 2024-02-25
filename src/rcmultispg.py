@@ -17,14 +17,16 @@ from time import sleep, time, strftime, gmtime
 from binascii import hexlify
 from collections import namedtuple
 from struct import pack as struct_pack
-from re import sub as re_sub
+from re import sub as re_sub, match as re_match
+import socket
 from typing import List, Union
-from json import dumps as jdumps
+from json import dumps as jdumps, loads as jloads, JSONDecodeError
 from signal import signal, SIGUSR1, SIGINT, SIGALRM, alarm
 import sys
 import os
 
 Number = Union[int, float]
+GpsData = namedtuple("GpsData", ["payload"])
 SpecData = namedtuple("SpecData", ["time", "serial_number", "spectrum"])
 MIN_POLL_INTERVAL: float = 0.5
 CHECKPOINT_INTERVAL: int = 0
@@ -71,6 +73,13 @@ def get_args() -> Namespace:
             raise ValueError("value cannot be less than 0")
         return f
 
+    def _gpsd(s):
+        m = re_match(r"^gpsd://(?P<host>[a-zA-Z0-9_.-]+)(:(?P<port>\d+))?(?P<dev>/.+)?", s)
+        if m:
+            return m.groupdict()
+        else:
+            return None
+
     ap = ArgumentParser(description="Poll all connected RadiaCode PSRDs and produce spectrograms")
     ap.add_argument(
         "-d",
@@ -114,6 +123,13 @@ def get_args() -> Namespace:
         help="prefix for generated filename [%(default)s]",
     )
     ap.add_argument(
+        "-g",
+        "--gpsd",
+        type=_gpsd,
+        metavar="URL",
+        help="Connect to specified device, eg. gpsd://localhost:2947/dev/ttyACM0",
+    )
+    ap.add_argument(
         "--reset-dose",
         default=False,
         action="store_true",
@@ -139,6 +155,9 @@ def get_args() -> Namespace:
         rv.interval = MIN_POLL_INTERVAL
 
     # post-processing stages.
+    if rv.raw_log is False and rv.gpsd:
+        raise RuntimeError("Geotagging requires raw log mode; either disable geotagging or enable raw logs.")
+
     rv.devs = list(set(rv.devs))
     return rv
 
@@ -341,6 +360,12 @@ def log_worker(args: Namespace) -> None:
                     fd = log_fds[msg.serial_number]
                     print(jdumps(make_rec(msg)), file=fd, flush=True)
 
+            elif isinstance(msg, GpsData):
+                if args.raw_log:
+                    for sn in log_fds:
+                        fd = log_fds[sn]
+                        print(jdumps(msg.payload), file=fd, flush=True)
+
             else:
                 pass  # who put this junk here?
         if snapshot:
@@ -356,6 +381,42 @@ def log_worker(args: Namespace) -> None:
         if sn in log_fds:
             log_fds[sn].close()
     return
+
+
+def gps_worker(args: Namespace) -> None:
+    "Feed position fixes from a GPSD instance into the logs"
+    srv = (args.gpsd["host"], 2947 if args.gpsd["port"] is None else args.gpsd["port"])
+    while CTRL_QUEUE.qsize() == 0:
+        try:
+            with socket.create_connection(srv, 3) as s:
+                gpsfd = s.makefile("rw")
+
+                print('?WATCH={"enable":true,"json":true}', file=gpsfd, flush=True)
+                dedup = None
+                while CTRL_QUEUE.qsize() == 0:
+                    line = gpsfd.readline().strip()
+                    try:
+                        x = jloads(line)
+                        if x["class"] != "TPV":
+                            continue
+                        if x["time"] == dedup:
+                            continue
+                        if x["mode"] < 2:
+                            continue
+
+                        x["gnss"] = True
+                        tpv = GpsData(
+                            {
+                                f: x.get(f, None)
+                                for f in ["time", "gnss", "mode", "lat", "lon", "alt", "speed", "track", "climb"]
+                            }
+                        )
+                        DATA_QUEUE.put(tpv)
+                    except (KeyError, JSONDecodeError):  # skip bad messages, no fix, etc.
+                        pass
+                return  # clean exit
+        except (socket.error, TimeoutError):
+            sleep(1)
 
 
 def main() -> None:
@@ -394,6 +455,9 @@ def main() -> None:
     ]
 
     threads.append(Thread(target=log_worker, args=(args,)))
+
+    if args.gpsd:
+        threads.append(Thread(target=gps_worker, args=(args,)))
 
     signal(SIGUSR1, handle_sigusr1)
     signal(SIGALRM, handle_sigalrm)
