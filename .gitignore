@@ -3,6 +3,8 @@ __pycache__
 .*.sw?
 .vscode
 *.json
+*.ndjson
+*.rcspg
 junk
 dist
 .coverage
