@@ -20,13 +20,14 @@ from struct import pack as struct_pack
 from re import sub as re_sub
 from typing import List, Union
 from json import dumps as jdumps
-from signal import signal, SIGUSR1, SIGINT
+from signal import signal, SIGUSR1, SIGINT, SIGALRM, alarm
 import sys
 import os
 
 Number = Union[int, float]
 SpecData = namedtuple("SpecData", ["time", "serial_number", "spectrum"])
 MIN_POLL_INTERVAL: float = 0.5
+CHECKPOINT_INTERVAL: int = 0
 STDIO_LOCK: Lock = Lock()  # Prevent stdio corruption
 THREAD_BARRIER: Barrier = Barrier(0)  # intialized to 0 to shut up static type checking
 
@@ -46,6 +47,11 @@ def tbar(wait_time=None) -> None:
     """
     if 0 == THREAD_BARRIER.wait(wait_time):
         THREAD_BARRIER.reset()
+
+
+def handle_sigalrm(_signum=None, _stackframe=None):
+    alarm(CHECKPOINT_INTERVAL)
+    DATA_QUEUE.put(SNAPSHOT_OBJECT)
 
 
 def handle_sigusr1(_signum=None, _stackframe=None):
@@ -90,6 +96,14 @@ def get_args() -> Namespace:
         metavar="FLOAT",
         default=5.0,
         help="Polling interval in seconds [%(default).1fs]",
+    )
+    ap.add_argument(
+        "-k",
+        "--checkpoint-interval",
+        type=gte_zero,
+        metavar="INT",
+        default=0,
+        help="Checkpoint interval in seconds",
     )
     ap.add_argument(
         "-p",
@@ -382,6 +396,7 @@ def main() -> None:
     threads.append(Thread(target=log_worker, args=(args,)))
 
     signal(SIGUSR1, handle_sigusr1)
+    signal(SIGALRM, handle_sigalrm)
     signal(SIGINT, handle_sigint)
     print(f"`kill -USR1 {os.getpid()}` to snapshot the spectrogram")
 
@@ -389,6 +404,11 @@ def main() -> None:
     [t.start() for t in threads]
 
     sleep(MIN_POLL_INTERVAL)
+
+    if args.checkpoint_interval:
+        global CHECKPOINT_INTERVAL
+        CHECKPOINT_INTERVAL = int(args.checkpoint_interval)
+        alarm(CHECKPOINT_INTERVAL)
 
     # Main process/thread slowly spins waiting for ^C. If interrupt is received, or one of the
     # workers exits, set a shutdown flag which will cause all other threads to gracefully shut

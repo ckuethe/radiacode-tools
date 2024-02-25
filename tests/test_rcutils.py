@@ -36,3 +36,4 @@ class TestRadiaCodeUtils(unittest.TestCase):
         dev = MockRadiaCode()
         devinfo = rcutils.get_device_id(dev=dev)
         self.assertIn("RC-102", devinfo["sernum"])
+    
