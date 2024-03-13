@@ -99,13 +99,15 @@ def gps_worker(args: Namespace) -> None:
                             print("1" if led_state else "0", flush=True, file=ofd)
                         except (KeyError, JSONDecodeError):  # skip bad messages, no fix, etc.
                             print("0", flush=True, file=ofd)
-                            pass
+                            break
                     # End of read loop
             except KeyboardInterrupt:
                 print("0", flush=True, file=ofd)
                 return
-            except (socket.error, TimeoutError):
-                sleep(1)
+            except (socket.error, TimeoutError) as e:
+                if args.verbose:
+                    print(f"Reattempting connection after exception: {e}")
+                sleep(3)
 
 
 def main() -> None:
