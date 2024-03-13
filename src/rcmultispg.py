@@ -202,7 +202,8 @@ def make_spectrogram_header(
 
 def make_spectrum_line(x: Spectrum) -> str:
     """
-    Encode a spectrum (probably the lifetime accumulated dose) for the second line of the file
+    The second line of the spectrogram is the spectrum of the accumulated exposure
+    since last data reset.
     (duration:int, coeffs:float[3], counts:int[1024])
     """
     v = struct_pack("<Ifff1024I", int(x.duration.total_seconds()), x.a0, x.a1, x.a2, *x.counts)
@@ -249,6 +250,9 @@ def save_data(
     serial_number: str,
     prefix: str = "rcmulti_",
 ):
+    """
+    Emit a spectrogram file into the current directory.
+    """
     duration = data[-1].time - data[2].time
     start_time = data[0].time
     time_string = strftime("%Y%m%d%H%M%S", gmtime(start_time))
