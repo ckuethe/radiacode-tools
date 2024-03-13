@@ -12,6 +12,21 @@ import socket
 from json import loads as jloads, JSONDecodeError
 import os
 
+_example_systemd_unit = """
+[Unit]
+Description=Set a GPIO LED based on gps fix state
+Requires=network.target
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/path/to/gpsled.py -g gpsd://127.0.0.1:2947/ green:lan
+Restart=on-failure
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=multi-user.target
+"""
 
 def get_args() -> Namespace:
     def _gpsd(s):
