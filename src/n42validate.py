@@ -3,12 +3,13 @@
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syn=python
 # SPDX-License-Identifier: MIT
 
-from argparse import ArgumentParser, Namespace
 import os
-import requests
-import defusedxml.ElementTree as ET
-from xmlschema import XMLSchema
+from argparse import ArgumentParser, Namespace
 from tempfile import mkstemp
+
+import defusedxml.ElementTree as ET
+import requests
+from xmlschema import XMLSchema
 
 
 def fetch_or_load_xsd(schema_file="~/.cache/n42.xsd", schema_url="https://www.nist.gov/document/n42xsd") -> XMLSchema:
@@ -112,7 +113,6 @@ def main() -> None:
 
     for f in workqueue:
         xml_doc = ET.parse(f)
-        v = "OK"
         if schema.is_valid(xml_doc):
             if args.verbose or args.valid_only:
                 print(f"[VALID] {f}")

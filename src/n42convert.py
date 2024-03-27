@@ -3,14 +3,16 @@
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syn=python
 # SPDX-License-Identifier: MIT
 
-from uuid import uuid4, UUID
-from textwrap import dedent
-import xmltodict
-from argparse import ArgumentParser, Namespace
-from rcutils import stringify
 import os
+from argparse import ArgumentParser, Namespace
 from io import TextIOWrapper
-from typing import List, Dict, Any
+from textwrap import dedent
+from typing import Any, Dict, List
+from uuid import UUID, uuid4
+
+import xmltodict
+
+from rcutils import stringify
 
 __version__ = "0.0.9"
 __creator__ = "https://github.com/ckuethe/radiacode-tools"
@@ -138,11 +140,11 @@ def format_spectrum(spectrum, fg=True):
             <MeasurementClassCode>{mclass}</MeasurementClassCode>
             <StartDateTime>{timestamp}</StartDateTime> {timestamp_commment}
             <RealTimeDuration>PT{spectrum[layer]["duration"]}S</RealTimeDuration>
-            <Spectrum id="rm-{tag}-sp" radDetectorInformationReference="radiacode-csi-sipm" energyCalibrationReference="ec-{tag}"> 
+            <Spectrum id="rm-{tag}-sp" radDetectorInformationReference="radiacode-csi-sipm" energyCalibrationReference="ec-{tag}">
                 <LiveTimeDuration>PT{spectrum[layer]["duration"]}S</LiveTimeDuration>
                 <ChannelData compressionCode="None">
                     {stringify(spectrum[layer]["spectrum"])}
-                </ChannelData> 
+                </ChannelData>
             </Spectrum>
         </RadMeasurement>
         """
@@ -182,7 +184,7 @@ def make_instrument_info(data):
         {serial_number}
         <RadInstrumentModelName>{data["device_name"]}</RadInstrumentModelName>
         <RadInstrumentClassCode>Spectroscopic Personal Radiation Detector</RadInstrumentClassCode>
-      
+
         <!-- I have a feature request to include firmware and app version in the exported xml files. -->
         <RadInstrumentVersion>
             <RadInstrumentComponentName>Firmware</RadInstrumentComponentName>
@@ -216,9 +218,9 @@ def format_output(
     template = f"""
     <?xml version="1.0"?>
     <?xml-model href="http://physics.nist.gov/N42/2011/schematron/n42.sch" type="application/xml" schematypens="http://purl.oclc.org/dsdl/schematron"?>
-    <RadInstrumentData xmlns="http://physics.nist.gov/N42/2011/N42" 
-                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
-                   xsi:schemaLocation="http://physics.nist.gov/N42/2011/N42 http://physics.nist.gov/N42/2011/n42.xsd" 
+    <RadInstrumentData xmlns="http://physics.nist.gov/N42/2011/N42"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://physics.nist.gov/N42/2011/N42 http://physics.nist.gov/N42/2011/n42.xsd"
                    n42DocUUID="{uuid}">
 
     <!-- What created this file? -->
@@ -311,7 +313,7 @@ def process_single_fileobj(fileobj: TextIOWrapper) -> str:
 
     try:
         bg_spectrum = (format_spectrum(fg_data, fg=False),)
-    except:
+    except Exception:
         bg_spectrum = ""
     n42data = format_output(
         uuid=None,
@@ -339,7 +341,7 @@ def process_single_file(fg_file=None, bg_file=None, out_file=None, uuid=None, ov
 
     try:
         bg_spectrum = format_spectrum(bg_data, fg=False)
-    except:
+    except Exception:
         bg_spectrum = ""
     n42data = format_output(
         uuid=uuid,

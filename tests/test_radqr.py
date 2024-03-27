@@ -3,9 +3,10 @@
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syn=python
 # SPDX-License-Identifier: MIT
 
-import radqr
-import unittest
 import datetime
+import unittest
+
+import radqr
 
 
 class TestRadqr(unittest.TestCase):

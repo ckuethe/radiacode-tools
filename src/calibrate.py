@@ -3,14 +3,15 @@
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syn=python
 # SPDX-License-Identifier: MIT
 
+import json
+import os
 from argparse import ArgumentParser, Namespace
+from sys import exit
+from tempfile import mkstemp
+from typing import Iterable, List, NoReturn, Tuple, Union
+
 from numpy import corrcoef
 from numpy.polynomial import Polynomial
-from tempfile import mkstemp
-import os
-from typing import NoReturn, List, Tuple, Union, Iterable
-import json
-from sys import exit
 
 Numeric = Union[int, float]
 

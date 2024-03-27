@@ -5,25 +5,30 @@
 
 "A tool for grabbing spectra from multiple radiacode devices at the same time"
 
-import usb.core
+import os
+import socket
+import sys
 from argparse import ArgumentParser, Namespace
-from radiacode import RadiaCode, Spectrum
-from radiacode.transports.usb import DeviceNotFound
-from threading import Barrier, BrokenBarrierError, Thread, Lock, active_count
-from queue import Queue
-from tempfile import mkstemp
-from rcutils import UnixTime2FileTime, find_radiacode_devices
-from time import sleep, time, strftime, gmtime
 from binascii import hexlify
 from collections import namedtuple
+from json import JSONDecodeError
+from json import dumps as jdumps
+from json import loads as jloads
+from queue import Queue
+from re import match as re_match
+from re import sub as re_sub
+from signal import SIGALRM, SIGINT, SIGUSR1, alarm, signal
 from struct import pack as struct_pack
-from re import sub as re_sub, match as re_match
-import socket
+from tempfile import mkstemp
+from threading import Barrier, BrokenBarrierError, Lock, Thread, active_count
+from time import gmtime, sleep, strftime, time
 from typing import List, Union
-from json import dumps as jdumps, loads as jloads, JSONDecodeError
-from signal import signal, SIGUSR1, SIGINT, SIGALRM, alarm
-import sys
-import os
+
+import usb.core
+from radiacode import RadiaCode, Spectrum
+from radiacode.transports.usb import DeviceNotFound
+
+from rcutils import UnixTime2FileTime, find_radiacode_devices
 
 Number = Union[int, float]
 GpsData = namedtuple("GpsData", ["payload"])
@@ -268,7 +273,7 @@ def save_data(
 
     tfd, tfn = mkstemp(dir=".")
     os.close(tfd)
-    with open(tfn, "w") as ofd:
+    with open(tfn, "wt") as ofd:
         print(header, file=ofd)
         print(make_spectrum_line(data[-1].spectrum), file=ofd)
         print(format_spectra(data), file=ofd)

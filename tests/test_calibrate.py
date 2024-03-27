@@ -3,13 +3,14 @@
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syn=python
 # SPDX-License-Identifier: MIT
 
-import calibrate
-import unittest
-from unittest.mock import patch
-from argparse import Namespace
 import json
-from tempfile import mkstemp
 import os
+import unittest
+from argparse import Namespace
+from tempfile import mkstemp
+from unittest.mock import patch
+
+import calibrate
 
 
 class TestCalibrate(unittest.TestCase):

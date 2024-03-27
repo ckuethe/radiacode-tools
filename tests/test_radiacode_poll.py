@@ -3,17 +3,19 @@
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syn=python
 # SPDX-License-Identifier: MIT
 
-import sys
 import datetime
-from radiacode.types import Spectrum
-from n42convert import load_radiacode_spectrum
-from rcutils import get_dose_from_spectrum
-from os.path import dirname, join as pathjoin
-import radiacode_poll
-from rcutils import get_device_id
+import sys
 import unittest
-from unittest.mock import patch
 from io import StringIO
+from os.path import dirname
+from os.path import join as pathjoin
+from unittest.mock import patch
+
+from radiacode.types import Spectrum
+
+import radiacode_poll
+from n42convert import load_radiacode_spectrum
+from rcutils import get_device_id, get_dose_from_spectrum
 
 # Approximately when I started writing this; used to give a stable start time
 test_epoch = datetime.datetime(2023, 10, 13, 13, 13, 13)

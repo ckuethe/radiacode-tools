@@ -3,11 +3,12 @@
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syn=python
 # SPDX-License-Identifier: MIT
 
-import deadtime
 import unittest
+from os.path import dirname
+from os.path import join as pathjoin
 from unittest.mock import patch
-from os.path import dirname, join as pathjoin
 
+import deadtime
 
 testdir = pathjoin(dirname(__file__), "data_deadtime")
 

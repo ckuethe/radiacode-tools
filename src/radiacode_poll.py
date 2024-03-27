@@ -3,24 +3,26 @@
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syn=python
 # SPDX-License-Identifier: MIT
 
-import n42convert
-from rcutils import get_dose_from_spectrum, probe_radiacode_devices, get_device_id
 import importlib.metadata
+import os
+import sys
 import warnings
 from argparse import ArgumentParser, Namespace
-from dateutil.parser import parse as dp
-from datetime import timedelta, datetime
-import radiacode
+from datetime import datetime, timedelta
 from tempfile import mkstemp
 from textwrap import dedent
 from time import sleep
-from tqdm.auto import tqdm
 from typing import Dict
-from uuid import uuid4
 from urllib.parse import quote_plus
+from uuid import uuid4
 from zlib import compress as deflate
-import sys
-import os
+
+import radiacode
+from dateutil.parser import parse as dp
+from tqdm.auto import tqdm
+
+import n42convert
+from rcutils import get_device_id, get_dose_from_spectrum, probe_radiacode_devices
 
 
 def get_args() -> Namespace:
@@ -70,8 +72,8 @@ def get_args() -> Namespace:
         default=False,
         action="store_true",
         help="Produce a single spectrum measurement file containing only the difference "
-        + "between the initial spectrum and the final spectrum. The start time will be the"
-        + "time the intial spectrum was captured. If not specified, the output file will"
+        + "between the initial spectrum and the final spectrum. The start time will be the "
+        + "time the intial spectrum was captured. If not specified, the output file will "
         + "contain the intial and final spectra, which can be subtracted in other tools.",
     )
     ux = ap.add_mutually_exclusive_group()

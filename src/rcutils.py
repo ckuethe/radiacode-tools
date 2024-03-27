@@ -5,9 +5,9 @@ Some stuff found to be useful in various scripts, and should thus be hoisted int
 utility library, rather than being imported from and between scripts.
 """
 
-from datetime import datetime
-from typing import Union, List, Any, Dict
 import re
+from datetime import datetime
+from typing import Any, Dict, List, Union
 
 Number = Union[int, float]
 

@@ -4,12 +4,13 @@
 # SPDX-License-Identifier: MIT
 
 import datetime
-from collections import namedtuple
+import unittest
 from argparse import Namespace
+from collections import namedtuple
+from unittest.mock import mock_open, patch
+
 import rcmultispg
 from rcmultispg import SpecData, Spectrum
-import unittest
-from unittest.mock import patch, mock_open
 
 
 class TestRadiaCodePoll(unittest.TestCase):

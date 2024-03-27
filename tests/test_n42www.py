@@ -3,11 +3,13 @@
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syn=python
 # SPDX-License-Identifier: MIT
 
+import unittest
+from os.path import dirname
+from os.path import join as pathjoin
+from unittest.mock import patch
+
 import n42www
 from n42www import n42srv
-import unittest
-from unittest.mock import patch
-from os.path import dirname, join as pathjoin
 
 testdir = pathjoin(dirname(__file__), "data")
 

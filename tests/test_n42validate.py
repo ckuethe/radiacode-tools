@@ -4,12 +4,14 @@
 # SPDX-License-Identifier: MIT
 
 
-import n42validate
-import unittest
-from unittest.mock import patch
-from tempfile import mkstemp
-from os.path import dirname, join as pathjoin
 import os
+import unittest
+from os.path import dirname
+from os.path import join as pathjoin
+from tempfile import mkstemp
+from unittest.mock import patch
+
+import n42validate
 
 testdir = pathjoin(dirname(__file__), "data")
 

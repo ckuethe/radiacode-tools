@@ -4,12 +4,13 @@
 # SPDX-License-Identifier: MIT
 
 import sys
-import n42convert
 import unittest
-from unittest.mock import patch
 from io import StringIO
-from os.path import dirname, join as pathjoin
+from os.path import dirname
+from os.path import join as pathjoin
+from unittest.mock import patch
 
+import n42convert
 
 testdir = pathjoin(dirname(__file__), "data")
 

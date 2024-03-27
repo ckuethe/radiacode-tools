@@ -3,14 +3,15 @@
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syn=python
 # SPDX-License-Identifier: MIT
 
-import zlib
-import re
-from urllib.parse import unquote_plus, quote_plus
 import base64
-import struct
 import datetime
+import re
+import struct
+import zlib
+from typing import Any, Dict, List, Optional, Tuple, Union
+from urllib.parse import unquote_plus
+
 from dateutil.parser import parse as dateparse
-from typing import Union, List, Dict, Tuple, Optional, Any
 
 Number = Union[float, int]
 

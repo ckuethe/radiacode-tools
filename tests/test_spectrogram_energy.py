@@ -3,11 +3,13 @@
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syn=python
 # SPDX-License-Identifier: MIT
 
-import spectrogram_energy
 import unittest
-from unittest.mock import patch
 from io import StringIO
-from os.path import dirname, join as pathjoin
+from os.path import dirname
+from os.path import join as pathjoin
+from unittest.mock import patch
+
+import spectrogram_energy
 
 test_dir = pathjoin(dirname(__file__), "data")
 

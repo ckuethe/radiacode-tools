@@ -3,13 +3,15 @@
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syn=python
 # SPDX-License-Identifier: MIT
 
-from flask import Flask, request, abort, send_file
-from argparse import ArgumentParser, Namespace
-from logging import Logger, getLogger, DEBUG, INFO, WARNING, basicConfig
-from n42convert import process_single_fileobj
 import os
-from re import sub as resub
+from argparse import ArgumentParser, Namespace
 from io import BytesIO
+from logging import DEBUG, INFO, WARNING, Logger, basicConfig, getLogger
+from re import sub as resub
+
+from flask import Flask, abort, request, send_file
+
+from n42convert import process_single_fileobj
 
 appname = "N42Server"
 logger: Logger = getLogger(appname)

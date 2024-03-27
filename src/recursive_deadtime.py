@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 
-from argparse import ArgumentParser, Namespace
-import deadtime
 import os
+from argparse import ArgumentParser, Namespace
 
+import deadtime
 
 _UNSET_ = "n0"  # a bare neutron, just as a string whose contents may be searched
 

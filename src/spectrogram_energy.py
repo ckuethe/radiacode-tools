@@ -5,13 +5,14 @@
 
 """compute the energy in a radiacode spectrogram (or list of spectrograms)"""
 
-from argparse import ArgumentParser, Namespace
-from collections import namedtuple
-from binascii import unhexlify
-from rcutils import get_dose_from_spectrum, FileTime2DateTime
+import os
 import struct
 import sys
-import os
+from argparse import ArgumentParser, Namespace
+from binascii import unhexlify
+from collections import namedtuple
+
+from rcutils import FileTime2DateTime, get_dose_from_spectrum
 
 SGHeader = namedtuple("SGHeader", field_names=["name", "time", "timestamp", "channels", "duration", "flags", "comment"])
 EnergyCalibration = namedtuple("EnergyCalibration", field_names=["a0", "a1", "a2"], defaults=[0, 3000 / 1024, 0])
