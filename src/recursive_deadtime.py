@@ -55,6 +55,7 @@ def main() -> None:
     else:
         rate_bg = 0
 
+    # file deepcode ignore PT: CLI tool intentionally opening the files the user asked for
     for rootdir, dirs, files in os.walk(args.datadir):
         if 3 == len(files):
             process_dir(rootdir, files, rate_bg=rate_bg)

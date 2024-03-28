@@ -348,6 +348,7 @@ def log_worker(args: Namespace) -> None:
         os.close(tmpfd)
         fn = f"raw_{sn}_{time_string}.ndjson"
         os.rename(tmpfn, fn)
+        # deepcode ignore MissingClose: There is a matching close loop below.. snyk just can't find it
         log_fds[sn] = open(fn, "w")
 
     running = True

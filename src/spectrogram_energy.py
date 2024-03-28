@@ -14,7 +14,9 @@ from collections import namedtuple
 
 from rcutils import FileTime2DateTime, get_dose_from_spectrum
 
-SGHeader = namedtuple("SGHeader", field_names=["name", "time", "timestamp", "channels", "duration", "flags", "comment"])
+SGHeader = namedtuple(
+    "SGHeader", field_names=["name", "time", "timestamp", "channels", "duration", "flags", "comment"], defaults=[""] * 7
+)
 EnergyCalibration = namedtuple("EnergyCalibration", field_names=["a0", "a1", "a2"], defaults=[0, 3000 / 1024, 0])
 SpecEnergy = namedtuple("SpecEnergy", field_names=["dose", "duration", "peak_dose"])
 
@@ -60,7 +62,7 @@ def extract_calibration_from_spectrum(s: str) -> EnergyCalibration:
 def load_spectrogram(fn: str) -> SpecEnergy:
     """Open a spectrogram"""
     cal: EnergyCalibration = None
-    header: SGHeader = None
+    header: SGHeader = SGHeader()
     total_energy: float = 0.0
     peak_dose_rate: float = 0.0
 
@@ -91,6 +93,7 @@ def main() -> None:
         found_files = []
         for d in args.files:
             print(f"scanning {d}")
+            # file deepcode ignore PT: CLI tool intentionally opening the files the user asked for
             for root, _, files in os.walk(d):
                 found_files.extend([os.path.join(root, f) for f in files])
         args.files = found_files

@@ -71,6 +71,7 @@ def template_calibration(args: Namespace) -> NoReturn:
     os.close(tfd)
     with open(tfn, "w") as ofd:
         ofd.write(blob)
+    # deepcode ignore PT: CLI tool, intentionally accepts user paths
     os.rename(tfn, args.cal_file)
 
     exit(0)
@@ -96,6 +97,7 @@ def load_calibration(args: Namespace) -> List[Tuple[Numeric, Numeric]]:
 
     """
     rv = []
+    # file deepcode ignore PT: CLI too, intentionally opening the file the user asked for
     with open(args.cal_file) as ifd:
         data = json.load(ifd)
     for element in data:

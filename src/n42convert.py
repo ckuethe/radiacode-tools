@@ -7,7 +7,7 @@ import os
 from argparse import ArgumentParser, Namespace
 from io import TextIOWrapper
 from textwrap import dedent
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 from uuid import UUID, uuid4
 
 import xmltodict
@@ -42,10 +42,11 @@ def parse_spectrum(spectrum, check: bool = True):
     return rv
 
 
-def load_radiacode_spectrum(filename: str = None, fileobj: TextIOWrapper = None) -> Dict[str, Any]:
+def load_radiacode_spectrum(filename: Optional[str] = None, fileobj: Optional[TextIOWrapper] = None) -> Dict[str, Any]:
     if filename and fileobj:
         raise ValueError("Only one of filename or fileobj may be given")
     if filename:
+        # file deepcode ignore MissingCloseOnSomePath: CLI tool intentionally opening the files the user asked for
         ifd = open(filename)
     elif fileobj:
         ifd = fileobj
@@ -357,6 +358,7 @@ def process_single_file(fg_file=None, bg_file=None, out_file=None, uuid=None, ov
         out_file = f"{fg_file}.n42"
 
     mode = "w" if overwrite else "x"
+    # file deepcode ignore PT: CLI tool intentionally opening the files the user asked for
     with open(out_file, mode) as ofd:
         print(f"Output file: {out_file}")
         ofd.write(dedent(n42data))

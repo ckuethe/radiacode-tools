@@ -22,6 +22,7 @@ def fetch_or_load_xsd(schema_file="~/.cache/n42.xsd", schema_url="https://www.ni
             tfd, tfn = mkstemp(prefix="schema_", dir=schema_dir)
             print(tfn)
             os.close(tfd)
+            # file deepcode ignore PT: CLI tool intentionally opening the files the user asked for
             with open(tfn, "w") as ofd:
                 ofd.write(resp.text)
             os.rename(tfn, schema_file)

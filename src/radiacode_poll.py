@@ -324,7 +324,9 @@ def main() -> None:
         print(data, file=ofd)
 
     if args.outfile:
-        ofd.close()
+        if ofd:
+            ofd.close()
+        # file deepcode ignore PT: CLI tool intentionally opening the files the user asked for
         os.rename(tfn, args.outfile)
 
 

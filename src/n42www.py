@@ -45,6 +45,7 @@ def handle_convert():
 
     upload = request.files[input_name]
     try:
+        # deepcode ignore PT: this is a file handle not a path subject to traversal.
         converted = process_single_fileobj(fileobj=upload.stream)
     except KeyboardInterrupt:
         raise
@@ -122,6 +123,7 @@ def main() -> None:
 
     basicConfig(level=loglevel)
     n42srv.config["MAX_CONTENT_LENGTH"] = args.max_size
+    # file deepcode ignore RunWithDebugTrue: Bind address is set to localhost when debug is enabled
     n42srv.run(
         host=args.bind_addr,
         port=args.port,
