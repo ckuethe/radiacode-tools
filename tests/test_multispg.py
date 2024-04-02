@@ -42,7 +42,7 @@ class TestRadiaCodePoll(unittest.TestCase):
             args = rcmultispg.get_args()
             self.assertFalse(args.require_all)
             self.assertEqual(len(args.devs), 2)
-            self.assertEqual(args.interval, 0.2)
+            self.assertEqual(args.interval, 0.5)
 
         # Reject negative times
         with patch("sys.argv", [__file__, "-i", "-10"]), self.assertRaises(SystemExit):
