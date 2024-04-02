@@ -37,6 +37,7 @@ def load_spectra(args) -> Dict[str, float]:
     try:
         rv["a"] = float(args.first) / args.interval
     except ValueError:
+        # file deepcode ignore PT: CLI tool intentionally opening the files the user asked for
         rv["a"] = get_rate_from_spectrum(args.first)
 
     try:

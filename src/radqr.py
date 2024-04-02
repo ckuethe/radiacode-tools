@@ -15,7 +15,7 @@ from dateutil.parser import parse as dateparse
 
 Number = Union[float, int]
 
-_B45C = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ $%*+-./:"
+_B45C = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ $%*+-./:"  # defined in RFC9285
 OPT_NO_DEFLATE = 0x01
 OPT_NO_BASE_X = 0x02
 OPT_USE_BASE64 = 0x10
@@ -402,6 +402,7 @@ def make_qr_payload(
     else:
         encoded_spectrum = vbyte_encode(spectrum)
 
+    # deepcode ignore BadMixOfStrAndBytes: snyk doesn't realize that encoded_spectrum is always bytes
     fields.append(b"S:" + encoded_spectrum)
 
     fieldsep = b" "
