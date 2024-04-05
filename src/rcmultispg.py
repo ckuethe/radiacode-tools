@@ -3,38 +3,44 @@
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syn=python
 # SPDX-License-Identifier: MIT
 
-"A tool for grabbing spectra from multiple radiacode devices at the same time"
+"""
+A tool for recording real time count and dose rates, as well as time synchronized
+spectra from multiple radiacode devices. These quantities may be geotagged if the
+the host running this tool is running a GPSD instance. This allows the production
+of Radiacode compatible rctrk (track) and rcspg (spectrogram files); additional
+environmental inputs may be supported in the future to allow for enrichment with
+sensor altitude, attitude, ambient temperature, humidity...
+"""
 
 import os
 import socket
 import sys
 from argparse import ArgumentParser, Namespace
-from binascii import hexlify
 from collections import namedtuple
+from datetime import datetime
 from json import JSONDecodeError
 from json import dumps as jdumps
 from json import loads as jloads
 from queue import Queue
 from re import match as re_match
-from re import sub as re_sub
-from signal import SIGALRM, SIGINT, SIGUSR1, alarm, signal
-from struct import pack as struct_pack
+from signal import SIGINT, signal
 from tempfile import mkstemp
 from threading import Barrier, BrokenBarrierError, Lock, Thread, active_count
+from threading import enumerate as list_threads
 from time import gmtime, sleep, strftime, time
-from typing import List, Union
+from typing import Dict, List, Union
 
 import usb.core
-from radiacode import RadiaCode, Spectrum
+from radiacode import RadiaCode
 from radiacode.transports.usb import DeviceNotFound
 
-from rcutils import UnixTime2FileTime, find_radiacode_devices
+from rcutils import RtData, SpecData, find_radiacode_devices, specdata_to_dict
 
 Number = Union[int, float]
 GpsData = namedtuple("GpsData", ["payload"])
-SpecData = namedtuple("SpecData", ["time", "serial_number", "spectrum"])
-MIN_POLL_INTERVAL: float = 0.5
-CHECKPOINT_INTERVAL: int = 0
+
+MIN_POLL_INTERVAL: float = 0.5  # internally radiacode seems to do 2Hz updates, but 1Hz may give better results
+RC_LOCKS: Dict[str, Lock] = dict()  # prevent rtdata polling and spectrum polling from stomping on each other
 STDIO_LOCK: Lock = Lock()  # Prevent stdio corruption
 THREAD_BARRIER: Barrier = Barrier(0)  # intialized to 0 to shut up static type checking
 
@@ -42,7 +48,6 @@ THREAD_BARRIER: Barrier = Barrier(0)  # intialized to 0 to shut up static type c
 DATA_QUEUE: Queue = Queue()  # Global so I can use them in signal handlers
 CTRL_QUEUE: Queue = Queue()
 SHUTDOWN_OBJECT = object()
-SNAPSHOT_OBJECT = object()
 
 
 def tbar(wait_time=None) -> None:
@@ -56,16 +61,7 @@ def tbar(wait_time=None) -> None:
         THREAD_BARRIER.reset()
 
 
-def handle_sigalrm(_signum=None, _stackframe=None):
-    alarm(CHECKPOINT_INTERVAL)
-    DATA_QUEUE.put(SNAPSHOT_OBJECT)
-
-
-def handle_sigusr1(_signum=None, _stackframe=None):
-    DATA_QUEUE.put(SNAPSHOT_OBJECT)
-
-
-def handle_sigint(_signum=None, _stackframe=None):
+def handle_sigint(_signum=None, _stackframe=None) -> None:
     CTRL_QUEUE.put(SHUTDOWN_OBJECT)
 
 
@@ -79,7 +75,7 @@ def get_args() -> Namespace:
         return f
 
     def _gpsd(s):
-        m = re_match(r"^gpsd://(?P<host>[a-zA-Z0-9_.-]+)(:(?P<port>\d+))?(?P<dev>/.+)?", s)
+        m = re_match(r"^gpsd://(?P<host>[a-zA-Z0-9_.-]+)(:(?P<port>\d+))?(?P<device>/.+)?", s)
         if m:
             return m.groupdict()
         else:
@@ -112,14 +108,6 @@ def get_args() -> Namespace:
         help="Polling interval in seconds [%(default).1fs]",
     )
     ap.add_argument(
-        "-k",
-        "--checkpoint-interval",
-        type=gte_zero,
-        metavar="INT",
-        default=0,
-        help="Checkpoint interval in seconds",
-    )
-    ap.add_argument(
         "-p",
         "--prefix",
         default="rcmulti_",
@@ -146,138 +134,47 @@ def get_args() -> Namespace:
         action="store_true",
         help="reset the currently displayed spectrum",
     )
-    ap.add_argument(
-        "-l",
-        "--raw-log",
-        default=False,
-        action="store_true",
-        help="record raw measurements to raw_{serial}_{timestamp}.ndjson",
-    )
-
     rv = ap.parse_args()
     if rv.interval < MIN_POLL_INTERVAL:
         print(f"increasing poll interval to {MIN_POLL_INTERVAL}s")
         rv.interval = MIN_POLL_INTERVAL
 
     # post-processing stages.
-    if rv.raw_log is False and rv.gpsd:
-        raise RuntimeError("Geotagging requires raw log mode; either disable geotagging or enable raw logs.")
-
     rv.devs = list(set(rv.devs))
     return rv
 
 
-def make_spectrogram_header(
-    duration: int,
-    serial_number: str,
-    start_time: Number,
-    name: str = "",
-    comment: str = "",
-    flags: int = 1,
-    channels: int = 1024,
-) -> str:
-    """
-    Create the first (header) line of the spectrum file
+def rtdata_worker(rc: RadiaCode, serial_number: str) -> None:
+    db = []
+    while CTRL_QUEUE.qsize() == 0:  # don't even need to read the item
+        sleep(1)
+        with RC_LOCKS[serial_number]:
+            try:
+                db = rc.data_buf()
+            except Exception as e:
+                if "seq jump" in e.args or "but have only" in e.args:
+                    continue
+                else:
+                    raise
 
-    Not all flag values are known, but bit 0 being unset means that the
-    spectrogram recording was interrupted and resumed.
-    """
+        for x in db:
+            rtd_type = x.__class__.__name__  # ick.
+            if rtd_type == "Event":
+                continue
+            d = {
+                "time": x.dt.timestamp(),
+                "serial_number": serial_number,
+                "type": rtd_type,
+            }
 
-    start_time = float(start_time)  # accept reasonable inputs: 1700000000, 1.7e9, "1.7e9", ...
-    file_time = UnixTime2FileTime(start_time)
-    gt = gmtime(start_time)
-    tstr = strftime("%Y-%m-%d %H:%M:%S", gt)  # This one is for the header
-
-    if not name:
-        # and this version of time just looks like an int... for deduplication
-        name = f"rcmulti-{strftime('%Y%m%d%H%M%S', gt)}-{serial_number}"
-
-    fields = [
-        f"Spectrogram: {name.strip()}",
-        f"Time: {tstr}",
-        f"Timestamp: {file_time}",
-        f"Accumulation time: {int(duration)}",
-        f"Channels: {channels}",
-        f"Device serial: {serial_number.strip()}",
-        f"Flags: {flags}",
-        f"Comment: {comment}",
-    ]
-    return "\t".join(fields)
-
-
-def make_spectrum_line(x: Spectrum) -> str:
-    """
-    The second line of the spectrogram is the spectrum of the accumulated exposure
-    since last data reset.
-    (duration:int, coeffs:float[3], counts:int[1024])
-    """
-    v = struct_pack("<Ifff1024I", int(x.duration.total_seconds()), x.a0, x.a1, x.a2, *x.counts)
-    v = hexlify(v, sep=" ").decode()
-    return f"Spectrum: {v}"
-
-
-def format_spectra(data: List[SpecData]) -> str:
-    """
-    Given the list of SpecData, convert them to whatever we need for the spectrogram
-
-    data[0] = all-time accumulated spectrum - survives "reset accumulation"
-    data[1] = current accumulated spectrum at the start of measurement. needed to compute
-    data[2:] = the rest of the spectra
-    """
-    lines = []
-    prev_rec = data[1]
-    for rec in data[2:]:
-        ts = rec.time
-        line = [UnixTime2FileTime(ts), int(ts - prev_rec.time)]
-        line.extend([int(x[0] - x[1]) for x in zip(rec.spectrum.counts, prev_rec.spectrum.counts)])
-        prev_rec = rec
-        line = "\t".join([str(x) for x in line])
-        line = re_sub(r"(\s0)+$", "", line)
-        lines.append(line)
-
-    return "\n".join(lines)
-
-
-def make_rec(data: SpecData):
-    "Turn a SpecData into an easily jsonified dict"
-    rec = {
-        "timestamp": data.time,
-        "serial_number": data.serial_number,
-        "duration": data.spectrum.duration.total_seconds(),
-        "calibration": [data.spectrum.a0, data.spectrum.a1, data.spectrum.a2],
-        "counts": data.spectrum.counts,
-    }
-    return rec
-
-
-def save_data(
-    data: List[SpecData],
-    serial_number: str,
-    prefix: str = "rcmulti_",
-):
-    """
-    Emit a spectrogram file into the current directory.
-    """
-    duration = data[-1].time - data[2].time
-    start_time = data[0].time
-    time_string = strftime("%Y%m%d%H%M%S", gmtime(start_time))
-    fn = f"{prefix}{serial_number}_{time_string}.rcspg"
-
-    header = make_spectrogram_header(
-        duration=duration,
-        serial_number=serial_number,
-        start_time=start_time,
-    )
-    with STDIO_LOCK:
-        print(f"saving spectrogram in {fn}")
-
-    tfd, tfn = mkstemp(dir=".")
-    os.close(tfd)
-    with open(tfn, "wt") as ofd:
-        print(header, file=ofd)
-        print(make_spectrum_line(data[-1].spectrum), file=ofd)
-        print(format_spectra(data), file=ofd)
-    os.rename(tfn, fn)
+            xd = x.__dict__
+            d.update(
+                {
+                    f: xd.get(f, None)
+                    for f in ["temperature", "charge_level", "count_rate", "dose_rate", "count", "dose", "duration"]
+                }
+            )
+            DATA_QUEUE.put(RtData(**d))
 
 
 def rc_worker(args: Namespace, serial_number: str) -> None:
@@ -286,6 +183,7 @@ def rc_worker(args: Namespace, serial_number: str) -> None:
     accumulates data, and generates the output file
     """
 
+    RC_LOCKS[serial_number] = Lock()
     try:
         rc = RadiaCode(serial_number=serial_number)
     except (usb.core.USBTimeoutError, usb.core.USBError, DeviceNotFound) as e:
@@ -294,9 +192,10 @@ def rc_worker(args: Namespace, serial_number: str) -> None:
             CTRL_QUEUE.put(SHUTDOWN_OBJECT)  # if we can't start all threads, shut everything down
         return
 
-    with STDIO_LOCK:
+    with RC_LOCKS[serial_number], STDIO_LOCK:
+        rc.set_local_time(datetime.now())
+        DATA_QUEUE.put(SpecData(time(), serial_number, rc.spectrum_accum()))
         print(f"{serial_number} Connected ")
-    DATA_QUEUE.put(SpecData(time(), serial_number, rc.spectrum_accum()))
 
     # wait for all threads to connect to their devices
     if THREAD_BARRIER.n_waiting >= 1:
@@ -306,12 +205,22 @@ def rc_worker(args: Namespace, serial_number: str) -> None:
     try:
         tbar(3)
     except BrokenBarrierError:
+        with STDIO_LOCK:
+            print(f"timeout waiting for devices")
         return
 
-    if args.reset_spectrum:
-        rc.spectrum_reset()
-    if args.reset_dose:
-        rc.dose_reset()
+    rtdata_thread = Thread(
+        target=rtdata_worker,
+        args=(rc, serial_number),
+        name=f"rtdata-worker-{serial_number}",
+    )
+    rtdata_thread.start()
+
+    with RC_LOCKS[serial_number]:
+        if args.reset_spectrum:
+            rc.spectrum_reset()
+        if args.reset_dose:
+            rc.dose_reset()
 
     with STDIO_LOCK:
         print(f"{serial_number} sampling")
@@ -319,7 +228,9 @@ def rc_worker(args: Namespace, serial_number: str) -> None:
     i = 0
     while CTRL_QUEUE.qsize() == 0:  # don't even need to read the item
         try:
-            DATA_QUEUE.put(SpecData(time(), serial_number, rc.spectrum()))
+            # Grab the spectrum...
+            with RC_LOCKS[serial_number]:
+                DATA_QUEUE.put(SpecData(time(), serial_number, rc.spectrum()))
             with STDIO_LOCK:
                 print(f"\rn:{i}", end="", flush=True)
                 i += 1
@@ -338,8 +249,7 @@ def log_worker(args: Namespace) -> None:
     with STDIO_LOCK:
         print(f"starting log_worker for: {' '.join(args.devs)}")
 
-    log_fds = {d: None for d in args.devs} if args.raw_log else {}
-    measurements = {d: [] for d in args.devs}
+    log_fds = {d: None for d in args.devs}
     start_time = time()
     time_string = strftime("%Y%m%d%H%M%S", gmtime(start_time))
 
@@ -352,7 +262,6 @@ def log_worker(args: Namespace) -> None:
         log_fds[sn] = open(fn, "w")
 
     running = True
-    snapshot = False
     while running:
         while DATA_QUEUE.qsize():
             msg = DATA_QUEUE.get()
@@ -360,48 +269,52 @@ def log_worker(args: Namespace) -> None:
                 running = False  # bail out once this batch of messages is done
                 continue
 
-            elif msg is SNAPSHOT_OBJECT:
-                snapshot = True  # save the current spectrogram immediately
-                continue
-
             elif isinstance(msg, SpecData):
-                measurements[msg.serial_number].append(msg)
-                if args.raw_log:
-                    fd = log_fds[msg.serial_number]
-                    print(jdumps(make_rec(msg)), file=fd, flush=True)
+                fd = log_fds[msg.serial_number]
+                print(jdumps(specdata_to_dict(msg)), file=fd, flush=True)
+
+            elif isinstance(msg, RtData):
+                fd = log_fds[msg.serial_number]
+                print(jdumps(msg._asdict()), file=fd, flush=True)
 
             elif isinstance(msg, GpsData):
-                if args.raw_log:
-                    for sn in log_fds:
-                        fd = log_fds[sn]
-                        print(jdumps(msg.payload), file=fd, flush=True)
+                gps_msg = jdumps(msg.payload)
+                for sn in log_fds:
+                    print(gps_msg, file=log_fds[sn], flush=True)
 
             else:
+                with STDIO_LOCK:
+                    print(f"ignored {msg}")
                 pass  # who put this junk here?
-        if snapshot:
-            with STDIO_LOCK:
-                print()
-            for sn in measurements:
-                save_data(data=measurements[sn], serial_number=sn)
-            snapshot = False
-        sleep(MIN_POLL_INTERVAL / 2)
 
+        sleep(MIN_POLL_INTERVAL)
+
+    # No longer `running`
     for sn in args.devs:
-        save_data(data=measurements[sn], serial_number=sn)
         if sn in log_fds:
             log_fds[sn].close()
     return
 
 
 def gps_worker(args: Namespace) -> None:
-    "Feed position fixes from a GPSD instance into the logs"
+    """
+    Feed position fixes from a GPSD instance into the logs
+
+    GPS data enrichment is ... a polite request. If GPSD goes down, navigation
+    solutions are unavailable or invalid, etc. we don't want to take quit the
+    whole process.
+    """
     srv = (args.gpsd["host"], 2947 if args.gpsd["port"] is None else args.gpsd["port"])
+    watch_args = {"enable": True, "json": True}
+    if args.gpsd["device"]:
+        watch_args["device"] = args.gpsd["device"]
+    watch = "?WATCH=" + jdumps(watch_args)
     while CTRL_QUEUE.qsize() == 0:
         try:
             with socket.create_connection(srv, 3) as s:
                 gpsfd = s.makefile("rw")
+                print(watch, file=gpsfd, flush=True)
 
-                print('?WATCH={"enable":true,"json":true}', file=gpsfd, flush=True)
                 dedup = None
                 while CTRL_QUEUE.qsize() == 0:
                     line = gpsfd.readline().strip()
@@ -418,7 +331,19 @@ def gps_worker(args: Namespace) -> None:
                         tpv = GpsData(
                             {
                                 f: x.get(f, None)
-                                for f in ["time", "gnss", "mode", "lat", "lon", "alt", "speed", "track", "climb"]
+                                for f in [
+                                    "time",
+                                    "gnss",
+                                    "mode",
+                                    "lat",
+                                    "lon",
+                                    "alt",
+                                    "epc",
+                                    "sep",
+                                    "speed",
+                                    "track",
+                                    "climb",
+                                ]
                             }
                         )
                         DATA_QUEUE.put(tpv)
@@ -426,6 +351,7 @@ def gps_worker(args: Namespace) -> None:
                         pass
                 return  # clean exit
         except (socket.error, TimeoutError):
+            DATA_QUEUE.put(GpsData(payload='{"gnss": false, "mode": 0}'))
             sleep(1)
 
 
@@ -452,43 +378,36 @@ def main() -> None:
     if not args.devs:  # no devs specified, use all detected
         args.devs = dev_names
 
-    THREAD_BARRIER._parties = len(args.devs)  # ick, but works
+    expected_thread_count = 2 * len(args.devs)  # two device threads: spectrum and realtime data
+
+    # file deepcode ignore MissingAPI: all threads will be cleaned at the bottom of main()
+    Thread(target=log_worker, args=(args,), name="log-worker").start()
+    expected_thread_count += 1
+
+    if args.gpsd:
+        Thread(target=gps_worker, args=(args,), name="gps-worker").start()
+        expected_thread_count += 1
 
     # create the threads and store in a list so they can be checked later
-    threads: List[Thread] = [
+    [
         Thread(
             target=rc_worker,
-            name=serial_number,
+            name=f"poller-worker-{serial_number}",
             args=(args, serial_number),
-        )
+        ).start()
         for serial_number in args.devs
     ]
 
-    threads.append(Thread(target=log_worker, args=(args,)))
-
-    if args.gpsd:
-        threads.append(Thread(target=gps_worker, args=(args,)))
-
-    signal(SIGUSR1, handle_sigusr1)
-    signal(SIGALRM, handle_sigalrm)
+    THREAD_BARRIER._parties = len(args.devs)
     signal(SIGINT, handle_sigint)
-    print(f"`kill -USR1 {os.getpid()}` to snapshot the spectrogram")
 
-    # Start the readers
-    [t.start() for t in threads]
-
-    sleep(MIN_POLL_INTERVAL)
-
-    if args.checkpoint_interval:
-        global CHECKPOINT_INTERVAL
-        CHECKPOINT_INTERVAL = int(args.checkpoint_interval)
-        alarm(CHECKPOINT_INTERVAL)
+    sleep(1)
 
     # Main process/thread slowly spins waiting for ^C. If interrupt is received, or one of the
     # workers exits, set a shutdown flag which will cause all other threads to gracefully shut
     try:
-        while active_count() - 1 == len(threads):
-            sleep(0.25)
+        while active_count() >= expected_thread_count:
+            sleep(MIN_POLL_INTERVAL)
     except KeyboardInterrupt:
         pass
     finally:
@@ -499,7 +418,10 @@ def main() -> None:
 
     # Clean up
     while active_count() > 1:  # main process counts as a thread
-        [t.join(0.1) for t in threads]
+        try:
+            [t.join(0.1) for t in list_threads()]
+        except RuntimeError:
+            pass
         sleep(0.1)
 
 
