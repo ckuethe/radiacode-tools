@@ -68,7 +68,7 @@ def load_spectrogram(fn: str) -> SpecEnergy:
 
     with open(fn) as ifd:
         for line in ifd:
-            if line.startswith("Spectrogram:") and header is None:
+            if line.startswith("Spectrogram:") and not header.name:
                 header = parse_header(line)
             elif line.startswith("Spectrum:") and cal is None:
                 cal = extract_calibration_from_spectrum(line)
