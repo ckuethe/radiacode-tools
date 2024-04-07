@@ -134,9 +134,15 @@ def get_args() -> Namespace:
         action="store_true",
         help="reset the currently displayed spectrum",
     )
+    ap.add_argument(
+        "--stdout",
+        default=False,
+        action="store_true",
+        help="log to stdout instead of to a file",
+    )
     rv = ap.parse_args()
     if rv.interval < MIN_POLL_INTERVAL:
-        print(f"increasing poll interval to {MIN_POLL_INTERVAL}s")
+        print(f"increasing poll interval to {MIN_POLL_INTERVAL}s", file=sys.stderr)
         rv.interval = MIN_POLL_INTERVAL
 
     # post-processing stages.
@@ -189,25 +195,28 @@ def rc_worker(args: Namespace, serial_number: str) -> None:
         rc = RadiaCode(serial_number=serial_number)
     except (usb.core.USBTimeoutError, usb.core.USBError, DeviceNotFound) as e:
         with STDIO_LOCK:
-            print(f"{serial_number} failed to connect - cable error, device disconnect, bt connected? {e}")
+            print(
+                f"{serial_number} failed to connect - cable error, device disconnect, bt connected? {e}",
+                file=sys.stderr,
+            )
             CTRL_QUEUE.put(SHUTDOWN_OBJECT)  # if we can't start all threads, shut everything down
         return
 
     with RC_LOCKS[serial_number], STDIO_LOCK:
         rc.set_local_time(datetime.now())
         DATA_QUEUE.put(SpecData(time(), serial_number, rc.spectrum_accum()))
-        print(f"{serial_number} Connected ")
+        print(f"{serial_number} Connected ", file=sys.stderr)
 
     # wait for all threads to connect to their devices
     if THREAD_BARRIER.n_waiting >= 1:
         with STDIO_LOCK:
-            print(f"{serial_number} waiting for device connections")
+            print(f"{serial_number} waiting for device connections", file=sys.stderr)
 
     try:
         tbar(3)
     except BrokenBarrierError:
         with STDIO_LOCK:
-            print(f"timeout waiting for devices")
+            print(f"timeout waiting for devices", file=sys.stderr)
         return
 
     rtdata_thread = Thread(
@@ -224,7 +233,7 @@ def rc_worker(args: Namespace, serial_number: str) -> None:
             rc.dose_reset()
 
     with STDIO_LOCK:
-        print(f"{serial_number} sampling")
+        print(f"{serial_number} sampling", file=sys.stderr)
 
     i = 0
     while CTRL_QUEUE.qsize() == 0:  # don't even need to read the item
@@ -233,7 +242,7 @@ def rc_worker(args: Namespace, serial_number: str) -> None:
             with RC_LOCKS[serial_number]:
                 DATA_QUEUE.put(SpecData(time(), serial_number, rc.spectrum()))
             with STDIO_LOCK:
-                print(f"\rn:{i}", end="", flush=True)
+                print(f"\rn:{i}", end="", flush=True, file=sys.stderr)
                 i += 1
             sleep(args.interval)
             tbar()
@@ -242,25 +251,28 @@ def rc_worker(args: Namespace, serial_number: str) -> None:
             THREAD_BARRIER.abort()
 
     with STDIO_LOCK:
-        print(f"{serial_number} data collection stop - {i} records, {i*args.interval:.1f}s")
+        print(f"{serial_number} data collection stop - {i} records, {i*args.interval:.1f}s", file=sys.stderr)
 
 
 def log_worker(args: Namespace) -> None:
     "Handle realtime logging of measurements if you can't wait for the spectrogram file"
     with STDIO_LOCK:
-        print(f"starting log_worker for: {' '.join(args.devs)}")
+        print(f"starting log_worker for: {' '.join(args.devs)}", file=sys.stderr)
 
     log_fds = {d: None for d in args.devs}
     start_time = time()
     time_string = strftime("%Y%m%d%H%M%S", gmtime(start_time))
 
     for sn in args.devs:
-        tmpfd, tmpfn = mkstemp(dir=".")
-        os.close(tmpfd)
-        fn = f"raw_{sn}_{time_string}.ndjson"
-        os.rename(tmpfn, fn)
-        # deepcode ignore MissingClose: There is a matching close loop below.. snyk just can't find it
-        log_fds[sn] = open(fn, "w")
+        if args.stdout:
+            log_fds[sn] = sys.stdout
+        else:
+            tmpfd, tmpfn = mkstemp(dir=".")
+            os.close(tmpfd)
+            fn = f"raw_{sn}_{time_string}.ndjson"
+            os.rename(tmpfn, fn)
+            # deepcode ignore MissingClose: There is a matching close loop below.. snyk just can't find it
+            log_fds[sn] = open(fn, "w")
 
     running = True
     while running:
@@ -293,7 +305,8 @@ def log_worker(args: Namespace) -> None:
     # No longer `running`
     for sn in args.devs:
         if sn in log_fds:
-            log_fds[sn].close()
+            if log_fds[sn] != sys.stdout:
+                log_fds[sn].close()
     return
 
 
@@ -364,13 +377,13 @@ def main() -> None:
         dev_names = None
     finally:
         if not dev_names:
-            print("No devices Found")
+            print("No devices Found", file=sys.stderr)
             sys.exit(1)
 
     missing = set(args.devs).difference(set(dev_names))
     if missing:
         if args.require_all:
-            print(f"Some devices are missing: {' '.join(list(missing))}")
+            print(f"Some devices are missing: {' '.join(list(missing))}", file=sys.stderr)
             sys.exit(1)
         else:
             # Well then, some devices were present, some were requested
@@ -415,7 +428,7 @@ def main() -> None:
         CTRL_QUEUE.put(SHUTDOWN_OBJECT)
         DATA_QUEUE.put(SHUTDOWN_OBJECT)
         with STDIO_LOCK:
-            print("Stopping threads")
+            print("Stopping threads", file=sys.stderr)
 
     # Clean up
     while active_count() > 1:  # main process counts as a thread
