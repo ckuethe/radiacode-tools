@@ -152,7 +152,8 @@ def rtdata_worker(rc: RadiaCode, serial_number: str) -> None:
             try:
                 db = rc.data_buf()
             except Exception as e:
-                if "seq jump" in e.args or "but have only" in e.args:
+                z = e.args[0]
+                if "seq jump" in z or "but have only" in z:
                     continue
                 else:
                     raise
