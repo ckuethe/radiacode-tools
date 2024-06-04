@@ -194,3 +194,32 @@ included as a Background measurement, with the final spectrum as a Foreground.
 
 Two options are given to reset the in-memory spectrum and the total accumulated dose.
 I'm calling them dangerous since they will delete data from device memory.
+
+### sanitize_track.py / rcsanitize
+```
+usage: rcsanitize [-h] [-p PREFIX] [-s STR] [-t TIME] [-x LON] [-y LAT] [-c STR] [-C] [-I] [-N] [-O] [-d] FILE [FILE ...]
+
+Sanitize a Radiacode track by rebasing it (to the notional setting of Hunt for Red October)
+
+positional arguments:
+  FILE
+
+options:
+  -h, --help                         show this help message and exit
+  -p PREFIX, --prefix PREFIX         [sanitized_]
+  -s STR, --serial-number STR        [RC-100-314159]
+  -t TIME, --start-time TIME         [1984-12-05T00:00:00]
+  -x LON, --base-longitude LON       [-55.926966]
+  -y LAT, --base-latitude LAT        [43.583332]
+  -c STR, --comment STR              [And I ... was never here.]
+  -C, --allow-unsanitized-comment    Preserve original comment [False]
+  -I, --force-input                  Allow processing of files that begin with the chosen prefix [False]
+  -N, --allow-unsanitized-name       Preserve original track name [False]
+  -O, --force-overwrite              Overwrite existing files [False]
+  -d, --dry-run                      Do not emit any output files [False]
+```
+
+Sanitize tracks by teleporting and time traveling them. This can be useful if
+you don't necessarily want to reveal exactly when or where you were wandering
+around a nuclear site or potential uranium mine, but want to share the general
+shape of the area... or if you want to bait your GEOINT friends.
