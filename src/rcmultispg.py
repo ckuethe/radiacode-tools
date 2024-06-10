@@ -62,6 +62,8 @@ def tbar(wait_time=None) -> None:
 
 
 def handle_sigint(_signum=None, _stackframe=None) -> None:
+    with STDIO_LOCK:
+        print("", file=sys.stderr)
     CTRL_QUEUE.put(SHUTDOWN_OBJECT)
 
 
@@ -208,15 +210,11 @@ def rc_worker(args: Namespace, serial_number: str) -> None:
         print(f"{serial_number} Connected ", file=sys.stderr)
 
     # wait for all threads to connect to their devices
-    if THREAD_BARRIER.n_waiting >= 1:
-        with STDIO_LOCK:
-            print(f"{serial_number} waiting for device connections", file=sys.stderr)
-
     try:
-        tbar(3)
+        tbar(10)
     except BrokenBarrierError:
         with STDIO_LOCK:
-            print(f"timeout waiting for devices", file=sys.stderr)
+            print(f"timeout waiting for all devices to connect", file=sys.stderr)
         return
 
     rtdata_thread = Thread(
@@ -402,20 +400,19 @@ def main() -> None:
         Thread(target=gps_worker, args=(args,), name="gps-worker").start()
         expected_thread_count += 1
 
+    THREAD_BARRIER._parties = len(args.devs)
+    signal(SIGINT, handle_sigint)
     # create the threads and store in a list so they can be checked later
-    [
+    threads = [
         Thread(
             target=rc_worker,
             name=f"poller-worker-{serial_number}",
             args=(args, serial_number),
-        ).start()
-        for serial_number in args.devs
+        ) for serial_number in args.devs
     ]
-
-    THREAD_BARRIER._parties = len(args.devs)
-    signal(SIGINT, handle_sigint)
-
-    sleep(1)
+    [t.start() for t in threads]
+    while active_count() < expected_thread_count:
+        sleep(1)
 
     # Main process/thread slowly spins waiting for ^C. If interrupt is received, or one of the
     # workers exits, set a shutdown flag which will cause all other threads to gracefully shut
