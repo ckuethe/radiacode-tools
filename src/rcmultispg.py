@@ -64,6 +64,7 @@ def tbar(wait_time=None) -> None:
 
 
 def handle_sigint(_signum=None, _stackframe=None) -> None:
+    "Signal handler for SIG_INT/KeyboardInterrupt to trigger clean shutdown"
     with STDIO_LOCK:
         print("", file=sys.stderr)
     CTRL_QUEUE.put(SHUTDOWN_OBJECT)
@@ -155,6 +156,11 @@ def get_args() -> Namespace:
 
 
 def rtdata_worker(rc: RadiaCode, serial_number: str) -> None:
+    """
+    RadiaCode emits some real-time data (databuf) and as it is available it gets
+    logged, in particular dose, count, and their rates. These are used to build
+    tracks.
+    """
     db = []
     while CTRL_QUEUE.qsize() == 0:  # don't even need to read the item
         sleep(1)
@@ -243,7 +249,7 @@ def rc_worker(args: Namespace, serial_number: str) -> None:
     with STDIO_LOCK:
         print(f"{serial_number} sampling", file=sys.stderr)
 
-    i = 0
+    samples = 0
     while CTRL_QUEUE.qsize() == 0:  # don't even need to read the item
         try:
             # Grab the spectrum...
@@ -253,8 +259,8 @@ def rc_worker(args: Namespace, serial_number: str) -> None:
                 ams.counter_increment(f"num_reports_{serial_number}")
                 ams.gauge_update(f"count_{serial_number}", sum(sd.spectrum.counts))
             with STDIO_LOCK:
-                print(f"\rn:{i}", end="", flush=True, file=sys.stderr)
-                i += 1
+                print(f"\rn:{samples}", end="", flush=True, file=sys.stderr)
+                samples += 1
             sleep(args.interval)
             tbar()
         except (usb.core.USBError, BrokenBarrierError):
@@ -262,11 +268,16 @@ def rc_worker(args: Namespace, serial_number: str) -> None:
             THREAD_BARRIER.abort()
 
     with STDIO_LOCK:
-        print(f"{serial_number} data collection stop - {i} records, {i*args.interval:.1f}s", file=sys.stderr)
+        print(
+            f"{serial_number} data collection stop - {samples} records, {samples*args.interval:.1f}s", file=sys.stderr
+        )
 
 
 def log_worker(args: Namespace) -> None:
-    "Handle realtime logging of measurements if you can't wait for the spectrogram file"
+    """
+    Handle realtime logging of measurements so you don't have to wait for a spectrogram
+    file to be written, and the reader threads don't have to wait on disk.
+    """
     with STDIO_LOCK:
         print(f"starting log_worker for: {' '.join(args.devs)}", file=sys.stderr)
 
