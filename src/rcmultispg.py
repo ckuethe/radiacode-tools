@@ -34,10 +34,12 @@ import usb.core
 from radiacode import RadiaCode
 from radiacode.transports.usb import DeviceNotFound
 
+from appmetrics import AppMetrics
 from rcutils import RtData, SpecData, find_radiacode_devices, specdata_to_dict
 
 Number = Union[int, float]
 GpsData = namedtuple("GpsData", ["payload"])
+ams = AppMetrics(stub=True)
 
 MIN_POLL_INTERVAL: float = 0.5  # internally radiacode seems to do 2Hz updates, but 1Hz may give better results
 RC_LOCKS: Dict[str, Lock] = dict()  # prevent rtdata polling and spectrum polling from stomping on each other
@@ -183,6 +185,10 @@ def rtdata_worker(rc: RadiaCode, serial_number: str) -> None:
                     for f in ["temperature", "charge_level", "count_rate", "dose_rate", "count", "dose", "duration"]
                 }
             )
+            for f in ["dose", "count", "dose_rate", "count_rate"]:
+                if f in d and d[f] is not None:
+                    ams.gauge_update(f"{f}_{serial_number}", d[f])
+
             DATA_QUEUE.put(RtData(**d))
 
 
@@ -191,7 +197,11 @@ def rc_worker(args: Namespace, serial_number: str) -> None:
     Thread responsible for data acquisition. Connects to devices, polls spectra,
     accumulates data, and generates the output file
     """
-
+    ams.counter_create(f"num_reports_{serial_number}")
+    ams.gauge_create(f"dose_{serial_number}")
+    ams.gauge_create(f"count_{serial_number}")
+    ams.gauge_create(f"dose_rate_{serial_number}")
+    ams.gauge_create(f"count_rate_{serial_number}")
     RC_LOCKS[serial_number] = Lock()
     try:
         rc = RadiaCode(serial_number=serial_number)
@@ -238,7 +248,10 @@ def rc_worker(args: Namespace, serial_number: str) -> None:
         try:
             # Grab the spectrum...
             with RC_LOCKS[serial_number]:
-                DATA_QUEUE.put(SpecData(time(), serial_number, rc.spectrum()))
+                sd = SpecData(time(), serial_number, rc.spectrum())
+                DATA_QUEUE.put(sd)
+                ams.counter_increment(f"num_reports_{serial_number}")
+                ams.gauge_update(f"count_{serial_number}", sum(sd.spectrum.counts))
             with STDIO_LOCK:
                 print(f"\rn:{i}", end="", flush=True, file=sys.stderr)
                 i += 1
@@ -316,6 +329,9 @@ def gps_worker(args: Namespace) -> None:
     solutions are unavailable or invalid, etc. we don't want to take quit the
     whole process.
     """
+    ams.gauge_create("latitude")
+    ams.gauge_create("longitude")
+    ams.gauge_create("gps_mode")
     srv = (args.gpsd["host"], 2947 if args.gpsd["port"] is None else args.gpsd["port"])
     watch_args = {"enable": True, "json": True}
     if args.gpsd["device"]:
@@ -326,7 +342,7 @@ def gps_worker(args: Namespace) -> None:
             with socket.create_connection(srv, 3) as s:
                 gpsfd = s.makefile("rw")
                 print(watch, file=gpsfd, flush=True)
-
+                ams.flag_set("gps_connected")
                 dedup = None
                 while CTRL_QUEUE.qsize() == 0:
                     line = gpsfd.readline().strip()
@@ -336,6 +352,7 @@ def gps_worker(args: Namespace) -> None:
                             continue
                         if x["time"] == dedup:
                             continue
+                        ams.gauge_update("gps_mode", x["mode"])
                         if x["mode"] < 2:
                             continue
 
@@ -358,9 +375,12 @@ def gps_worker(args: Namespace) -> None:
                                 ]
                             }
                         )
+                        ams.gauge_update("latitude", tpv.payload["lat"])
+                        ams.gauge_update("longitude", tpv.payload["lon"])
                         DATA_QUEUE.put(tpv)
                     except (KeyError, JSONDecodeError):  # skip bad messages, no fix, etc.
                         pass
+                ams.flag_clear("gps_connected")
                 return  # clean exit
         except (socket.error, TimeoutError):
             DATA_QUEUE.put(GpsData(payload='{"gnss": false, "mode": 0}'))
@@ -369,6 +389,10 @@ def gps_worker(args: Namespace) -> None:
 
 def main() -> None:
     args = get_args()
+    global ams
+
+    ams = AppMetrics(port=6853, local_only=False, appname="rcmultispg")
+    ams.flag_create("gps_connected")
     try:
         dev_names = find_radiacode_devices()
     except Exception:
@@ -408,7 +432,8 @@ def main() -> None:
             target=rc_worker,
             name=f"poller-worker-{serial_number}",
             args=(args, serial_number),
-        ) for serial_number in args.devs
+        )
+        for serial_number in args.devs
     ]
     [t.start() for t in threads]
     while active_count() < expected_thread_count:
@@ -431,6 +456,7 @@ def main() -> None:
     while active_count() > 1:  # main process counts as a thread
         try:
             [t.join(0.1) for t in list_threads()]
+            # FIXME print what we're still waiting for
         except RuntimeError:
             pass
         sleep(0.1)

@@ -1,6 +1,9 @@
 # Radiacode Tools
 
-Just some things for working with my RadiaCode-102 from Scan-Electronics.
+Just some things for working with my RadiaCode devices from Scan-Electronics.
+
+If you're planning on generating gps-tagged logs with a headless sensor, you
+might also want to look at my [web console for gpsd](https://github.com/ckuethe/webcpgs/).
 
 ## Quick start
 
@@ -223,3 +226,35 @@ Sanitize tracks by teleporting and time traveling them. This can be useful if
 you don't necessarily want to reveal exactly when or where you were wandering
 around a nuclear site or potential uranium mine, but want to share the general
 shape of the area... or if you want to bait your GEOINT friends.
+
+### rcmultispg.py
+```
+usage: rcmultispg [-h] [-d STR] [-a] [-i FLOAT] [-p STR] [-g URL] [--reset-dose] [--reset-spectrum] [--stdout]
+
+Poll all connected RadiaCode PSRDs and produce spectrograms
+
+options:
+  -h, --help                  show this help message and exit
+  -d STR, --dev STR           USB ID of target device. May be repeated for multiple devices. Leave blank to use all connected devices
+  -a, --require-all           abort if not all specified devices can be attached
+  -i FLOAT, --interval FLOAT  Polling interval in seconds [5.0s]
+  -p STR, --prefix STR        prefix for generated filename [rcmulti_]
+  -g URL, --gpsd URL          Connect to specified device, eg. gpsd://localhost:2947/dev/ttyACM0
+  --reset-dose                reset the internal dose meter
+  --reset-spectrum            reset the currently displayed spectrum
+  --stdout                    log to stdout instead of to a file
+
+```
+
+This tool emits a merged log of realtime and spectrum data from a number of sensors,
+optionally enriched with GPS data from [gpsd](https://gpsd.io). This can be used to
+produce radiacode-compatible spectrograms, spectra, and tracks; as well as 3D tracks
+for use with other tools. Additionally, near synchronous polling of multiple connected
+devices is done in case measurements inside and outside of shielding (for example) is
+desired.
+
+Logs are emitted as `ndjson` (newline-delimited JSON, one record per line), typically
+to distinct logfiles but optionally to `stdout`.
+
+To assist in runtime monitoring, a pollable metrics server runs on port 6853 (on a
+phone keypad it spells `NUKE`) which emits some performance figures as a JSON object.
