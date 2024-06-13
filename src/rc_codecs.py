@@ -6,7 +6,8 @@
 import struct
 from typing import List, Union
 
-Number = Union[float, int]
+from rctypes import Number
+
 _B45C = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ $%*+-./:"  # defined in RFC9285
 
 

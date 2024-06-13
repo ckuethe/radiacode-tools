@@ -8,12 +8,12 @@ import os
 from argparse import ArgumentParser, Namespace
 from sys import exit
 from tempfile import mkstemp
-from typing import Iterable, List, NoReturn, Tuple, Union
+from typing import Iterable, List, NoReturn, Tuple
 
 from numpy import corrcoef
 from numpy.polynomial import Polynomial
 
-Numeric = Union[int, float]
+from rctypes import Number
 
 
 def template_calibration(args: Namespace) -> NoReturn:
@@ -77,7 +77,7 @@ def template_calibration(args: Namespace) -> NoReturn:
     exit(0)
 
 
-def load_calibration(args: Namespace) -> List[Tuple[Numeric, Numeric]]:
+def load_calibration(args: Namespace) -> List[Tuple[Number, Number]]:
     """
     Calibration file is a json file which contains a dict like this:
 
@@ -163,7 +163,7 @@ def get_args() -> Namespace:
     return ap.parse_args()
 
 
-def rsquared(xlist: Iterable[Numeric], ylist: Iterable[Numeric], coeffs: Iterable[Numeric]) -> float:
+def rsquared(xlist: Iterable[Number], ylist: Iterable[Number], coeffs: Iterable[Number]) -> float:
     """
     Compute R^2 for the fit model
 
@@ -172,7 +172,7 @@ def rsquared(xlist: Iterable[Numeric], ylist: Iterable[Numeric], coeffs: Iterabl
     coeffs: an iterable of polynomial coefficients, least significant first (x^0, x^1, .. , x^n)
     """
     chan2kev = Polynomial(coeffs)
-    computed: List[Numeric] = [chan2kev(i) for i in xlist]
+    computed: List[Number] = [chan2kev(i) for i in xlist]
     corr_matrix = corrcoef(ylist, computed)
     r_squared = corr_matrix[0, 1] ** 2
 

@@ -9,9 +9,7 @@ from math import pow, sqrt
 from typing import Dict, Union
 
 from n42convert import get_rate_from_spectrum
-
-Number = Union[int, float]
-DTstats = namedtuple("DTstats", ["lost_cps", "loss_fraction", "dt_us", "dt_cps"])
+from rctypes import DTstats, Number
 
 
 def get_args() -> Namespace:

@@ -16,7 +16,6 @@ import os
 import socket
 import sys
 from argparse import ArgumentParser, Namespace
-from collections import namedtuple
 from datetime import datetime
 from json import JSONDecodeError
 from json import dumps as jdumps
@@ -28,17 +27,16 @@ from tempfile import mkstemp
 from threading import Barrier, BrokenBarrierError, Lock, Thread, active_count
 from threading import enumerate as list_threads
 from time import gmtime, sleep, strftime, time
-from typing import Dict, List, Union
+from typing import Dict
 
 import usb.core
 from radiacode import RadiaCode
 from radiacode.transports.usb import DeviceNotFound
 
 from appmetrics import AppMetrics
-from rcutils import RtData, SpecData, find_radiacode_devices, specdata_to_dict
+from rctypes import GpsData, RtData, SpecData
+from rcutils import find_radiacode_devices, specdata_to_dict
 
-Number = Union[int, float]
-GpsData = namedtuple("GpsData", ["payload"])
 ams = AppMetrics(stub=True)
 
 MIN_POLL_INTERVAL: float = 0.5  # internally radiacode seems to do 2Hz updates, but 1Hz may give better results

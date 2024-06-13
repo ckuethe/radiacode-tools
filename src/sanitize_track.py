@@ -8,10 +8,10 @@ from hashlib import sha256 as hf
 from tempfile import mkstemp
 from typing import List
 
+from rctypes import TrackPoint
 from rcutils import DateTime2FileTime
 
-_trackpoint_fields = ["timestamp", "time", "latitude", "longitude", "accuracy", "doserate", "countrate", "comment"]
-TrackPoint = namedtuple("TrackPoint", field_names=_trackpoint_fields, defaults=[None] * len(_trackpoint_fields))
+# file deepcode ignore PT: CLI utility, intended to walk files...
 
 
 class RangeFinder:

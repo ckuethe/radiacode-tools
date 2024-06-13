@@ -10,15 +10,9 @@ import struct
 import sys
 from argparse import ArgumentParser, Namespace
 from binascii import unhexlify
-from collections import namedtuple
 
+from rctypes import EnergyCalibration, SGHeader, SpecEnergy
 from rcutils import FileTime2DateTime, get_dose_from_spectrum
-
-SGHeader = namedtuple(
-    "SGHeader", field_names=["name", "time", "timestamp", "channels", "duration", "flags", "comment"], defaults=[""] * 7
-)
-EnergyCalibration = namedtuple("EnergyCalibration", field_names=["a0", "a1", "a2"], defaults=[0, 3000 / 1024, 0])
-SpecEnergy = namedtuple("SpecEnergy", field_names=["dose", "duration", "peak_dose"])
 
 
 def get_args() -> Namespace:

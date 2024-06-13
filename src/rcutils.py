@@ -7,34 +7,17 @@ utility library, rather than being imported from and between scripts.
 
 import os
 from binascii import hexlify
-from collections import namedtuple
 from datetime import datetime
 from re import search as re_search
 from re import sub as re_sub
 from struct import pack as struct_pack
 from tempfile import mkstemp
 from time import gmtime, strftime
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List
 
-from radiacode import RadiaCode, Spectrum
+from radiacode import RadiaCode
 
-# custom types
-Number = Union[int, float]
-_rt_fields = [
-    "time",
-    "dt",
-    "serial_number",
-    "type",
-    "count_rate",
-    "count",
-    "dose_rate",
-    "dose",
-    "charge_level",
-    "temperature",
-    "duration",
-]
-RtData = namedtuple("RtData", _rt_fields, defaults=[None] * len(_rt_fields))
-SpecData = namedtuple("SpecData", ["time", "serial_number", "spectrum"])
+from rctypes import Number, SpecData, Spectrum
 
 # The spectrogram format uses FileTime, the number of 100ns intervals since the
 # beginning of 1600 CE. On a linux/unix/bsd host, we get the number of (fractional)
