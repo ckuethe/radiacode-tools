@@ -80,7 +80,7 @@ class RcTrack:
         fz = [None] + list(tp._asdict().values())
         fz[0] = DateTime2FileTime(fz[1])
         fz[1] = _format_datetime(fz[1])
-        return [str(x) for x in fz]
+        return "\t".join([str(x) for x in fz])
 
     def write_file(self, filename: str) -> None:
         with open(filename, "wt") as ofd:

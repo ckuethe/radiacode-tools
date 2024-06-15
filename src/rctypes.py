@@ -73,3 +73,25 @@ SpectrogramPoint = namedtuple("SpectrogramPoint", ["timestamp", "timedelta", "co
 # storing datetime as the canonical timestamp. It'll be transcoded for output
 _trackpoint_fields = ["datetime", "latitude", "longitude", "accuracy", "doserate", "countrate", "comment"]
 TrackPoint = namedtuple("TrackPoint", _trackpoint_fields, defaults=[None] * len(_trackpoint_fields))
+
+
+class RangeFinder:
+    "A helper class to determine the range of a list"
+
+    def __init__(self, name: str = "RangeFinder"):
+        self.name = name
+        self.min_val = None
+        self.max_val = None
+
+    def update(self, x):
+        self.min_val = x if self.min_val is None else min(x, self.min_val)
+        self.max_val = x if self.max_val is None else max(x, self.max_val)
+
+    def get(self):
+        return (self.min_val, self.max_val)
+
+    def __str__(self):
+        return f"{self.name}(min={self.min_val}, max={self.max_val})"
+
+    def __repr__(self):
+        print(self.__str__())
