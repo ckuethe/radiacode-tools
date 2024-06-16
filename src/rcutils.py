@@ -6,13 +6,8 @@ utility library, rather than being imported from and between scripts.
 """
 
 import os
-from binascii import hexlify
 from datetime import datetime, timedelta, timezone
 from re import search as re_search
-from re import sub as re_sub
-from struct import pack as struct_pack
-from tempfile import mkstemp
-from time import gmtime, strftime
 from typing import Any, Dict, List
 
 from radiacode import RadiaCode
