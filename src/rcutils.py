@@ -7,7 +7,7 @@ utility library, rather than being imported from and between scripts.
 
 import os
 from binascii import hexlify
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from re import search as re_search
 from re import sub as re_sub
 from struct import pack as struct_pack
@@ -26,6 +26,8 @@ from rctypes import Number, SpecData, Spectrum
 _filetime_quantum = 1e-7
 _filetime_epoch_offset = 116444736000000000
 
+UTC = timezone(timedelta(0))
+
 
 def FileTime2UnixTime(x: Number) -> float:
     "Convert a FileTime to Unix timestamp"
@@ -34,7 +36,7 @@ def FileTime2UnixTime(x: Number) -> float:
 
 def FileTime2DateTime(x: Number) -> datetime:
     "Convert a FileTime to Python DateTime"
-    return datetime.fromtimestamp(FileTime2UnixTime(x))
+    return datetime.fromtimestamp(FileTime2UnixTime(x), UTC)
 
 
 def UnixTime2FileTime(x: Number) -> int:
