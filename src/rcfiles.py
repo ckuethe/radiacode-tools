@@ -5,7 +5,6 @@ Interfaces to Radiacode File Formats: tracks, spectra, and spectrograms
 
 from binascii import hexlify, unhexlify
 from datetime import datetime, timedelta
-from json import dumps as jdumps
 from re import sub as re_sub
 from struct import pack as struct_pack
 from struct import unpack as struct_unpack
@@ -13,14 +12,8 @@ from typing import Any, Dict, List, Optional
 
 import xmltodict
 
-from rctypes import (
-    EnergyCalibration,
-    SpecData,
-    SpectrogramPoint,
-    SpectrumLayer,
-    TrackPoint,
-)
-from rcutils import DateTime2FileTime, FileTime2DateTime, UnixTime2FileTime
+from rctypes import EnergyCalibration, SpectrogramPoint, SpectrumLayer, TrackPoint
+from rcutils import DateTime2FileTime, FileTime2DateTime
 
 _datestr: str = "%Y-%m-%d %H:%M:%S"
 
@@ -85,7 +78,8 @@ class RcTrack:
     def write_file(self, filename: str) -> None:
         with open(filename, "wt") as ofd:
             print("Track: " + "\t".join([self.name, self.serialnumber, self.comment, self.flags]), file=ofd)
-            print("\t".join(self._columns), file=ofd)
+            # Patch column names in output file.
+            print("\t".join(["Timestamp", "Time"] + self._columns[1:]), file=ofd)
             for p in self.points:
                 print(self._format_trackpoint(p), file=ofd)
 
@@ -108,11 +102,11 @@ class RcTrack:
                 fields = line.split("\t")
                 if len(fields) != nf + 1:
                     raise ValueError(f"Incorrect number of values on line {n+1}")
-                fields[1] = FileTime2DateTime(fields[0])  # filetime is higher resolution than datetime
+                fields[1] = FileTime2DateTime(fields[0])  # filetime is higher resolution than YYYY-mm-dd HH:MM:SS
                 for i in range(2, 7):
                     fields[i] = float(fields[i])
                     pass
-                fields[-1] = fields[-1].strip()
+                fields[-1] = fields[-1].rstrip("\n")
                 self.points.append(TrackPoint(*fields[1:]))
 
     def add_point(
