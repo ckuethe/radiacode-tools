@@ -92,20 +92,16 @@ def get_args() -> Namespace:
         raise ValueError
 
     def _geocircle(s) -> GeoCircle:
-        try:
-            rv = [float(f) for f in s.split(",")]
-            if (
-                True
-                and (3 == len(rv))
-                and (-90 <= rv[0] <= 90)
-                and (-180 <= rv[1] <= 180)
-                and (0 < rv[2] <= 40030e3)  # 3.1416 * 2 * 6371km
-            ):
-                return GeoCircle(*rv)
-        except Exception:
-            pass
-        finally:
-            raise ValueError
+        rv = [float(f) for f in s.split(",")]
+        if (
+            True
+            and (3 == len(rv))
+            and (-90 <= rv[0] <= 90)
+            and (-180 <= rv[1] <= 180)
+            and (0 < rv[2] <= 40030e3)  # 3.1416 * 2 * 6371km
+        ):
+            return GeoCircle(*rv)
+        raise ValueError
 
     ap = ArgumentParser(description="Edit a Radiacode track by clipping to (or out) time ranges and geometries.")
     ap.add_argument(  # -t include-time-range
