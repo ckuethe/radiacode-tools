@@ -27,11 +27,14 @@ def _format_datetime(dt: datetime) -> str:
 
 
 class RcTrack:
-    "Radiacode Track (.rctrk)"
+    "Radiacode Track (.rctrk) interface"
 
-    def __init__(self) -> None:
+    def __init__(self, filename: Optional[str] = None) -> None:
         self._clear_data()
         self._columns = ["DateTime", "Latitude", "Longitude", "Accuracy", "DoseRate", "CountRate", "Comment"]
+        self.filename = filename
+        if filename:
+            self.load_file(filename)
 
     def _clear_data(self) -> None:
         "Clear out the header, in preparation for loading"
@@ -53,6 +56,29 @@ class RcTrack:
         return rv
 
     def from_dict(self, d: Dict[str, Any]) -> bool:
+        """
+        Populate the in-memory representation from a dict:
+
+        {
+            "name": str,
+            "serialnumber": str,
+            "comment": str,
+            "flags": str,
+            "points": [
+                {
+                    "datetime": datetime(),
+                    "latitude": float(),
+                    "longitude": float(),
+                    "accuracy": float(),
+                    "doserate": float(),
+                    "countrate": float(),
+                    "comment": str(),
+                },
+                ...
+            ]
+        }
+        """
+
         if sorted(d.keys()) != ["comment", "flags", "name", "points", "serialnumber"]:
             raise ValueError
 
@@ -76,6 +102,7 @@ class RcTrack:
         return "\t".join([str(x) for x in fz])
 
     def write_file(self, filename: str) -> None:
+        "Write the in-memory representation to filesystem"
         with open(filename, "wt") as ofd:
             print("Track: " + "\t".join([self.name, self.serialnumber, self.comment, self.flags]), file=ofd)
             # Patch column names in output file.
@@ -84,6 +111,7 @@ class RcTrack:
                 print(self._format_trackpoint(p), file=ofd)
 
     def load_file(self, filename: str) -> None:
+        "Load a track from the filesystem"
         with open(filename, "rt") as ifd:
             self._clear_data()
             nf = len(self._columns)
