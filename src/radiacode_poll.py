@@ -160,7 +160,7 @@ def format_spectrum(hw_num: str, res: radiacode.Spectrum, bg: bool = False):
     # they come from the same instrument, and in this case the same observing session.
 
     cal_str = f"""
-        <EnergyCalibration id="ec-{hw_num}">
+        <EnergyCalibration id="ec-{hw_num}-{tag}">
             <CoefficientValues> {res.a0} {res.a1} {res.a2} </CoefficientValues>
         </EnergyCalibration>
         """
@@ -170,7 +170,7 @@ def format_spectrum(hw_num: str, res: radiacode.Spectrum, bg: bool = False):
             <MeasurementClassCode>{mc}</MeasurementClassCode>
             <StartDateTime> {sdt} </StartDateTime>
             <RealTimeDuration> PT{md}S </RealTimeDuration>
-            <Spectrum id="sp-{hw_num}-{tag}" radDetectorInformationReference="radiacode-csi-sipm" energyCalibrationReference="ec-{hw_num}"> 
+            <Spectrum id="sp-{hw_num}-{tag}" radDetectorInformationReference="radiacode-csi-sipm" energyCalibrationReference="ec-{hw_num}-{tag}"> 
                 <LiveTimeDuration> PT{md}S </LiveTimeDuration>
                 <ChannelData compressionCode="None"> {count_str} </ChannelData> 
             </Spectrum>
