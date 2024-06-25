@@ -5,6 +5,7 @@ Interfaces to Radiacode File Formats: tracks, spectra, and spectrograms
 
 from binascii import hexlify, unhexlify
 from datetime import datetime, timedelta
+from hashlib import sha256
 from re import sub as re_sub
 from struct import pack as struct_pack
 from struct import unpack as struct_unpack
@@ -26,7 +27,28 @@ def _format_datetime(dt: datetime) -> str:
     return dt.strftime(_datestr)
 
 
-class RcTrack:
+class _RcFile:
+    def __init__(self, filename: Optional[str] = None) -> None:
+        raise NotImplementedError
+
+    def as_dict(self) -> Dict[str, Any]:
+        "Convert the internal state into a format that could be easily jsonified"
+        raise NotImplementedError
+
+    def from_dict(self, d: Dict[str, Any]) -> None:
+        "Populate the in-memory representation from a dict"
+        raise NotImplementedError
+
+    def write_file(self, filename: str) -> None:
+        "Write the in-memory representation to filesystem"
+        raise NotImplementedError
+
+    def load_file(self, filename: str) -> None:
+        "Load a data file from the filesystem"
+        raise NotImplementedError
+
+
+class RcTrack(_RcFile):
     "Radiacode Track (.rctrk) interface"
 
     def __init__(self, filename: Optional[str] = None) -> None:
@@ -161,13 +183,16 @@ class RcTrack:
         )
 
 
-class RcSpectrum:
+class RcSpectrum(_RcFile):
     "Radiacode Spectrum (.xml)"
 
-    def __init__(self) -> None:
+    def __init__(self, filename: str = None) -> None:
         self.fg_spectrum: Optional[SpectrumLayer] = None
         self.bg_spectrum: Optional[SpectrumLayer] = None
         self.note: str = ""
+
+        if filename:
+            self.load_file(filename)
 
     def __repr__(self):
         return "Spectrum(" f"\n\tfg={self.fg_spectrum}" f"\n\tbg={self.bg_spectrum}" f'\n\tnote="{self.note}"\n)'
@@ -349,8 +374,13 @@ class RcSpectrum:
             if len(self.bg_spectrum.counts) != self.bg_spectrum.channels:
                 raise ValueError("Inconsistent channel counts in background")
 
+    def uuid(self) -> str:
+        "generate a uuid-shaped string based on the content of the spectrum file"
+        h = sha256(str(self).encode()).hexdigest()[:32]
+        return f"{h[0:8]}-{h[8:12]}-{h[12:16]}-{h[16:20]}-{h[20:]}"
 
-class RcSpectrogram:
+
+class RcSpectrogram(_RcFile):
     "Radiacode Spectrogram (.rcspg)"
 
     def __init__(self) -> None:
@@ -506,6 +536,3 @@ class RcSpectrogram:
             print(self._make_historical_spectrum_line(), file=ofd)
             for s in self.samples:
                 print(self._make_spectrogram_line(s), file=ofd)
-
-    def as_dict() -> Dict[str, Any]:
-        raise NotImplementedError
