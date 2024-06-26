@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
+# coding: utf-8
+# vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syn=python
+# Author: Chris Kuethe <chris.kuethe@gmail.com> , https://github.com/ckuethe/radiacode-tools
+# SPDX-License-Identifier: MIT
+
 """
-Interfaces to Radiacode File Formats: tracks, spectra, and spectrograms
+Interfaces to Radiacode File Formats: tracks, spectra, spectrograms, and N42 conversion
 """
 
 from binascii import hexlify, unhexlify
@@ -10,45 +15,27 @@ from re import sub as re_sub
 from struct import pack as struct_pack
 from struct import unpack as struct_unpack
 from typing import Any, Dict, List, Optional
+from uuid import uuid4
 
 import xmltodict
 
 from rctypes import EnergyCalibration, SpectrogramPoint, SpectrumLayer, TrackPoint
 from rcutils import DateTime2FileTime, FileTime2DateTime
 
+# there's enough datetime mangling that it's worth making a few helpers
 _datestr: str = "%Y-%m-%d %H:%M:%S"
+_datestr_T: str = _datestr.replace(" ", "T")
 
 
-def _parse_datetime(ds: str) -> datetime:
-    return datetime.strptime(ds, _datestr)
+def _parse_datetime(ds: str, fmt: str = _datestr) -> datetime:
+    return datetime.strptime(ds, fmt)
 
 
-def _format_datetime(dt: datetime) -> str:
-    return dt.strftime(_datestr)
+def _format_datetime(dt: datetime, fmt: str = _datestr) -> str:
+    return dt.strftime(fmt)
 
 
-class _RcFile:
-    def __init__(self, filename: Optional[str] = None) -> None:
-        raise NotImplementedError
-
-    def as_dict(self) -> Dict[str, Any]:
-        "Convert the internal state into a format that could be easily jsonified"
-        raise NotImplementedError
-
-    def from_dict(self, d: Dict[str, Any]) -> None:
-        "Populate the in-memory representation from a dict"
-        raise NotImplementedError
-
-    def write_file(self, filename: str) -> None:
-        "Write the in-memory representation to filesystem"
-        raise NotImplementedError
-
-    def load_file(self, filename: str) -> None:
-        "Load a data file from the filesystem"
-        raise NotImplementedError
-
-
-class RcTrack(_RcFile):
+class RcTrack:
     "Radiacode Track (.rctrk) interface"
 
     def __init__(self, filename: Optional[str] = None) -> None:
@@ -183,7 +170,7 @@ class RcTrack(_RcFile):
         )
 
 
-class RcSpectrum(_RcFile):
+class RcSpectrum:
     "Radiacode Spectrum (.xml)"
 
     def __init__(self, filename: str = None) -> None:
@@ -238,21 +225,18 @@ class RcSpectrum(_RcFile):
             tmp = None
 
         # older versions of data files don't have start and end times
-        def _spectrum_parse_time(s):
-            return datetime.strptime(s, "%Y-%m-%dT%H:%M:%S")
-
         if tmp:
             try:
-                a = [_spectrum_parse_time(s) for s in sp.get("StartTime", None)]
-                b = [_spectrum_parse_time(s) for s in sp.get("EndTime", None)]
+                a = [_parse_datetime(s, _datestr_T) for s in sp.get("StartTime", None)]
+                b = [_parse_datetime(s, _datestr_T) for s in sp.get("EndTime", None)]
                 self.fg_spectrum = self.fg_spectrum._replace(timestamp=a[0], duration=b[0] - a[0])
                 self.bg_spectrum = self.bg_spectrum._replace(timestamp=a[1], duration=b[1] - a[1])
             except (KeyError, TypeError, AttributeError):
                 pass
         else:
             try:
-                a = _spectrum_parse_time(sp.get("StartTime", None))
-                b = _spectrum_parse_time(sp.get("EndTime", None))
+                a = _parse_datetime(sp.get("StartTime", None), _datestr_T)
+                b = _parse_datetime(sp.get("EndTime", None), _datestr_T)
                 d = b - a
                 self.fg_spectrum = self.fg_spectrum._replace(timestamp=a, duration=d)
             except (KeyError, TypeError, AttributeError):
@@ -263,12 +247,11 @@ class RcSpectrum(_RcFile):
         sc = sl.comment if sl.comment else ""
         st = sl.timestamp
         et = sl.timestamp + sl.duration
-        tf = "%Y-%m%dT%H:%M:%S"
 
         b = "Background" if bg else ""
         rv = [
-            f"<StartTime>{st.strftime(tf)}</StartTime>",
-            f"<EndTime>{et.strftime(tf)}</EndTime>\n",
+            f"<StartTime>{st.strftime(_datestr_T)}</StartTime>",
+            f"<EndTime>{et.strftime(_datestr_T)}</EndTime>\n",
             f"<{b}EnergySpectrum>",
             f"<NumberOfChannels>{sl.channels}</NumberOfChannels>",
             "<ChannelPitch>1</ChannelPitch>",
@@ -353,7 +336,7 @@ class RcSpectrum(_RcFile):
                 device_model=d["device_model"],
                 serial_number=d["serial_number"],
                 calibration=EnergyCalibration(d["calibration"]),
-                timestamp=datetime.strptime(d["timestamp"], "%Y-%m-%d %H:%M:%S"),
+                timestamp=datetime.strptime(d["timestamp"], _datestr),
                 duration=timedelta(seconds=float(d["duration"])),
                 channels=int(d["channels"]),
                 counts=[int(i) for i in d["counts"]],
@@ -380,7 +363,7 @@ class RcSpectrum(_RcFile):
         return f"{h[0:8]}-{h[8:12]}-{h[12:16]}-{h[16:20]}-{h[20:]}"
 
 
-class RcSpectrogram(_RcFile):
+class RcSpectrogram:
     "Radiacode Spectrogram (.rcspg)"
 
     def __init__(self) -> None:
@@ -536,3 +519,207 @@ class RcSpectrogram(_RcFile):
             print(self._make_historical_spectrum_line(), file=ofd)
             for s in self.samples:
                 print(self._make_spectrogram_line(s), file=ofd)
+
+
+class RcN42:
+    "Minimal N42 implementation that can transcode to/from dual layer RadiaCode XML spectrum"
+    rad_detector_information: Dict[str, Any] = {}
+    rad_instrument_information: Dict[str, Any] = {}
+    _rdi: str = "radiacode-scinitillator-sipm"
+
+    def __init__(self, filename: str = None) -> None:
+        self.serial_number: str = ""
+        self.model: str = ""
+        self.header: Dict[str, str] = {}
+        self.uuid: str = ""
+        self.spectrum_data: RcSpectrum = RcSpectrum()
+
+        self._populate_header()
+        if filename:
+            self.load_file(filename)
+
+    def _populate_header(self) -> None:
+        self.header = {
+            "@xmlns": "http://physics.nist.gov/N42/2011/N42",
+            "@xmlns:xsi": "http://www.w3.org/2001/XMLSchema-instance",
+            "@xsi:schemaLocation": "http://physics.nist.gov/N42/2011/N42 http://physics.nist.gov/N42/2011/n42.xsd",
+            "@n42DocUUID": "",
+            "RadInstrumentDataCreatorName": "https://github.com/ckuethe/radiacode-tools",
+        }
+
+    def _spectrum_layer_from_rad_measurement(self, rm: Dict[str, Any], ecz: Dict[str, Any]) -> SpectrumLayer:
+        ec = EnergyCalibration(*[float(x) for x in ecz[rm["Spectrum"]["@energyCalibrationReference"]].split()])
+        counts = [int(x) for x in rm["Spectrum"]["ChannelData"]["#text"].split()]
+
+        return SpectrumLayer(
+            spectrum_name=rm["Remark"].replace("Title: ", ""),
+            device_model=self.model,
+            serial_number=self.serial_number,
+            calibration=ec,
+            timestamp=_parse_datetime(rm["StartDateTime"], _datestr_T),
+            duration=timedelta(seconds=int(rm["RealTimeDuration"].strip("PTS"))),
+            channels=len(counts),
+            counts=counts,
+            comment="",
+        )
+
+    def _rad_measurement_from_spectrum_layer(self, sl: SpectrumLayer, fg: bool) -> Dict[str, Any]:
+        tag = "fg"
+        fb = "Fore"
+        if fg is False:
+            tag = "bg"
+            fb = "Back"
+        duration = f"PT{round(sl.duration.total_seconds())}S"
+
+        return {
+            "@id": f"radmeas-{tag}",
+            "Remark": sl.spectrum_name,
+            "MeasurementClassCode": f"{fb}ground",
+            "StartDateTime": sl.timestamp.strftime("%Y-%m-%dT%H:%M:%S"),
+            "RealTimeDuration": duration,
+            "Spectrum": {
+                "@id": f"spectrum-{tag}",
+                "@radDetectorInformationReference": self._rdi,
+                "@energyCalibrationReference": f"ec-{tag}",
+                "LiveTimeDuration": duration,
+                "ChannelData": {
+                    "@compressionCode": "None",
+                    "#text": " ".join([f"{i}" for i in sl.counts]),
+                },
+            },
+        }
+
+    def _populate_rad_instrument_information(self, serial_number: str = None) -> bool:
+        "Fill in the RadiationInstrumentInformation element, mostly for the scintillator type"
+        if serial_number is None and self.serial_number is None:
+            raise ValueError
+        if serial_number:
+            self.serial_number = serial_number
+        self.model = f"RadiaCode-{self.serial_number.split('-')[1]}"
+
+        self.rad_instrument_information = {
+            "@id": "radiacode-instrument-info",
+            "RadInstrumentManufacturerName": "Radiacode",
+            "RadInstrumentIdentifier": self.serial_number,
+            "RadInstrumentModelName": self.model,
+            "RadInstrumentClassCode": "Spectroscopic Personal Radiation Detector",
+            "RadInstrumentVersion": [
+                {"RadInstrumentComponentName": "Radiacode-Firmware", "RadInstrumentComponentVersion": "unknown"},
+                {"RadInstrumentComponentName": "Radiacode-App", "RadInstrumentComponentVersion": "unknown"},
+                {"RadInstrumentComponentName": "Radiacode-Tools", "RadInstrumentComponentVersion": "0.1.2"},
+            ],
+        }
+
+        return self._populate_rad_detector_information()
+
+    def _populate_rad_detector_information(self) -> bool:
+        "Fill in the RadiationDectInformation element, mostly for the scintillator type"
+        rdkc = "CsI"
+        rdd = "CsI:Tl"
+        if self.model.endswith("G"):
+            rdkc = "GaGG"
+            rdd = "GaGG:Ce"
+        self.rad_detector_information = {
+            "@id": self._rdi,
+            "RadDetectorCategoryCode": "Gamma",
+            "RadDetectorKindCode": rdkc,
+            "RadDetectorDescription": f"{rdd} scintillator, coupled to SiPM",
+            "RadDetectorLengthValue": {"@units": "mm", "#text": "10"},
+            "RadDetectorWidthValue": {"@units": "mm", "#text": "10"},
+            "RadDetectorDepthValue": {"@units": "mm", "#text": "10"},
+            "RadDetectorVolumeValue": {"@units": "cc", "#text": "1"},
+        }
+        return True
+
+    def load_file(self, filename: str) -> None:
+        """
+        Read an N42 File
+
+        Use this to read from the filesystem
+        """
+        with open(filename, "rt") as ifd:
+            self.load_data(ifd.read())
+
+    def load_data(self, data) -> None:
+        """
+        Process N42 data, with some radiacode-specific assumptions
+
+        Use this function if you're passing in a string or file object.
+        """
+        n42_data = xmltodict.parse(data, dict_constructor=dict)["RadInstrumentData"]
+
+        self.uuid = n42_data["@n42DocUUID"]
+        self._populate_rad_instrument_information(n42_data["RadInstrumentInformation"]["RadInstrumentIdentifier"])
+
+        # XML transports entities as a dict for a single item, or a list of dicts. Ugh.
+        if isinstance(n42_data["EnergyCalibration"], list):
+            energy_calibrations = {x["@id"]: x["CoefficientValues"] for x in n42_data["EnergyCalibration"]}
+        else:
+            energy_calibrations = {
+                n42_data["EnergyCalibration"]["@id"]: n42_data["EnergyCalibration"]["CoefficientValues"]
+            }
+
+        if isinstance(n42_data["RadMeasurement"], list):
+            rmz = n42_data["RadMeasurement"]
+        else:
+            rmz = [n42_data["RadMeasurement"]]
+
+        for rm in rmz:
+            sl = self._spectrum_layer_from_rad_measurement(rm, energy_calibrations)
+            mc = rm["MeasurementClassCode"]
+            if mc == "Foreground":
+                self.spectrum_data.fg_spectrum = sl
+            elif mc == "Background":
+                self.spectrum_data.bg_spectrum = sl
+            else:
+                raise ValueError
+
+    def generate_xml(self, dest=None) -> str:
+        """
+        Export the in-memory representation to XML
+
+        dest can be a file-like object, and if not given a string representation will be returned.
+        """
+        if not self.uuid:
+            self.uuid = uuid4()
+
+        data = self.header.copy()
+        data["@n42DocUUID"] = self.uuid
+        data["RadInstrumentInformation"] = self.rad_instrument_information
+        data["RadDetectorInformation"] = self.rad_detector_information
+        data["EnergyCalibration"] = [
+            {
+                "@id": "ec-fg",
+                "CoefficientValues": " ".join([f"{x:f}" for x in self.spectrum_data.fg_spectrum.calibration]),
+            },
+        ]
+        data["RadMeasurement"] = [
+            self._rad_measurement_from_spectrum_layer(self.spectrum_data.fg_spectrum, fg=True),
+        ]
+
+        if self.spectrum_data.bg_spectrum:
+            data["EnergyCalibration"].append(
+                {
+                    "@id": "ec-bg",
+                    "CoefficientValues": " ".join([f"{x:f}" for x in self.spectrum_data.bg_spectrum.calibration]),
+                }
+            )
+            data["RadMeasurement"].append(
+                self._rad_measurement_from_spectrum_layer(self.spectrum_data.bg_spectrum, fg=False)
+            )
+
+        return xmltodict.unparse({"RadInstrumentData": data}, output=dest, pretty=True)
+
+    def write_file(self, filename: str) -> None:
+        "Write an N42 file"
+        with open(filename, "wt") as ofd:
+            self.generate_xml(ofd)
+
+    def to_rcspectrum(self) -> RcSpectrum:
+        return self.spectrum_data
+
+    def from_rcspectrum(self, s: RcSpectrum) -> bool:
+        self.uuid = s.uuid()
+        self.spectrum_data = s
+        self._populate_rad_instrument_information(s.fg_spectrum.serial_number)
+        return True
