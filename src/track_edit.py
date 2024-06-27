@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
+# coding: utf-8
+# vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syn=python
+# Author: Chris Kuethe <chris.kuethe@gmail.com> , https://github.com/ckuethe/radiacode-tools
+# SPDX-License-Identifier: MIT
+
 import os
-import re
 from argparse import ArgumentParser, Namespace
 from collections import namedtuple
 from datetime import datetime, timezone
