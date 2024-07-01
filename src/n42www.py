@@ -12,7 +12,7 @@ from re import sub as resub
 
 from flask import Flask, abort, request, send_file
 
-from n42convert import process_single_fileobj
+from rcfiles import RcN42, RcSpectrum
 
 appname = "N42Server"
 logger: Logger = getLogger(appname)
@@ -46,8 +46,12 @@ def handle_convert():
 
     upload = request.files[input_name]
     try:
-        # deepcode ignore PT: this is a file handle not a path subject to traversal.
-        converted = process_single_fileobj(fileobj=upload.stream)
+        sp = RcSpectrum()
+        n42 = RcN42()
+        sp.load_str(upload.stream.read())
+        n42.from_rcspectrum(sp)
+        converted = n42.generate_xml()
+
     except KeyboardInterrupt:
         raise
     except Exception:

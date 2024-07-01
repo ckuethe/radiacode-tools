@@ -7,254 +7,16 @@
 import os
 from argparse import ArgumentParser, Namespace
 from io import TextIOWrapper
-from textwrap import dedent
 from typing import Any, Dict, List, Optional
-from uuid import UUID, uuid4
+from uuid import UUID
 
-import xmltodict
-
-from rcutils import stringify
-
-__version__ = "0.0.9"
-__creator__ = "https://github.com/ckuethe/radiacode-tools"
-
-
-def parse_spectrum(spectrum, check: bool = True):
-    """Given an spectrum dict, return useful items"""
-    rv = {
-        "name": spectrum["SpectrumName"],
-        "device_serial_number": spectrum.get("SerialNumber", None),
-        "calibration_order": int(spectrum["EnergyCalibration"]["PolynomialOrder"]),
-        "calibration_values": [float(f) for f in spectrum["EnergyCalibration"]["Coefficients"]["Coefficient"]],
-        "duration": int(spectrum["MeasurementTime"]),
-        "channels": int(spectrum["NumberOfChannels"]),
-        "spectrum": [int(i) for i in spectrum["Spectrum"]["DataPoint"]],
-    }
-
-    if check and (len(rv["spectrum"]) != rv["channels"]):
-        raise ValueError("spectrum length != number of channels")
-
-    if check and (2 != rv["calibration_order"]):
-        raise ValueError("invalid calibration order")
-
-    if check and (len(rv["calibration_values"]) != rv["calibration_order"] + 1):
-        raise ValueError("Inconsistent calibration polynomial")
-
-    return rv
-
-
-def load_radiacode_spectrum(filename: Optional[str] = None, fileobj: Optional[TextIOWrapper] = None) -> Dict[str, Any]:
-    if filename and fileobj:
-        raise ValueError("Only one of filename or fileobj may be given")
-    if filename:
-        # file deepcode ignore MissingCloseOnSomePath: CLI tool intentionally opening the files the user asked for
-        ifd = open(filename)
-    elif fileobj:
-        ifd = fileobj
-    else:
-        raise ValueError("One of filename or fileobj are required")
-
-    try:
-        sp = xmltodict.parse(ifd.read(), dict_constructor=dict)["ResultDataFile"]["ResultDataList"]["ResultData"]
-    except Exception:  # something went wrong
-        if filename:  # don't leak the fd
-            ifd.close()
-        raise  # let the caller figure out what to do next
-
-    if filename:
-        ifd.close()
-
-    fg = sp["EnergySpectrum"]  # let this raise if the spectrum is missing. No foreground = not useful
-    fg = parse_spectrum(fg)
-    try:
-        bg = sp.get("BackgroundEnergySpectrum")
-        bg = parse_spectrum(bg)
-    except (KeyError, AttributeError, TypeError):
-        bg = None
-
-    rv = {
-        "device_name": sp["DeviceConfigReference"]["Name"],
-        "foreground": fg,
-        "background": bg,
-    }
-
-    # older versions of data files don't have start and end times
-    if "StartTime" in sp:
-        rv["start_time"] = sp["StartTime"]
-    if "EndTime" in sp:
-        rv["end_time"] = sp["EndTime"]
-
-    return rv
-
-
-def get_rate_from_spectrum(filename: str) -> float:
-    s = load_radiacode_spectrum(filename)
-    return sum(s["foreground"]["spectrum"]) / s["foreground"]["duration"]
-
-
-def squareformat(a: List[Any], columns: int = 16):
-    "reformat the a long list of numbers (any elements, actually) as some nice lines"
-    if columns < 1:
-        raise ValueError("Columns must be greater than zero")
-    rv = []
-    for x in range(columns):
-        line = " ".join([f"{i:5}" for i in a[x * columns : (x + 1) * columns]])
-        rv.append(line)
-    return "\n".join(rv)
-
-
-def format_calibration(spectrum, fg=True):
-    "Format calibration factors from data file"
-    try:
-        tag = "fg" if fg else "bg"
-        layer = spectrum["foreground"] if fg else spectrum["background"]
-        rv = f"""
-        <EnergyCalibration id="ec-{tag}">
-            <CoefficientValues>{stringify(layer["calibration_values"])} </CoefficientValues>
-        </EnergyCalibration>
-        """
-        return dedent(rv).strip()
-    except (KeyError, TypeError):
-        print("No background data present")
-        # Spectrum file may not contain a background series. That is not an error. Other exceptions are
-        return ""
-
-
-def format_spectrum(spectrum, fg=True):
-    try:
-        tag, mclass = ("fg", "Foreground") if fg else ("bg", "Background")
-        layer = mclass.lower()
-        time_index = 0 if fg else 1
-
-        try:
-            # old versions may not have timestamps.
-            timestamp = spectrum["start_time"]
-            if isinstance(timestamp, list):
-                timestamp = timestamp[time_index]
-            timestamp_commment = ""
-        except KeyError:
-            timestamp = "1970-01-01T00:00:00"
-            timestamp_commment = "<!-- WARNING, no datetime was present in source file -->"
-
-        rv = f"""
-        <RadMeasurement id="rm-{tag}">
-            <Remark>Title: {spectrum[layer]['name']}</Remark>
-            <MeasurementClassCode>{mclass}</MeasurementClassCode>
-            <StartDateTime>{timestamp}</StartDateTime> {timestamp_commment}
-            <RealTimeDuration>PT{spectrum[layer]["duration"]}S</RealTimeDuration>
-            <Spectrum id="rm-{tag}-sp" radDetectorInformationReference="radiacode-csi-sipm" energyCalibrationReference="ec-{tag}">
-                <LiveTimeDuration>PT{spectrum[layer]["duration"]}S</LiveTimeDuration>
-                <ChannelData compressionCode="None">
-                    {stringify(spectrum[layer]["spectrum"])}
-                </ChannelData>
-            </Spectrum>
-        </RadMeasurement>
-        """
-        return dedent(rv).strip()
-    except Exception:
-        return ""
-
-
-def make_detector_info():
-    "Hard-coded information about the RC-101 and RC-102, id is fixed to 'radiacode-csi-sipm'"
-    # Category and Kind are from N42, Description is free text
-    rv = """
-    <RadDetectorInformation id="radiacode-csi-sipm">
-        <RadDetectorCategoryCode>Gamma</RadDetectorCategoryCode>
-        <RadDetectorKindCode>CsI</RadDetectorKindCode>
-        <RadDetectorDescription>CsI:Tl scintillator, coupled to SiPM</RadDetectorDescription>
-        <RadDetectorLengthValue units="mm">10</RadDetectorLengthValue>
-        <RadDetectorWidthValue units="mm">10</RadDetectorWidthValue>
-        <RadDetectorDepthValue units="mm">10</RadDetectorDepthValue>
-        <RadDetectorVolumeValue units="cc">1</RadDetectorVolumeValue>
-    </RadDetectorInformation>
-    """
-    return dedent(rv).strip()
-
-
-def make_instrument_info(data):
-    try:
-        # Extract the serial number from the data file
-        serial_number = data.get("foreground", data.get("background"))["device_serial_number"]
-        serial_number = f"<RadInstrumentIdentifier>{serial_number}</RadInstrumentIdentifier>"
-    except KeyError:
-        serial_number = ""
-
-    rv = f"""
-    <RadInstrumentInformation id="rii-1">
-        <RadInstrumentManufacturerName>Radiacode</RadInstrumentManufacturerName>
-        {serial_number}
-        <RadInstrumentModelName>{data["device_name"]}</RadInstrumentModelName>
-        <RadInstrumentClassCode>Spectroscopic Personal Radiation Detector</RadInstrumentClassCode>
-
-        <!-- I have a feature request to include firmware and app version in the exported xml files. -->
-        <RadInstrumentVersion>
-            <RadInstrumentComponentName>Firmware</RadInstrumentComponentName>
-            <RadInstrumentComponentVersion>4.06</RadInstrumentComponentVersion>
-        </RadInstrumentVersion>
-        <RadInstrumentVersion>
-            <RadInstrumentComponentName>App</RadInstrumentComponentName>
-            <RadInstrumentComponentVersion>1.42.00</RadInstrumentComponentVersion>
-        </RadInstrumentVersion>
-        <RadInstrumentVersion>
-            <RadInstrumentComponentName>Converter</RadInstrumentComponentName>
-            <RadInstrumentComponentVersion>{__version__}</RadInstrumentComponentVersion>
-        </RadInstrumentVersion>
-    </RadInstrumentInformation>
-    """
-    return dedent(rv).strip()
-
-
-def format_output(
-    uuid="",
-    instrument_info="",
-    detector_info="",
-    fg_cal="",
-    fg_spectrum="",
-    bg_cal="",
-    bg_spectrum="",
-    fwhm_cal="",
-) -> str:
-    if uuid is None:
-        uuid = uuid4()
-    template = f"""
-    <?xml version="1.0"?>
-    <?xml-model href="http://physics.nist.gov/N42/2011/schematron/n42.sch" type="application/xml" schematypens="http://purl.oclc.org/dsdl/schematron"?>
-    <RadInstrumentData xmlns="http://physics.nist.gov/N42/2011/N42"
-                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                   xsi:schemaLocation="http://physics.nist.gov/N42/2011/N42 http://physics.nist.gov/N42/2011/n42.xsd"
-                   n42DocUUID="{uuid}">
-
-    <!-- What created this file? -->
-    <RadInstrumentDataCreatorName>{__creator__}</RadInstrumentDataCreatorName>
-
-    <!-- What product was used to gather the data? -->
-    {instrument_info}
-
-    <!-- What detection technology is used? -->
-    {detector_info}
-
-    <!-- Calibration factors, mapping channel/bin to energy level. Foreground and background may have separate calibrations-->
-    {fg_cal}
-    {bg_cal}
-    {fwhm_cal}
-
-    <!-- Primary spectrum in this file-->
-    {fg_spectrum}
-
-    <!-- N42 can transport multiple spectra; If present, this will be used as background -->
-    {bg_spectrum}
-
-    <!-- All done! -->
-    </RadInstrumentData>
-    """
-    return dedent(template).strip()
+from rcfiles import RcN42, RcSpectrum
 
 
 def get_args() -> Namespace:
     ap = ArgumentParser()
 
-    def _uuid(s):
+    def _uuid(s) -> UUID:
         if s.strip():
             return UUID(s)
         return None
@@ -305,64 +67,33 @@ def get_args() -> Namespace:
     return ap.parse_args()
 
 
-def process_single_fileobj(fileobj: TextIOWrapper) -> str:
-    """
-    wrapper to allow conversion from a file object
-
-    this is used by the conversion server
-    """
-    fg_data = load_radiacode_spectrum(fileobj=fileobj)
-
-    try:
-        bg_spectrum = (format_spectrum(fg_data, fg=False),)
-    except Exception:
-        bg_spectrum = ""
-    n42data = format_output(
-        uuid=None,
-        instrument_info=make_instrument_info(fg_data),
-        detector_info=make_detector_info(),
-        fg_cal=format_calibration(fg_data),
-        bg_cal=format_calibration(fg_data, fg=False),
-        fg_spectrum=format_spectrum(fg_data),
-        bg_spectrum=bg_spectrum,
-    )
-
-    return n42data
-
-
 def process_single_file(fg_file=None, bg_file=None, out_file=None, uuid=None, overwrite=False) -> None:
     "Read a data file and convert it"
     if out_file and os.path.exists(out_file) and overwrite is False:
         return  # shortcut for recursive mode
 
-    fg_data = load_radiacode_spectrum(filename=fg_file)
-    if bg_file:
-        bg_data = load_radiacode_spectrum(filename=bg_file)
-    else:
-        bg_data = fg_data
-
-    try:
-        bg_spectrum = format_spectrum(bg_data, fg=False)
-    except Exception:
-        bg_spectrum = ""
-    n42data = format_output(
-        uuid=uuid,
-        instrument_info=make_instrument_info(fg_data),
-        detector_info=make_detector_info(),
-        fg_cal=format_calibration(fg_data),
-        bg_cal=format_calibration(bg_data, fg=False),
-        fg_spectrum=format_spectrum(fg_data),
-        bg_spectrum=bg_spectrum,
-    )
+    fg_spec = RcSpectrum(fg_file)
+    bg_spec = RcSpectrum(bg_file)
+    n42 = RcN42()
+    n42.spectrum_data.fg_spectrum = fg_spec.fg_spectrum
+    if bg_spec.bg_spectrum:
+        # if a background spectrum file has been provided,
+        # first try its background layer as the background
+        n42.spectrum_data.bg_spectrum = bg_spec.bg_spectrum
+    elif bg_spec.fg_spectrum:
+        # if a background spectrum file has been provided, but it
+        # doesn't have a background layer, use its foreground layer
+        n42.spectrum_data.bg_spectrum = bg_spec.bg_spectrum
+    elif fg_spec.bg_spectrum:
+        # if an explicit background has not been provided
+        # use the one provided by the foreground data file.
+        n42.spectrum_data.bg_spectrum = fg_spec.bg_spectrum
 
     if out_file is None:
         out_file = f"{fg_file}.n42"
 
-    mode = "w" if overwrite else "x"
     # file deepcode ignore PT: CLI tool intentionally opening the files the user asked for
-    with open(out_file, mode) as ofd:
-        print(f"Output file: {out_file}")
-        ofd.write(dedent(n42data))
+    n42.write_file(out_file)
 
 
 def main() -> None:

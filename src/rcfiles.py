@@ -212,9 +212,11 @@ class RcSpectrum:
 
     def load_file(self, filename: str) -> None:
         with open(filename) as ifd:
-            sp = xmltodict.parse(ifd.read(), dict_constructor=dict)["ResultDataFile"]["ResultDataList"]["ResultData"]
+            self.load_str(ifd.read())
 
-        print(f"loaded {filename}")
+    def load_str(self, data: str) -> None:
+        sp = xmltodict.parse(data, dict_constructor=dict)["ResultDataFile"]["ResultDataList"]["ResultData"]
+
         tmp = sp["EnergySpectrum"]  # explode if the spectrum is missing. No foreground = not useful
         self.fg_spectrum = self._parse_spectrum(tmp)._replace(device_model=sp["DeviceConfigReference"]["Name"])
 
@@ -573,6 +575,7 @@ class RcN42:
 
         return {
             "@id": f"radmeas-{tag}",
+            # FIXME how to store the spectrum comment as well as the name?
             "Remark": sl.spectrum_name,
             "MeasurementClassCode": f"{fb}ground",
             "StartDateTime": sl.timestamp.strftime("%Y-%m-%dT%H:%M:%S"),
