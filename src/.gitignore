@@ -1,0 +1,4 @@
+# Ignore everything in this directory except for python source files.
+# Protection from commiting random garbage test data.
+*
+!*.py
