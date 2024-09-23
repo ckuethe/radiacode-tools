@@ -364,6 +364,11 @@ class RcSpectrum:
         h = sha256(str(self).encode()).hexdigest()[:32]
         return f"{h[0:8]}-{h[8:12]}-{h[12:16]}-{h[16:20]}-{h[20:]}"
 
+    def count_rate(self, bg=False) -> float:
+        n = sum(self.bg_spectrum.counts if bg else self.fg_spectrum.counts)
+        t = self.bg_spectrum.duration if bg else self.fg_spectrum.duration
+        return n / t.total_seconds()
+
 
 class RcSpectrogram:
     "Radiacode Spectrogram (.rcspg)"

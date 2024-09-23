@@ -5,11 +5,10 @@
 # SPDX-License-Identifier: MIT
 
 from argparse import ArgumentParser, Namespace
-from collections import namedtuple
 from math import pow, sqrt
 from typing import Dict, Union
 
-from n42convert import get_rate_from_spectrum
+from rcfiles import RcSpectrum
 from rctypes import DTstats, Number
 
 
@@ -37,25 +36,27 @@ def load_spectra(args) -> Dict[str, float]:
         rv["a"] = float(args.first) / args.interval
     except ValueError:
         # file deepcode ignore PT: CLI tool intentionally opening the files the user asked for
-        rv["a"] = get_rate_from_spectrum(args.first)
+        rv["a"] = RcSpectrum(args.first).count_rate()
 
     try:
         rv["b"] = float(args.second) / args.interval
     except ValueError:
-        rv["b"] = get_rate_from_spectrum(args.second)
+        rv["b"] = RcSpectrum(args.second).count_rate()
 
     try:
         rv["ab"] = float(args.combined) / args.interval
     except ValueError:
-        rv["ab"] = get_rate_from_spectrum(args.combined)
+        rv["ab"] = RcSpectrum(args.combined).count_rate()
 
     if args.background is not None:
         try:
             rv["bg"] = float(args.background) / args.interval
         except ValueError:
-            rv["bg"] = get_rate_from_spectrum(args.background)
+            rv["bg"] = RcSpectrum(args.background).count_rate()
     else:
         rv["bg"] = 0
+
+    print(f"Computing deadtime from a={args.first}, b={args.second}, ab={args.combined}")
 
     return rv
 
@@ -95,7 +96,7 @@ def compute_deadtime(*, a: Number, b: Number, ab: Number, bg: Number = 0) -> DTs
 def print_deadtime(rates: Dict[str, Number]) -> DTstats:
     "Given a dict of a,b,ab,bg rates, print the computed deadtime."
     dt = compute_deadtime(**rates)
-    # print(rates)
+    print(rates)
     print(f"dead time at {dt.dt_cps:.1f}cps: {dt.dt_us*1e6:.1f}us")
     print(f"lost count/sec: {dt.lost_cps:.1f} loss_fraction: {100*dt.loss_fraction:.1f}%")
     return dt
