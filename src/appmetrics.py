@@ -22,7 +22,7 @@ from json import dumps as jdumps
 from os import getpid
 from threading import Lock, Thread
 from time import monotonic, process_time, time
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Union
 
 Number = Union[int, float]
 
@@ -65,8 +65,6 @@ class AppMetrics:
     """
 
     _mtypes: List[str] = [C, F, G]
-    _stub = False
-    am_mutex: Lock = Lock()
 
     def __init__(self, port: int = 8274, local_only: bool = True, appname: str = "", stub=False):
         """
@@ -75,9 +73,11 @@ class AppMetrics:
         appname: identificaton string for metrics
         stub: create a dummy that doesn't do anything, but can at least be used for prototyping
         """
+        self._stub = False
         if stub:
             self._stub = stub
             return
+        self.am_mutex: Lock = Lock()
         self._stats: Dict[str, Any] = {P: {"pid": getpid(), "appname": appname}, C: {}, F: {}, G: {}}
         self._init_real_time = monotonic()
         self._wall_time = time()
@@ -172,8 +172,6 @@ class AppMetricsBaseReqHandler(BaseHTTPRequestHandler):
 
 
 class AppMetricsServer:
-    _server_thread: Optional[Thread] = None
-
     def __init__(self, app_metrics: AppMetrics, port: int = 8274, local_only: bool = True, appname: str = ""):
         address = "localhost" if local_only else "0.0.0.0"
         self._server_thread = Thread(
