@@ -342,6 +342,8 @@ def gps_worker(args: Namespace) -> None:
     ams.gauge_create("latitude")
     ams.gauge_create("longitude")
     ams.gauge_create("gps_mode")
+    ams.gauge_create("sats_seen")
+    ams.gauge_create("sats_used")
     srv = (args.gpsd["host"], 2947 if args.gpsd["port"] is None else args.gpsd["port"])
     watch_args = {"enable": True, "json": True}
     if args.gpsd["device"]:
@@ -358,10 +360,14 @@ def gps_worker(args: Namespace) -> None:
                     line = gpsfd.readline().strip()
                     try:
                         x = jloads(line)
+                        if x["class"] == "SKY":
+                            ams.gauge_update("sats_seen", int(x.get("nSat", 0)))
+                            ams.gauge_update("sats_used", int(x.get("uSat", 0)))
                         if x["class"] != "TPV":
                             continue
                         if x["time"] == dedup:
                             continue
+                        dedup = x["time"]
                         ams.gauge_update("gps_mode", x["mode"])
                         if x["mode"] < 2:
                             continue
