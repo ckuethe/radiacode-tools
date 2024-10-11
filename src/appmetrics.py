@@ -19,7 +19,7 @@ import sys
 from functools import partial
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from json import dumps as jdumps
-from os import getpid
+from os import getpgrp, getppid, killpg
 from threading import Lock, Thread
 from time import monotonic, process_time, time
 from typing import Any, Dict, List, Union
@@ -78,7 +78,7 @@ class AppMetrics:
             self._stub = stub
             return
         self.am_mutex: Lock = Lock()
-        self._stats: Dict[str, Any] = {P: {"pid": getpid(), "appname": appname}, C: {}, F: {}, G: {}}
+        self._stats: Dict[str, Any] = {P: {"pid": getppid(), "appname": appname}, C: {}, F: {}, G: {}}
         self._init_real_time = monotonic()
         self._wall_time = time()
         self._init_proc_time = process_time()
@@ -165,6 +165,10 @@ class AppMetricsBaseReqHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", len(encoded))
         self.end_headers()
         self.wfile.write(encoded)
+        self.wfile.flush()
+
+        if self.path.startswith("/quitquitquit"):
+            killpg(getpgrp(), 15)
 
     def log_message(self, format: str, *args: Any) -> None:
         "Ingentional log suppression"
