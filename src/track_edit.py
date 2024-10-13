@@ -5,26 +5,81 @@
 # SPDX-License-Identifier: MIT
 
 import os
-from argparse import ArgumentParser, Namespace
+from argparse import ArgumentParser, Namespace, RawDescriptionHelpFormatter
 from collections import namedtuple
 from datetime import datetime, timezone
 from math import atan2, cos, pow, radians, sin, sqrt
 from tempfile import mkstemp
 from textwrap import dedent
-from typing import List, NoReturn, Tuple
+from typing import List, Tuple
 
 from rcfiles import RcTrack
 from rctypes import TrackPoint
 
 _nan = float("nan")
-TimeRange = namedtuple("TimeRange", ["t_start", "t_end"], defaults=[None] * 2)
-GeoBox = namedtuple("GeoBox", ["lat1", "lon1", "lat2", "lon2"], defaults=[_nan] * 4)
-GeoCircle = namedtuple("GeoCircle", ["latitude", "longintude", "radius"], defaults=[_nan] * 3)
+TimeRange = namedtuple("TimeRange", ["t_start", "t_end"], defaults=[None, None])
+GeoPoint = namedtuple("GeoPoint", ["latitude", "longitude"], defaults=[_nan, _nan])
+GeoBox = namedtuple("GeoBox", ["p1", "p2"], defaults=[GeoPoint(), GeoPoint()])
+GeoCircle = namedtuple("GeoCircle", ["point", "radius"], defaults=[GeoPoint(), _nan])
 localtz = datetime.now(timezone.utc).astimezone().tzinfo
 
 
-def long_help() -> NoReturn:
-    txt: str = """
+def _timerange(s: str) -> TimeRange:
+    """
+    helper to validate a timerange (a pair of datetimes)
+
+    Either end can be unspecified, in which case it will be treated
+    as the start or end of time (or at least the unix epoch).
+    """
+    _datestr: str = "%Y-%m-%dT%H:%M:%S"
+    w = s.split("~")
+    if len(w) != 2:
+        raise ValueError
+    a = datetime(1945, 7, 16, 11, 29, 21, 0, localtz)
+    b = datetime.fromtimestamp(2**32, localtz)
+    if w[0]:
+        a = datetime.strptime(w[0], _datestr).replace(tzinfo=localtz)
+    if w[1]:
+        b = datetime.strptime(w[1], _datestr).replace(tzinfo=localtz)
+    return TimeRange(a, b)
+
+
+def _geobox(s: str) -> GeoBox:
+    "helper to validate a box geometry"
+    points = s.split("~")
+    p0 = [float(f) for f in points[0].split(",")]
+    p1 = [float(f) for f in points[1].split(",")]
+
+    if (
+        True  # just for the formatting
+        and (2 == len(points))
+        and (-90 <= p0[0] <= 90)
+        and (-90 <= p1[0] <= 90)
+        and (-180 <= p0[1] <= 180)
+        and (-180 <= p1[1] <= 180)
+    ):
+        return GeoBox(GeoPoint(*p0), GeoPoint(*p1))
+    raise ValueError
+
+
+def _geocircle(s: str) -> GeoCircle:
+    "helper to validate a geocircle; a radius around a point"
+    rv = [float(f) for f in s.split(",")]
+    if (
+        True
+        and (3 == len(rv))
+        and (-90 <= rv[0] <= 90)
+        and (-180 <= rv[1] <= 180)
+        and (0 < rv[2] <= 40030e3)  # 3.1416 * 2 * 6371km
+    ):
+        return GeoCircle(GeoPoint(rv[0], rv[1]), rv[2])
+    raise ValueError
+
+
+def get_args() -> Namespace:
+    "The usual argument parsing stuff"
+
+    longhelp: str = """
     Track Filtering
     ===============
 
@@ -57,57 +112,13 @@ def long_help() -> NoReturn:
     out a restricted area, or trimming some excess recording off the end of track.
 
     If both include and exclude filters are given
-
     """
 
-    print(dedent(txt))
-    exit()
-
-
-def get_args() -> Namespace:
-    "The usual argument parsing stuff"
-
-    def _timerange(s) -> TimeRange:
-        "helper to validate a timerange (a pair of datetimes)"
-        _datestr: str = "%Y-%m-%dT%H:%M:%S"
-        w = s.split("~")
-        if len(w) != 2:
-            raise ValueError
-        return TimeRange(
-            datetime.strptime(w[0], _datestr).replace(tzinfo=localtz),
-            datetime.strptime(w[1], _datestr).replace(tzinfo=localtz),
-        )
-
-    def _geobox(s) -> GeoBox:
-        "helper to validate a box geometry"
-        points = s.split("~")
-        p0 = [float(f) for f in points[0].split(",")]
-        p1 = [float(f) for f in points[1].split(",")]
-
-        if (
-            True  # just for the formatting
-            and (2 == len(points))
-            and (-90 <= p0[0] <= 90)
-            and (-90 <= p1[0] <= 90)
-            and (-180 <= p0[1] <= 180)
-            and (-180 <= p1[1] <= 180)
-        ):
-            return GeoBox(*p0, *p1)
-        raise ValueError
-
-    def _geocircle(s) -> GeoCircle:
-        rv = [float(f) for f in s.split(",")]
-        if (
-            True
-            and (3 == len(rv))
-            and (-90 <= rv[0] <= 90)
-            and (-180 <= rv[1] <= 180)
-            and (0 < rv[2] <= 40030e3)  # 3.1416 * 2 * 6371km
-        ):
-            return GeoCircle(*rv)
-        raise ValueError
-
-    ap = ArgumentParser(description="Edit a Radiacode track by clipping to (or out) time ranges and geometries.")
+    ap = ArgumentParser(
+        description="Edit a Radiacode track by clipping to (or out) time ranges and geometries.",
+        epilog=dedent(longhelp),
+        formatter_class=RawDescriptionHelpFormatter,
+    )
     ap.add_argument(  # -t include-time-range
         "-t",
         "--include-time-range",
@@ -176,7 +187,6 @@ def get_args() -> Namespace:
         metavar="FILENAME",
         help="Save output to different name, default <inputfile>~",
     )
-    ap.add_argument("-H", "--long-help", default=False, action="store_true")
     ap.add_argument(nargs=1, dest="filename", metavar="FILE")
 
     rv = ap.parse_args()
@@ -224,27 +234,54 @@ def check_geobox(member: TrackPoint, container: GeoBox) -> bool:
                         (x2,y2)       (x2,y2)
 
     """
-    x = min(container.lon1, container.lon2) <= member.longitude <= max(container.lon1, container.lon2)
-    y = min(container.lat1, container.lat2) <= member.latitude <= max(container.lat1, container.lat2)
+    x = (
+        min(container.p1.longitude, container.p2.longitude)
+        <= member.longitude
+        <= max(container.p1.longitude, container.p2.longitude)
+    )
+    y = (
+        min(container.p1.latitude, container.p2.llatitude)
+        <= member.longitude
+        <= max(container.p1.latitude, container.p2.latitude)
+    )
     return x and y
 
 
 def check_geocircle(member: TrackPoint, container: GeoCircle) -> bool:
+    """
+    Check if a point is within a circle
+       ________
+      /        \
+     /       *  \
+    |            |
+    |      x---->|
+    |        r   |
+     \          /
+      \________/
+
+    """
     return (
-        earthdistance(member.latitude, member.longitude, container.latitude, container.longintude) <= container.radius
+        earthdistance(member.latitude, member.longitude, container.point.latitude, container.point.longitude)
+        <= container.radius
     )
 
 
 def check_timeranges(member: TrackPoint, container: List[TimeRange]) -> List[bool]:
+    if not isinstance(container, list):
+        raise ValueError("container must be a list")
     return [check_timerange(member, tr) for tr in container]
 
 
 def check_geoboxes(member: TrackPoint, container: List[GeoBox]) -> List[bool]:
-    return [check_geobox(member, tr) for tr in container]
+    if not isinstance(container, list):
+        raise ValueError("container must be a list")
+    return [check_geobox(member, gb) for gb in container]
 
 
 def check_geocircles(member: TrackPoint, container: List[GeoCircle]) -> List[bool]:
-    return [check_geocircle(member, tr) for tr in container]
+    if not isinstance(container, list):
+        raise ValueError("container must be a list")
+    return [check_geocircle(member, gc) for gc in container]
 
 
 def edit_track(args: Namespace, track: RcTrack) -> Tuple[int, int]:
@@ -257,6 +294,8 @@ def edit_track(args: Namespace, track: RcTrack) -> Tuple[int, int]:
     the track by popping elements from the list of points. Once a point
     has survived filtering it is not referred to again and its index
     can change without ill effect.
+
+    Returns a tuple of (before_len,after_len), and modifies the input track
     """
 
     if args.track_name is None:
@@ -302,8 +341,6 @@ def edit_track(args: Namespace, track: RcTrack) -> Tuple[int, int]:
 
 def main() -> None:
     args = get_args()
-    if args.long_help:
-        long_help()
 
     if True:
         print("parsed args:")

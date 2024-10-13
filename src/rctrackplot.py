@@ -18,10 +18,13 @@ import plotly.express as px
 from rcfiles import RcTrack
 from rctypes import TrackPoint
 
+# Figure out what the local timezone is, once, because I use it so often
 localtz = datetime.now(timezone.utc).astimezone().tzinfo
 
 
 def get_args() -> Namespace:
+    "The usual argument handling stuff"
+
     def PositiveInt(s: str) -> int:
         rv = int(s)
         if rv > 0:
@@ -35,16 +38,30 @@ def get_args() -> Namespace:
         raise ValueError()
 
     ap = ArgumentParser()
-    ap.add_argument("-a", "--accuracy", type=PositiveFloat, default=15.0)
-    ap.add_argument("-d", "--downsample", type=PositiveInt, default=16)
+    ap.add_argument("-o", "--output-file", type=str, metavar="FILE", help="[<input_file>.png]")
+    ap.add_argument(
+        "-a",
+        "--accuracy",
+        type=PositiveFloat,
+        default=15.0,
+        help="Maximum point error in meters [%(default)s]",
+    )
+    ap.add_argument("-d", "--downsample", type=PositiveInt, default=16, help="[%(default)s]")
     ap.add_argument("-r", "--min-count-rate", type=PositiveFloat)
     ap.add_argument("-R", "--max-count-rate", type=PositiveFloat)
-    ap.add_argument("-i", "--input-file", type=str, required=True)
-    ap.add_argument("-o", "--output-file", type=str)
-    ap.add_argument("-w", "--interactive", default=False, action="store_true")
+    ap.add_argument("--interactive", default=False, action="store_true", help="Open an interactive plot in a browser")
+    ap.add_argument("--opacity", type=PositiveFloat, default=0.25, help="Marker opacity [%(default)s]")
+    ap.add_argument(
+        "--palette",
+        default="turbo",
+        choices=["magma", "rainbow", "thermal", "turbo", "veridis"],
+        help="see https://plotly.com/python/builtin-colorscales/ [%(default)s]",
+    )
+    ap.add_argument("--renderer", choices=["plotly", "hvplot"], default="plotly")
+    ap.add_argument(nargs=1, dest="input_file", metavar="FILE")
 
     rv = ap.parse_args()
-    rv.input_file = os.path.expanduser(rv.input_file)
+    rv.input_file = os.path.expanduser(rv.input_file[0])
     if rv.output_file is None:
         rv.output_file = rv.input_file + ".png"
     return rv
@@ -116,6 +133,7 @@ def main() -> None:
     if args.downsample >= 2:
         tk.points = downsample_trackpoints(tk.points, args.downsample)
 
+    # FIXME would a pandas dataframe or parquet be better? can i just
     for i in range(len(tk.points)):
         x = list(tk.points[i])
         x[0] = x[0].astimezone(localtz)
@@ -132,8 +150,13 @@ def main() -> None:
         if tk.points[i].accuracy > 15:
             tk.points.pop(i)
 
-    # Based on https://plotly.com/python/builtin-colorscales/
-    # I think rainbow, magma, turbo, thermal, viridis are good...
+    if "plotly" == args.renderer:
+        render_plotly(tk, args)
+    if "hvplot" == args.renderer:
+        render_hvplot(tk, args)
+
+
+def render_plotly(tk: RcTrack, args: Namespace):
     fig = px.scatter_mapbox(
         tk.points,
         lat="latitude",
@@ -141,7 +164,7 @@ def main() -> None:
         hover_name="datetime",
         zoom=14,  # FIXME compute this from bounding box
         color="doserate",
-        color_continuous_scale="turbo",
+        color_continuous_scale=args.palette,
         # opacity=0.25,
         # size="countrate",
         height=900,
@@ -152,6 +175,12 @@ def main() -> None:
     fig.write_image(args.output_file)
     if args.interactive:
         fig.show()
+
+    # FIXME also try holoviz? this looks https://examples.holoviz.org/gallery/opensky/opensky.html
+
+
+def render_hvplot(tk: RcTrack, args: Namespace):
+    raise NotImplementedError
 
 
 if __name__ == "__main__":
