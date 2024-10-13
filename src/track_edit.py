@@ -7,7 +7,7 @@
 import os
 from argparse import ArgumentParser, Namespace, RawDescriptionHelpFormatter
 from collections import namedtuple
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from math import atan2, cos, pow, radians, sin, sqrt
 from tempfile import mkstemp
 from textwrap import dedent
@@ -23,6 +23,10 @@ GeoBox = namedtuple("GeoBox", ["p1", "p2"], defaults=[GeoPoint(), GeoPoint()])
 GeoCircle = namedtuple("GeoCircle", ["point", "radius"], defaults=[GeoPoint(), _nan])
 localtz = datetime.now(timezone.utc).astimezone().tzinfo
 
+_BEGINNING_OF_TIME: datetime = datetime.strptime("1945-07-16T11:29:21:00").replace(tzinfo=localtz)
+# https://pumas.nasa.gov/examples/how-many-days-are-year says approximately 365.25 days per year
+_THE_END_OF_DAYS: datetime = _BEGINNING_OF_TIME + timedelta(days=250 * 365.25)
+
 
 def _timerange(s: str) -> TimeRange:
     """
@@ -35,8 +39,8 @@ def _timerange(s: str) -> TimeRange:
     w = s.split("~")
     if len(w) != 2:
         raise ValueError
-    a = datetime(1945, 7, 16, 11, 29, 21, 0, localtz)
-    b = datetime.fromtimestamp(2**32, localtz)
+    a = _BEGINNING_OF_TIME
+    b = _THE_END_OF_DAYS
     if w[0]:
         a = datetime.strptime(w[0], _datestr).replace(tzinfo=localtz)
     if w[1]:
