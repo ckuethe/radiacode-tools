@@ -14,16 +14,12 @@ from textwrap import dedent
 from typing import List, Tuple
 
 from rcfiles import RcTrack
-from rctypes import TrackPoint
+from rctypes import GeoBox, GeoCircle, GeoPoint, TimeRange, TrackPoint
 
-_nan = float("nan")
-TimeRange = namedtuple("TimeRange", ["t_start", "t_end"], defaults=[None, None])
-GeoPoint = namedtuple("GeoPoint", ["latitude", "longitude"], defaults=[_nan, _nan])
-GeoBox = namedtuple("GeoBox", ["p1", "p2"], defaults=[GeoPoint(), GeoPoint()])
-GeoCircle = namedtuple("GeoCircle", ["point", "radius"], defaults=[GeoPoint(), _nan])
 localtz = datetime.now(timezone.utc).astimezone().tzinfo
 
-_BEGINNING_OF_TIME: datetime = datetime.strptime("1945-07-16T11:29:21:00").replace(tzinfo=localtz)
+_DATEFMT: str = "%Y-%m-%dT%H:%M:%S"
+_BEGINNING_OF_TIME: datetime = datetime.strptime("1945-07-16T11:29:21", _DATEFMT).replace(tzinfo=localtz)
 # https://pumas.nasa.gov/examples/how-many-days-are-year says approximately 365.25 days per year
 _THE_END_OF_DAYS: datetime = _BEGINNING_OF_TIME + timedelta(days=250 * 365.25)
 
@@ -35,16 +31,15 @@ def _timerange(s: str) -> TimeRange:
     Either end can be unspecified, in which case it will be treated
     as the start or end of time (or at least the unix epoch).
     """
-    _datestr: str = "%Y-%m-%dT%H:%M:%S"
     w = s.split("~")
     if len(w) != 2:
         raise ValueError
     a = _BEGINNING_OF_TIME
     b = _THE_END_OF_DAYS
     if w[0]:
-        a = datetime.strptime(w[0], _datestr).replace(tzinfo=localtz)
+        a = datetime.strptime(w[0], _DATEFMT).replace(tzinfo=localtz)
     if w[1]:
-        b = datetime.strptime(w[1], _datestr).replace(tzinfo=localtz)
+        b = datetime.strptime(w[1], _DATEFMT).replace(tzinfo=localtz)
     return TimeRange(a, b)
 
 

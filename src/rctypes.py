@@ -13,6 +13,12 @@ from typing import Union
 
 Number = Union[int, float]
 
+_nan = float("nan")
+TimeRange = namedtuple("TimeRange", ["t_start", "t_end"], defaults=[None, None])
+GeoPoint = namedtuple("GeoPoint", ["latitude", "longitude"], defaults=[_nan, _nan])
+GeoBox = namedtuple("GeoBox", ["p1", "p2"], defaults=[GeoPoint(), GeoPoint()])
+GeoCircle = namedtuple("GeoCircle", ["point", "radius"], defaults=[GeoPoint(), _nan])
+
 # Dead Time statistics
 DTstats = namedtuple("DTstats", ["lost_cps", "loss_fraction", "dt_us", "dt_cps"])
 
