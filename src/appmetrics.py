@@ -66,7 +66,7 @@ class AppMetrics:
 
     _mtypes: List[str] = [C, F, G]
 
-    def __init__(self, port: int = 8274, local_only: bool = True, appname: str = "", stub=False):
+    def __init__(self, port: int = 8274, local_only: bool = True, appname: str = "", stub: bool = False):
         """
         port: tcp port on which to listen
         local_only: whether or not to bind to localhost or wildcard
