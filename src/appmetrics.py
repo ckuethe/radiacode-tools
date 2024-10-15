@@ -158,16 +158,80 @@ class AppMetricsBaseReqHandler(BaseHTTPRequestHandler):
         self.metrics = metrics
         super().__init__(*args, **kwargs)
 
+    def index_html(self) -> str:
+        kz = self.metrics._stats.keys()
+
+        lines = [
+            "<html> <body> <tt>",
+            '<table id="mtx" border="1" cellpadding="2"><h2>Application Metrics</h2></td>',
+        ]
+
+        for k in self.metrics._stats:
+            tr = f'<tr><td colspan="2" id="{k}"><b>{k.upper()}</b></tr></td>'
+            lines.append(tr)
+            for m in self.metrics._stats[k]:
+                n = m
+                if m == "wall":
+                    n = "current time"
+                elif m == "real":
+                    n = "process running time (s)"
+                elif m == "proc":
+                    n = "process cpu time (s)"
+                tr = f'<tr><td>{n}</td><td><output id="{k}_{m}">*</output></td></tr>'
+                lines.append(tr)
+
+        lines.append("</table>\n</tt>\n")
+
+        js = """
+        <script type="text/javascript" id="metricsloader">
+            function fetchMetricsData() {
+                var httpRequest = new XMLHttpRequest();
+                httpRequest.addEventListener("readystatechange", (url) => {
+                    if (httpRequest.readyState === 4 && httpRequest.status === 200) {
+                        var metricsInfo = JSON.parse(httpRequest.responseText);
+                        for (const [section, sec_data] of Object.entries(metricsInfo)) {
+                            for ([k, v] of Object.entries(sec_data)) {
+                                var element_id = section + "_" + k;
+                                if (element_id == "process_wall") {
+                                    v = new Date(v*1000);
+                                }
+                                document.getElementById(element_id).innerText = v;
+                            }
+                        }
+                    }
+                });
+                httpRequest.open("GET", "/", true);
+                httpRequest.send();
+            }
+            var metricsUpdateInterval = 2500; // millseconds
+            var metricsTimer = setInterval(fetchMetricsData, metricsUpdateInterval);
+            fetchMetricsData();
+        </script>
+        </body>
+        </html>
+        """
+
+        return "\n".join(lines) + js
+
     def do_GET(self):
-        encoded = jdumps(self.metrics.get_stats(), indent=1).encode() + b"\r\n"
+        shutdown = False
+        content_type = "application/json"
+        if "/quitquitquit" == self.path:
+            shutdown = True
+        if self.path.startswith("/web"):
+            content_type = "text/html"
+            content = self.index_html().encode()
+        else:
+            content = jdumps(self.metrics.get_stats(), indent=1).encode() + b"\r\n"
+
         self.send_response(200)
-        self.send_header("Content-Type", "application/json")
-        self.send_header("Content-Length", len(encoded))
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", len(content))
         self.end_headers()
-        self.wfile.write(encoded)
+        self.wfile.write(content)
         self.wfile.flush()
 
-        if self.path.startswith("/quitquitquit"):
+        if shutdown:
             killpg(getpgrp(), 15)
 
     def log_message(self, format: str, *args: Any) -> None:
