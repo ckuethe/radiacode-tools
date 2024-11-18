@@ -361,8 +361,8 @@ def gps_worker(args: Namespace) -> None:
                     try:
                         x = jloads(line)
                         if x["class"] == "SKY":
-                            ams.gauge_update("sats_seen", int(x.get("nSat", 0)))
-                            ams.gauge_update("sats_used", int(x.get("uSat", 0)))
+                            ams.gauge_update("sats_seen", int(x["nSat"]))
+                            ams.gauge_update("sats_used", int(x["uSat"]))
                         if x["class"] != "TPV":
                             continue
                         if x["time"] == dedup:
