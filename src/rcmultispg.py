@@ -219,6 +219,19 @@ def rc_worker(args: Namespace, serial_number: str) -> None:
             CTRL_QUEUE.put(SHUTDOWN_OBJECT)  # if we can't start all threads, shut everything down
         return
 
+    try:
+        # radiacode will enumerate and give some information like serial number
+        # and calibration if it's turned off, but won't return a useful spectrum.
+        # Ask me how much data I've lost because of this. :(
+        rc.set_device_on(True)
+    except AssertionError as e:
+        # versions of cdump/radiacode <= 0.3.3 throw an assertion error if you try
+        # to turn the device on. I've sent a PR to allow this to work.
+        with STDIO_LOCK:
+            print(
+                f"WARNING: unable to turn device {serial_number} on. Upgrade to radiacode>=0.3.4 or data may be lost."
+            )
+
     with RC_LOCKS[serial_number], STDIO_LOCK:
         rc.set_local_time(datetime.now())
         DATA_QUEUE.put(SpecData(time(), serial_number, rc.spectrum_accum()))
