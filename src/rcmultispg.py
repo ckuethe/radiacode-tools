@@ -28,7 +28,7 @@ from tempfile import mkstemp
 from threading import Barrier, BrokenBarrierError, Lock, Thread, active_count
 from threading import enumerate as list_threads
 from time import gmtime, sleep, strftime, time
-from typing import Dict
+from typing import Dict, TextIO
 
 import usb.core
 from radiacode import RadiaCode
@@ -172,6 +172,8 @@ def rtdata_worker(rc: RadiaCode, serial_number: str) -> None:
     logged, in particular dose, count, and their rates. These are used to build
     tracks.
     """
+    with STDIO_LOCK:
+        print("Starting rtdata_worker", file=stderr)
     db = []
     while CTRL_QUEUE.qsize() == 0:  # don't even need to read the item
         sleep(1)
@@ -180,7 +182,9 @@ def rtdata_worker(rc: RadiaCode, serial_number: str) -> None:
                 db = rc.data_buf()
             except Exception as e:
                 z = str(e.args[0])
+                print(f"rtdata_worker caught exception {z}")
                 if "seq jump" in z or "but have only" in z:
+                    sleep(0.1)
                     continue
                 else:
                     raise
@@ -207,6 +211,9 @@ def rtdata_worker(rc: RadiaCode, serial_number: str) -> None:
                     ams.gauge_update(f"{f}_{serial_number}", d[f])
 
             DATA_QUEUE.put(RtData(**d))
+    with STDIO_LOCK:
+        print("Exiting rtdata_worker", file=stderr)
+    return
 
 
 def rc_worker(args: Namespace, serial_number: str) -> None:
@@ -279,6 +286,7 @@ def rc_worker(args: Namespace, serial_number: str) -> None:
         try:
             # Grab the spectrum...
             with RC_LOCKS[serial_number]:
+                # FIXME figure out a way to augment with monotonic time
                 sd = SpecData(time(), serial_number, rc.spectrum())
                 DATA_QUEUE.put(sd)
                 ams.counter_increment(f"num_reports_{serial_number}")
@@ -307,7 +315,7 @@ def log_worker(args: Namespace) -> None:
     with STDIO_LOCK:
         print(f"starting log_worker for: {' '.join(args.devs)}", file=stderr)
 
-    log_fds = {d: None for d in args.devs}
+    log_fds: Dict[str, TextIO] = {}  # {d: None for d in args.devs}
     start_time = time()
     time_string = strftime("%Y%m%d%H%M%S", gmtime(start_time))
 
@@ -383,7 +391,7 @@ def gps_worker(args: Namespace) -> None:
                 print(watch, file=gpsfd, flush=True)
                 ams.flag_set("gps_connected")
                 dedup = None
-                while CTRL_QUEUE.qsize() == 0:
+                while CTRL_QUEUE.qsize() == 0:  # Check the control queue every line
                     line = gpsfd.readline().strip()
                     try:
                         x = jloads(line)
@@ -421,13 +429,19 @@ def gps_worker(args: Namespace) -> None:
                         ams.gauge_update("latitude", tpv.payload["lat"])
                         ams.gauge_update("longitude", tpv.payload["lon"])
                         DATA_QUEUE.put(tpv)
-                    except (KeyError, JSONDecodeError):  # skip bad messages, no fix, etc.
+                    except (KeyError, JSONDecodeError) as e:  # skip bad messages, no fix, etc.
+                        print(f"JSON processing error {e} in gps thread", file=stderr)
                         pass
+                # Control Queue is non-empty, shutting down
                 ams.flag_clear("gps_connected")
                 return  # clean exit
-        except (socket.error, TimeoutError):
+        except (socket.error, TimeoutError) as e:
             DATA_QUEUE.put(GpsData(payload='{"gnss": false, "mode": 0}'))
+            print(f"caught exception {e} in gps thread", file=stderr)
             sleep(1)
+    #
+    ams.flag_clear("gps_connected")
+    return  # clean exit
 
 
 def main() -> None:
