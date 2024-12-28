@@ -144,6 +144,12 @@ def get_args() -> Namespace:
         action="store_true",
         help="log to stdout instead of to a file",
     )
+    ap.add_argument(
+        "--poweroff",
+        action="store_true",
+        default=False,
+        help="Turn off radiacode devices when this program exits",
+    )
     rv = ap.parse_args()
     if rv.interval < MIN_POLL_INTERVAL:
         print(f"increasing poll interval to {MIN_POLL_INTERVAL}s", file=stderr)
@@ -281,6 +287,9 @@ def rc_worker(args: Namespace, serial_number: str) -> None:
 
     with STDIO_LOCK:
         print(f"{serial_number} data collection stop - {samples} records, {samples*args.interval:.1f}s", file=stderr)
+
+    if args.poweroff:
+        rc.set_device_on(False)
 
 
 def log_worker(args: Namespace) -> None:
