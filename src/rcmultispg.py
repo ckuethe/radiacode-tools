@@ -437,7 +437,9 @@ def gps_worker(args: Namespace) -> None:
                 return  # clean exit
         except (socket.error, TimeoutError) as e:
             DATA_QUEUE.put(GpsData(payload='{"gnss": false, "mode": 0}'))
-            print(f"caught exception {e} in gps thread", file=stderr)
+            with STDIO_LOCK:
+                if e.errno != 111:
+                    print(f"caught exception {e} in gps thread", file=stderr)
             sleep(1)
     #
     ams.flag_clear("gps_connected")
