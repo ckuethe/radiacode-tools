@@ -22,7 +22,7 @@ from json import dumps as jdumps
 from os import getpgrp, getppid, killpg
 from threading import Lock, Thread
 from time import monotonic, process_time, time
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List, Optional, Union
 
 Number = Union[int, float]
 
@@ -96,6 +96,9 @@ class AppMetrics:
         with self.am_mutex:
             self._set_clocks()
             return self._stats.copy()
+
+    def close(self) -> None:
+        self._server._close()
 
     # Counters
     def counter_create(self, name: str, init_val: Number = 0):
@@ -242,7 +245,7 @@ class AppMetricsBaseReqHandler(BaseHTTPRequestHandler):
 class AppMetricsServer:
     def __init__(self, app_metrics: AppMetrics, port: int = 8274, local_only: bool = True, appname: str = ""):
         address = "localhost" if local_only else "0.0.0.0"
-        self._server_thread = Thread(
+        self._server_thread: Optional[Thread] = Thread(
             # deepcode ignore MissingAPI: Thread is joined below..
             target=self._make_http_thread,
             args=((address, port), app_metrics),
@@ -250,14 +253,24 @@ class AppMetricsServer:
             name="varz_server",
         )
         self._server_thread.start()
+        self._server: Optional[HTTPServer] = None
 
-    def __del__(self):
-        if self._server_thread and isinstance(self._server_thread, Thread):
-            self._server_thread.join()
-            self._server_thread = None
+    def __del__(self) -> None:
+        self._close()
 
-    def _make_http_thread(self, server_address, metrics: AppMetrics):
+    def _make_http_thread(self, server_address, metrics: AppMetrics) -> None:
         print(f"Starting AppMetrics server on {server_address}", file=sys.stderr)
         AppMetricsReqHandler = partial(AppMetricsBaseReqHandler, metrics)
         self._server = HTTPServer(server_address=server_address, RequestHandlerClass=AppMetricsReqHandler)
         self._server.serve_forever()
+
+    def _close(self) -> None:
+        if self._server and isinstance(self._server, HTTPServer):
+            self._server.shutdown()
+            self._server.server_close()
+            self._server = None
+
+        if self._server_thread and isinstance(self._server_thread, Thread):
+            self._server_thread.join(1)
+            if self._server_thread.is_alive() is False:
+                self._server_thread = None
