@@ -141,11 +141,17 @@ def map_ctr(bbx: Dict[str, Any]) -> Dict[str, float]:
 
 
 def osm_zoom(bbx: Dict[str, Any]) -> int:
+    "Estimate the OpenStreetMap zoom level from the bounding box of the track"
+    # https://wiki.openstreetmap.org/wiki/Zoom_levels
+    # experimentally derived coefficients that work well for me. Plug them into
+    # the "y = mx+b" equation of a line and you get a pretty good conversion from
+    # the diagonal size of the bounding box in decimal degrees to zoom level.
+    m = -3.27
+    b = 9.32
     dx = bbx["longitude"][1] - bbx["longitude"][0]
     dy = bbx["latitude"][1] - bbx["latitude"][0]
-    ld = log10(sqrt(dx**2 + dy**2))
-    zl = ceil(-3.27 * ld + 9.32)
-    return zl
+    x = log10(sqrt(dx**2 + dy**2))
+    return ceil(m * x + b)  # which is better: ceil, floor, round?
 
 
 def render_plotly(tk: RcTrack, args: Namespace, bbx: Dict[str, Any]):
