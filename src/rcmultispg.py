@@ -438,7 +438,7 @@ def gps_worker(args: Namespace) -> None:
         except (socket.error, TimeoutError) as e:
             DATA_QUEUE.put(GpsData(payload='{"gnss": false, "mode": 0}'))
             with STDIO_LOCK:
-                if e.errno != 111:
+                if e.errno != 111:  # FIXME is ECONNREFUSED always 111? Is there a macro?
                     print(f"caught exception {e} in gps thread", file=stderr)
             sleep(1)
     #
@@ -512,9 +512,10 @@ def main() -> None:
             print("Stopping threads", file=stderr)
 
     # Clean up
+    ams.close()
     while active_count() > 1:  # main process counts as a thread
         try:
-            [t.join(0.1) for t in list_threads()]
+            [t.join(0.1) for t in list_threads() if t.name != "MainThread"]
             # FIXME print what we're still waiting for
         except RuntimeError:
             pass
