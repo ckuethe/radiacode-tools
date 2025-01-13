@@ -376,6 +376,7 @@ def gps_worker(args: Namespace) -> None:
     """
     ams.gauge_create("latitude")
     ams.gauge_create("longitude")
+    ams.gauge_create("altitude")
     ams.gauge_create("gps_mode")
     ams.gauge_create("sats_seen")
     ams.gauge_create("sats_used")
@@ -396,8 +397,11 @@ def gps_worker(args: Namespace) -> None:
                     try:
                         x = jloads(line)
                         if x["class"] == "SKY":
-                            ams.gauge_update("sats_seen", int(x["nSat"]))
-                            ams.gauge_update("sats_used", int(x["uSat"]))
+                            try:
+                                ams.gauge_update("sats_seen", int(x["nSat"]))
+                                ams.gauge_update("sats_used", int(x["uSat"]))
+                            except KeyError:
+                                pass
                         if x["class"] != "TPV":
                             continue
                         if x["time"] == dedup:
@@ -428,6 +432,7 @@ def gps_worker(args: Namespace) -> None:
                         )
                         ams.gauge_update("latitude", tpv.payload["lat"])
                         ams.gauge_update("longitude", tpv.payload["lon"])
+                        ams.gauge_update("altitude", tpv.payload.get("alt",-6378))
                         DATA_QUEUE.put(tpv)
                     except (KeyError, JSONDecodeError) as e:  # skip bad messages, no fix, etc.
                         print(f"JSON processing error {e} in gps thread", file=stderr)
