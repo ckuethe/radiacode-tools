@@ -22,7 +22,7 @@ from json import dumps as jdumps
 from json import loads as jloads
 from queue import Queue
 from re import match as re_match
-from signal import SIGINT, signal
+from signal import SIGHUP, SIGINT, signal
 from sys import exit, stderr, stdout
 from tempfile import mkstemp
 from threading import Barrier, BrokenBarrierError, Lock, Thread, active_count
@@ -62,8 +62,8 @@ def tbar(wait_time=None) -> None:
         THREAD_BARRIER.reset()
 
 
-def handle_sigint(_signum=None, _stackframe=None) -> None:
-    "Signal handler for SIG_INT/KeyboardInterrupt to trigger clean shutdown"
+def handle_shutdown_signal(_signum=None, _stackframe=None) -> None:
+    "Signal handler to trigger clean shutdown"
     with STDIO_LOCK:
         print("", file=stderr)
     CTRL_QUEUE.put(SHUTDOWN_OBJECT)
@@ -432,7 +432,7 @@ def gps_worker(args: Namespace) -> None:
                         )
                         ams.gauge_update("latitude", tpv.payload["lat"])
                         ams.gauge_update("longitude", tpv.payload["lon"])
-                        ams.gauge_update("altitude", tpv.payload.get("alt",-6378))
+                        ams.gauge_update("altitude", tpv.payload.get("alt", -6378))
                         DATA_QUEUE.put(tpv)
                     except (KeyError, JSONDecodeError) as e:  # skip bad messages, no fix, etc.
                         print(f"JSON processing error {e} in gps thread", file=stderr)
@@ -489,7 +489,12 @@ def main() -> None:
         expected_thread_count += 1
 
     THREAD_BARRIER._parties = len(args.devs)
-    signal(SIGINT, handle_sigint)
+    signal(SIGINT, handle_shutdown_signal)
+    # appmetrics will SIGHUP the parent process when you hit the /quitquitquit
+    # endpoint. catch it here in the same way as we catch SIGINT to shut down
+    # logging cleanly. This also will power down connected radiacode devices to
+    # save batteries.
+    signal(SIGHUP, handle_shutdown_signal)
     # create the threads and store in a list so they can be checked later
     threads = [
         Thread(
