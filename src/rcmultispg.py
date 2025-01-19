@@ -374,6 +374,8 @@ def gps_worker(args: Namespace) -> None:
     solutions are unavailable or invalid, etc. we don't want to take quit the
     whole process.
     """
+    BAD_GPS_ALT: float = -6378  # center of earth
+    DFLT_GPSD_PORT: int = 2947
     ams.gauge_create("latitude")
     ams.gauge_create("longitude")
     ams.gauge_create("altitude")
@@ -381,14 +383,14 @@ def gps_worker(args: Namespace) -> None:
     ams.gauge_create("sats_seen")
     ams.gauge_create("sats_used")
     gps_fields = ["time", "gnss", "mode", "lat", "lon", "alt", "epc", "sep", "speed", "track", "climb"]
-    srv = (args.gpsd["host"], 2947 if args.gpsd["port"] is None else args.gpsd["port"])
+    srv = (args.gpsd["host"], DFLT_GPSD_PORT if args.gpsd["port"] is None else args.gpsd["port"])
     watch_args = {"enable": True, "json": True}
     if args.gpsd["device"]:
         watch_args["device"] = args.gpsd["device"]
     watch = "?WATCH=" + jdumps(watch_args)
     while CTRL_QUEUE.qsize() == 0:
         try:
-            with socket.create_connection(srv, 3) as s:
+            with socket.create_connection(srv, timeout=3) as s:
                 gpsfd = s.makefile("rw")
                 print(watch, file=gpsfd, flush=True)
                 ams.flag_set("gps_connected")
@@ -416,7 +418,7 @@ def gps_worker(args: Namespace) -> None:
                         tpv = GpsData({f: x.get(f, None) for f in gps_fields})
                         ams.gauge_update("latitude", tpv.payload["lat"])
                         ams.gauge_update("longitude", tpv.payload["lon"])
-                        ams.gauge_update("altitude", tpv.payload.get("alt", -6378))
+                        ams.gauge_update("altitude", tpv.payload.get("alt", BAD_GPS_ALT))
                         DATA_QUEUE.put(tpv)
                     except (KeyError, JSONDecodeError) as e:  # skip bad messages, no fix, etc.
                         print(f"JSON processing error {e} in gps thread", file=stderr)
