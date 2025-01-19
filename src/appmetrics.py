@@ -20,6 +20,7 @@ from functools import partial
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from json import dumps as jdumps
 from os import getpgrp, getppid, killpg
+from signal import SIGHUP
 from threading import Lock, Thread
 from time import monotonic, process_time, time
 from typing import Any, Dict, List, Optional, Union
@@ -235,7 +236,7 @@ class AppMetricsBaseReqHandler(BaseHTTPRequestHandler):
         self.wfile.flush()
 
         if shutdown:
-            killpg(getpgrp(), 15)
+            killpg(getpgrp(), SIGHUP)
 
     def log_message(self, format: str, *args: Any) -> None:
         "Ingentional log suppression"
