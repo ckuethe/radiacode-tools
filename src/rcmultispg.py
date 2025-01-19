@@ -380,6 +380,7 @@ def gps_worker(args: Namespace) -> None:
     ams.gauge_create("gps_mode")
     ams.gauge_create("sats_seen")
     ams.gauge_create("sats_used")
+    gps_fields = ["time", "gnss", "mode", "lat", "lon", "alt", "epc", "sep", "speed", "track", "climb"]
     srv = (args.gpsd["host"], 2947 if args.gpsd["port"] is None else args.gpsd["port"])
     watch_args = {"enable": True, "json": True}
     if args.gpsd["device"]:
@@ -412,24 +413,7 @@ def gps_worker(args: Namespace) -> None:
                             continue
 
                         x["gnss"] = True
-                        tpv = GpsData(
-                            {
-                                f: x.get(f, None)
-                                for f in [
-                                    "time",
-                                    "gnss",
-                                    "mode",
-                                    "lat",
-                                    "lon",
-                                    "alt",
-                                    "epc",
-                                    "sep",
-                                    "speed",
-                                    "track",
-                                    "climb",
-                                ]
-                            }
-                        )
+                        tpv = GpsData({f: x.get(f, None) for f in gps_fields})
                         ams.gauge_update("latitude", tpv.payload["lat"])
                         ams.gauge_update("longitude", tpv.payload["lon"])
                         ams.gauge_update("altitude", tpv.payload.get("alt", -6378))
