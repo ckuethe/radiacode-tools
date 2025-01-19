@@ -43,7 +43,7 @@ ams = AppMetrics(stub=True)
 MIN_POLL_INTERVAL: float = 0.5  # internally radiacode seems to do 2Hz updates, but 1Hz may give better results
 RC_LOCKS: Dict[str, Lock] = dict()  # prevent rtdata polling and spectrum polling from stomping on each other
 STDIO_LOCK: Lock = Lock()  # Prevent stdio corruption
-THREAD_BARRIER: Barrier = Barrier(0)  # intialized to 0 to shut up static type checking
+THREAD_BARRIER: Barrier = Barrier(0)
 
 # Queues and stuff
 DATA_QUEUE: Queue = Queue()  # Global so I can use them in signal handlers
@@ -440,6 +440,7 @@ def gps_worker(args: Namespace) -> None:
 def main() -> None:
     args = get_args()
     global ams
+    global THREAD_BARRIER
 
     ams = AppMetrics(port=6853, local_only=False, appname="rcmultispg")
     ams.flag_create("gps_connected")
@@ -474,7 +475,7 @@ def main() -> None:
         Thread(target=gps_worker, args=(args,), name="gps-worker").start()
         expected_thread_count += 1
 
-    THREAD_BARRIER._parties = len(args.devs)
+    THREAD_BARRIER = Barrier(len(args.devs))
     signal(SIGINT, handle_shutdown_signal)
     # appmetrics will SIGHUP the parent process when you hit the /quitquitquit
     # endpoint. catch it here in the same way as we catch SIGINT to shut down
@@ -490,7 +491,7 @@ def main() -> None:
         )
         for serial_number in args.devs
     ]
-    [t.start() for t in threads]
+    [t.start() for t in threads]  # type: ignore[func-returns-value]
     while active_count() < expected_thread_count:
         sleep(1)
 
@@ -511,7 +512,7 @@ def main() -> None:
     ams.close()
     while active_count() > 1:  # main process counts as a thread
         try:
-            [t.join(0.1) for t in list_threads() if t.name != "MainThread"]
+            [t.join(0.1) for t in list_threads() if t.name != "MainThread"]  # type: ignore[func-returns-value]
             # FIXME print what we're still waiting for
         except RuntimeError:
             pass
