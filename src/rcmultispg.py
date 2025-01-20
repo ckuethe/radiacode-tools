@@ -30,13 +30,13 @@ from threading import enumerate as list_threads
 from time import gmtime, sleep, strftime, time
 from typing import Dict, TextIO
 
-import usb.core
-from radiacode import RadiaCode
-from radiacode.transports.usb import DeviceNotFound
+import usb.core  # type: ignore
+from radiacode import RadiaCode  # type: ignore
+from radiacode.transports.usb import DeviceNotFound  # type: ignore
 
-from appmetrics import AppMetrics
-from rctypes import GpsData, RtData, SpecData
-from rcutils import find_radiacode_devices, specdata_to_dict
+from appmetrics import AppMetrics  # type: ignore
+from rctypes import GpsData, RtData, SpecData  # type: ignore
+from rcutils import find_radiacode_devices, specdata_to_dict  # type: ignore
 
 ams = AppMetrics(stub=True)
 
