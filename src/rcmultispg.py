@@ -427,7 +427,7 @@ def gps_worker(args: Namespace) -> None:
                 ams.flag_clear("gps_connected")
                 return  # clean exit
         except (socket.error, TimeoutError) as e:
-            DATA_QUEUE.put(GpsData(payload='{"gnss": false, "mode": 0}'))
+            DATA_QUEUE.put(GpsData(payload={"gnss": False, "mode": 0}))
             with STDIO_LOCK:
                 if e.errno != 111:  # FIXME is ECONNREFUSED always 111? Is there a macro?
                     print(f"caught exception {e} in gps thread", file=stderr)
