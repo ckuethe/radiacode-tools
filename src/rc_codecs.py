@@ -7,8 +7,6 @@
 import struct
 from typing import List, Union
 
-from rctypes import Number
-
 _B45C = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ $%*+-./:"  # defined in RFC9285
 
 
@@ -58,7 +56,7 @@ def b45_decode(s: str) -> bytes:
 
 def rle0_encode(l: List[int]) -> List[int]:
     "N42 CountedZeros. It's run length encoding, but only for zero value"
-    rv = []
+    rv: List[int] = []
     nz = 0
     for i, v in enumerate(l):
         if v:
@@ -134,7 +132,7 @@ def vbyte_encode(numbers: List[int]) -> bytes:
 
 def vbyte_decode(vbz: bytes) -> List[int]:
     "decompress vbyte encoded data into a regular list of ints"
-    rv = []
+    rv: List[int] = []
     hl = 2
     nn = 0
 
