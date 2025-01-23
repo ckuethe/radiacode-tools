@@ -9,14 +9,13 @@ Some stuff found to be useful in various scripts, and should thus be hoisted int
 utility library, rather than being imported from and between scripts.
 """
 
-import os
 from datetime import datetime, timedelta, timezone
 from re import search as re_search
 from typing import Any, Dict, List
 
 from radiacode import RadiaCode
 
-from rctypes import Number, SpecData, Spectrum
+from rctypes import Number, SpecData
 
 # The spectrogram format uses FileTime, the number of 100ns intervals since the
 # beginning of 1600 CE. On a linux/unix/bsd host, we get the number of (fractional)
@@ -84,11 +83,12 @@ def get_dose_from_spectrum(
 
 def find_radiacode_devices() -> List[str]:
     "List all the radiacode devices detected"
-    import usb.core  # defer import until someone calls this function
+    # defer import until someone calls this function
+    from usb.core import find as usb_find
 
     return [  # No error handling. Caller can deal with any errors.
         d.serial_number
-        for d in usb.core.find(idVendor=0x0483, idProduct=0xF123, find_all=True)
+        for d in usb_find(idVendor=0x0483, idProduct=0xF123, find_all=True)
         if d.serial_number.startswith("RC-")
     ]
 
@@ -104,8 +104,11 @@ def get_device_id(dev: RadiaCode) -> Dict[str, str]:
     f = re_search(
         r'Signature: (?P<fw_signature>[0-9A-F]{8}), FileName="(?P<fw_file>.+?)", IdString="(?P<product>.+?)"',
         rv["fw"],
-    ).groupdict()
-    rv.update(f)
+    )
+    if f is None:
+        raise ValueError("Couldn't parse device signature")
+
+    rv.update(f.groupdict())
     rv.pop("fw")
 
     bv, fv = rv.pop("fv")
