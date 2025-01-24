@@ -44,7 +44,7 @@ _rtdata_fields = [
     "temperature",
     "duration",
 ]
-RtData = namedtuple("RtData", _rtdata_fields, defaults=[None] * len(_rtdata_fields))
+RtData = namedtuple("RtData", _rtdata_fields, defaults=[None] * len(_rtdata_fields))  # type: ignore[misc]
 
 # Just like radiacode.types.Spectrum, but without having to import radiacode.
 Spectrum = namedtuple("Spectrum", ["duration", "a0", "a1", "a2", "counts"])
@@ -65,7 +65,7 @@ _sl_fields = [
     "channels",
     "counts",
 ]
-SpectrumLayer = namedtuple("SpectrumLayer", _sl_fields, defaults=[None] * len(_sl_fields))
+SpectrumLayer = namedtuple("SpectrumLayer", _sl_fields, defaults=[None] * len(_sl_fields))  # type: ignore[misc]
 
 # A single
 SpecData = namedtuple("SpecData", ["time", "serial_number", "spectrum"])
@@ -73,17 +73,17 @@ SpecData = namedtuple("SpecData", ["time", "serial_number", "spectrum"])
 SpecEnergy = namedtuple("SpecEnergy", ["dose", "duration", "peak_dose"])
 
 _sgheader_fields = ["name", "time", "timestamp", "channels", "duration", "flags", "comment"]
-SGHeader = namedtuple("SGHeader", _sgheader_fields, defaults=[None] * len(_sgheader_fields))
+SGHeader = namedtuple("SGHeader", _sgheader_fields, defaults=[None] * len(_sgheader_fields))  # type: ignore[misc]
 
 # A single datapoint, at least in this implementaton, is a timestamp and a collection of counts per channel.
 # No integration time, since that's kind of implicit from the inter-sample timing
 # "time" is kinda vague here; it could be either a timestamp of the sample or the duration
-SpectrogramPoint = namedtuple("SpectrogramPoint", ["timestamp", "timedelta", "counts"], defaults=[None, None, []])
+SpectrogramPoint = namedtuple("SpectrogramPoint", ["datetime", "timedelta", "counts"], defaults=[None, None, []])
 
 # As you might expect a trackpoint is a datapoint from a radiacode track
 # storing datetime as the canonical timestamp. It'll be transcoded for output
 _trackpoint_fields = ["datetime", "latitude", "longitude", "accuracy", "doserate", "countrate", "comment"]
-TrackPoint = namedtuple("TrackPoint", _trackpoint_fields, defaults=[None] * len(_trackpoint_fields))
+TrackPoint = namedtuple("TrackPoint", _trackpoint_fields, defaults=[None] * len(_trackpoint_fields))  # type: ignore[misc]
 
 
 class RangeFinder:

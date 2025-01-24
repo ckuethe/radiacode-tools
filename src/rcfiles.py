@@ -14,13 +14,22 @@ from hashlib import sha256
 from re import sub as re_sub
 from struct import pack as struct_pack
 from struct import unpack as struct_unpack
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 from uuid import uuid4
 
 import xmltodict
 
-from rctypes import EnergyCalibration, SpectrogramPoint, SpectrumLayer, TrackPoint
+from rctypes import (
+    EnergyCalibration,
+    Number,
+    SpectrogramPoint,
+    SpectrumLayer,
+    TrackPoint,
+)
 from rcutils import DateTime2FileTime, FileTime2DateTime
+
+TimeStampish = Union[Number, datetime]
+TimeDurationish = Union[Number, timedelta]
 
 # there's enough datetime mangling that it's worth making a few helpers
 _datestr: str = "%Y-%m-%d %H:%M:%S"
@@ -136,13 +145,12 @@ class RcTrack:
                     if not line.startswith("Timestamp"):
                         raise ValueError("This doesn't look like a valid track - missing column signature")
                     continue
-                fields = line.split("\t")
+                fields: List[Any] = line.split("\t")
                 if len(fields) != nf + 1:
                     raise ValueError(f"Incorrect number of values on line {n+1}")
                 fields[1] = FileTime2DateTime(fields[0])  # filetime is higher resolution than YYYY-mm-dd HH:MM:SS
                 for i in range(2, 7):
                     fields[i] = float(fields[i])
-                    pass
                 fields[-1] = fields[-1].rstrip("\n")
                 self.points.append(TrackPoint(*fields[1:]))
 
@@ -173,7 +181,7 @@ class RcTrack:
 class RcSpectrum:
     "Radiacode Spectrum (.xml)"
 
-    def __init__(self, filename: str = None) -> None:
+    def __init__(self, filename: str = "") -> None:
         self.fg_spectrum: Optional[SpectrumLayer] = None
         self.bg_spectrum: Optional[SpectrumLayer] = None
         self.note: str = ""
@@ -181,7 +189,7 @@ class RcSpectrum:
         if filename:
             self.load_file(filename)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "Spectrum(" f"\n\tfg={self.fg_spectrum}" f"\n\tbg={self.bg_spectrum}" f'\n\tnote="{self.note}"\n)'
 
     def _parse_spectrum(self, spectrum: Dict[str, Any]) -> SpectrumLayer:
@@ -211,10 +219,12 @@ class RcSpectrum:
         return rv
 
     def load_file(self, filename: str) -> None:
+        "Load a spectrum from disk"
         with open(filename) as ifd:
             self.load_str(ifd.read())
 
     def load_str(self, data: str) -> None:
+        "Load a spectrum from a string, such as one might get over the network or have in memory"
         sp = xmltodict.parse(data, dict_constructor=dict)["ResultDataFile"]["ResultDataList"]["ResultData"]
 
         tmp = sp["EnergySpectrum"]  # explode if the spectrum is missing. No foreground = not useful
@@ -229,10 +239,11 @@ class RcSpectrum:
         # older versions of data files don't have start and end times
         if tmp:
             try:
-                a = [_parse_datetime(s, _datestr_T) for s in sp.get("StartTime", None)]
-                b = [_parse_datetime(s, _datestr_T) for s in sp.get("EndTime", None)]
-                self.fg_spectrum = self.fg_spectrum._replace(timestamp=a[0], duration=b[0] - a[0])
-                self.bg_spectrum = self.bg_spectrum._replace(timestamp=a[1], duration=b[1] - a[1])
+                az = [_parse_datetime(s, _datestr_T) for s in sp.get("StartTime", None)]
+                bz = [_parse_datetime(s, _datestr_T) for s in sp.get("EndTime", None)]
+                self.fg_spectrum = self.fg_spectrum._replace(timestamp=az[0], duration=bz[0] - az[0])
+                if isinstance(self.bg_spectrum, SpectrumLayer):
+                    self.bg_spectrum = self.bg_spectrum._replace(timestamp=az[1], duration=bz[1] - az[1])
             except (KeyError, TypeError, AttributeError):
                 pass
         else:
@@ -315,13 +326,15 @@ class RcSpectrum:
         print("\n".join(trailer))
 
     def as_dict(self) -> Dict[str, Any]:
-        rv = {
-            "fg": self.fg_spectrum._asdict(),
+        rv: Dict[str, Any] = {
+            "fg": None,
             "bg": None,
             "note": self.note,
         }
+        if self.fg_spectrum:
+            rv["fg"] = self.fg_spectrum._asdict()
         if self.bg_spectrum:
-            rv["bg"] = (self.bg_spectrum._asdict(),)
+            rv["bg"] = self.bg_spectrum._asdict()
 
         rv["fg"]["timestamp"] = str(rv["fg"]["timestamp"])
         rv["fg"]["duration"] = rv["fg"]["duration"].total_seconds()
@@ -364,18 +377,35 @@ class RcSpectrum:
         h = sha256(str(self).encode()).hexdigest()[:32]
         return f"{h[0:8]}-{h[8:12]}-{h[12:16]}-{h[16:20]}-{h[20:]}"
 
-    def count_rate(self, bg=False) -> float:
+    def count_rate(self, bg: bool = False) -> float:
+        if bg and not isinstance(self.bg_spectrum, SpectrumLayer):
+            raise ValueError("bg_spectrum is undefined")
         n = sum(self.bg_spectrum.counts if bg else self.fg_spectrum.counts)
         t = self.bg_spectrum.duration if bg else self.fg_spectrum.duration
         return n / t.total_seconds()
 
 
 class RcSpectrogram:
-    "Radiacode Spectrogram (.rcspg)"
+    """
+    Radiacode Spectrogram (.rcspg)
 
-    def __init__(self) -> None:
+    A Radiacode spectrogrum file has basically 3 parts.
+
+    1. A metadata line with information like the device serial number, accumulatiion time,
+       channel count, name, comment, ...
+    2. The energy calibration, and the total intrated spectrum at the time recording started
+    3. A series of timestamped channel counts: (timestamp, [counts]), (timestamp, [counts]), ...
+       The counts are deltas since the last spectrum.
+
+    The two expected use cases are loading a spectrogram from disk to plot it, and building
+    a spectrogram from samples for writing to disk. This class works well enough to roundtrip
+    the data and produce valid plots
+
+    """
+
+    def __init__(self, filename: str = "") -> None:
         self.name: str = ""
-        self.timestamp: datetime = None
+        self.timestamp: datetime = datetime.now()
         self.accumulation_time: timedelta = timedelta(0)
         self.channels: int = 0
         self.serial_number: str = ""
@@ -387,21 +417,23 @@ class RcSpectrogram:
         # that's total integration time for the historical spectrum.
         self.historical_spectrum: SpectrogramPoint = SpectrogramPoint()
         # saving spectra so that differences can be computed
-        self.delta_point: SpectrogramPoint = SpectrogramPoint()
+        self.previous_spectrum: Optional[SpectrogramPoint] = None
         # and this is what it's really for: counts at a particular time.
         self.samples: List[SpectrogramPoint] = []
+        if filename:
+            self.load_file(filename)
 
     def __repr__(self) -> str:
         s = " " + self.comment if self.comment else ""
         return (
-            f"Spectrogram(\n\tname:'{self.name}',"
-            f"\n\ttime:'{self.timestamp}',"
-            f"\n\tsn:{self.serial_number},"
+            f"Spectrogram(\n\tname='{self.name}',"
+            f"\n\ttime='{self.timestamp}',"
+            f"\n\tserial_number={self.serial_number},"
             f"\n\t{self.calibration},"
-            f"\n\taccumulaton:{self.accumulation_time}s,"
-            f"\n\tnch={self.channels},"
+            f"\n\taccumulation={self.accumulation_time},"
+            f"\n\tchannels={self.channels},"
             f"\n\tcomment:'{s}'"
-            f"\n\tn={len(self.samples)})"
+            f"\n\tnum_samples={len(self.samples)})"
         )
 
     def _parse_header_line(self, line: str) -> None:
@@ -480,22 +512,27 @@ class RcSpectrogram:
                     self._parse_historical_spectrum_line(line)
                     continue
                 else:
-                    tmp = [int(x) for x in line.strip().split()]
-                    dt = FileTime2DateTime(tmp.pop(0))
-                    td = timedelta(seconds=tmp.pop(0))
-                    self.samples.append(SpectrogramPoint(dt, td, tmp))
+                    counts = [int(x) for x in line.strip().split()]
+                    dt = FileTime2DateTime(counts.pop(0))
+                    td = timedelta(seconds=counts.pop(0))
+                    self.samples.append(SpectrogramPoint(datetime=dt, timedelta=td, counts=counts))
 
     def _make_spectrogram_line(self, l: SpectrogramPoint) -> str:
         """
         Format a SpectrogramPoint as line for the rcspg
         """
-        rv = [DateTime2FileTime(l.timestamp), int(l.timedelta.total_seconds())]
+        rv = [DateTime2FileTime(l.datetime), int(l.timedelta.total_seconds())]
         rv.extend(l.counts)
         rv = "\t".join([str(x) for x in rv])
         rv = re_sub(r"(\s0)+$", "", rv)
         return rv
 
-    def add_point(self, counts: List[int], timestamp: Optional[datetime] = None) -> bool:
+    def add_calibration(self, calibration: EnergyCalibration) -> None:
+        self.calibration = calibration
+
+    def add_point(
+        self, counts: List[int], timestamp: Optional[TimeStampish] = None, duration: Optional[TimeDurationish] = None
+    ) -> bool:
         """
         Add a datapoint to the spectrogram.
 
@@ -503,18 +540,45 @@ class RcSpectrogram:
         care of computing the difference. Returns True if a point was added to
         history, False otherwise. If not given, timestamp is set to the system
         time.
+
+        The first time this function is called, it will set the historical spectrum.
         """
-        if timestamp is None:
+
+        set_historical = False
+        if self.channels == 0:
+            self.channels = len(counts)
+            set_historical = True
+        elif len(counts) != self.channels:
+            raise ValueError(f"Unexpected channel count != {self.channels}")
+
+        # gin up a valid timestamp
+        if isinstance(timestamp, datetime):
+            pass
+        elif isinstance(timestamp, int) or isinstance(timestamp, float):
+            timestamp = datetime.fromtimestamp(timestamp)
+        else:
             timestamp = datetime.now()
-        if self.delta_point is None:
-            self.delta_point = SpectrogramPoint(timestamp=timestamp, counts=counts)
+
+        if isinstance(duration, timedelta):
+            pass
+        elif isinstance(duration, int) or isinstance(duration, float):
+            duration = timedelta(seconds=duration)
+        else:
+            duration = None
+
+        if set_historical:
+            self.historical_spectrum = SpectrogramPoint(datetime=timestamp, counts=counts, timedelta=duration)
+
+        if self.previous_spectrum is None:
+            self.previous_spectrum = SpectrogramPoint(datetime=timestamp, counts=[0] * self.channels)
             return False
 
-        dx = [z[0] - z[1] for z in zip(counts, self.delta_point.counts)]
+        dx = [z[0] - z[1] for z in zip(counts, self.previous_spectrum.counts)]
         self.samples.append(
-            SpectrogramPoint(timestamp=timestamp, timedelta=timestamp - self.delta_point.timestamp, counts=dx)
+            SpectrogramPoint(datetime=timestamp, timedelta=timestamp - self.previous_spectrum.datetime, counts=dx)
         )
-        self.delta_point = SpectrogramPoint(time=timestamp, counts=counts)
+        self.previous_spectrum = SpectrogramPoint(datetime=timestamp, counts=counts)
+        self.accumulation_time = self.samples[-1].datetime - self.samples[0].datetime
         return True
 
     def write_file(self, filename: str) -> None:
@@ -534,7 +598,7 @@ class RcN42:
     rad_instrument_information: Dict[str, Any] = {}
     _rdi: str = "radiacode-scinitillator-sipm"
 
-    def __init__(self, filename: str = None) -> None:
+    def __init__(self, filename: str = "") -> None:
         self.serial_number: str = ""
         self.model: str = ""
         self.header: Dict[str, str] = {}
@@ -597,7 +661,7 @@ class RcN42:
             },
         }
 
-    def _populate_rad_instrument_information(self, serial_number: str = None) -> bool:
+    def _populate_rad_instrument_information(self, serial_number: str = "") -> bool:
         "Fill in the RadiationInstrumentInformation element, mostly for the scintillator type"
         if serial_number is None and self.serial_number is None:
             raise ValueError
