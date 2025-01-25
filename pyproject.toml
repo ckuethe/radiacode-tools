@@ -29,6 +29,7 @@ classifiers = [
 rccalibrate = "calibrate:main"
 rcdeadtime = "deadtime:main"
 rcmultispg = "rcmultispg:main"
+rcspg_from_json = "rcspg_from_json:main"
 rcsanitize = "track_sanititze:main"
 rctrkedit = "track_edit:main"
 rctrkplot = "track_plot:main"
