@@ -65,8 +65,9 @@ def tbar(wait_time=None) -> None:
 def handle_shutdown_signal(_signum=None, _stackframe=None) -> None:
     "Signal handler to trigger clean shutdown"
     with STDIO_LOCK:
-        print("", file=stderr)
+        print("\ngot shutdown signal", file=stderr)
     CTRL_QUEUE.put(SHUTDOWN_OBJECT)
+    DATA_QUEUE.put(SHUTDOWN_OBJECT)
 
 
 def get_args() -> Namespace:
@@ -173,7 +174,7 @@ def rtdata_worker(rc: RadiaCode, serial_number: str) -> None:
     tracks.
     """
     with STDIO_LOCK:
-        print("Starting rtdata_worker", file=stderr)
+        print(f"Starting rtdata_worker for {serial_number}", file=stderr)
     db = []
     while CTRL_QUEUE.qsize() == 0:  # don't even need to read the item
         sleep(1)
@@ -182,7 +183,8 @@ def rtdata_worker(rc: RadiaCode, serial_number: str) -> None:
                 db = rc.data_buf()
             except Exception as e:
                 z = str(e.args[0])
-                print(f"rtdata_worker caught exception {z}")
+                with STDIO_LOCK:
+                    print(f"rtdata_worker caught exception {z}", file=stderr)
                 if "seq jump" in z or "but have only" in z:
                     sleep(0.1)
                     continue
@@ -212,7 +214,7 @@ def rtdata_worker(rc: RadiaCode, serial_number: str) -> None:
 
             DATA_QUEUE.put(RtData(**d))
     with STDIO_LOCK:
-        print("Exiting rtdata_worker", file=stderr)
+        print(f"Exiting rtdata_worker {serial_number}", file=stderr)
     return
 
 
@@ -248,7 +250,8 @@ def rc_worker(args: Namespace, serial_number: str) -> None:
         # to turn the device on. I've sent a PR to allow this to work.
         with STDIO_LOCK:
             print(
-                f"WARNING: unable to turn device {serial_number} on. Upgrade to radiacode>=0.3.4 or data may be lost."
+                f"WARNING: unable to turn device {serial_number} on. Upgrade to radiacode>=0.3.4 or data may be lost.",
+                file=stderr,
             )
 
     with RC_LOCKS[serial_number], STDIO_LOCK:
@@ -300,11 +303,13 @@ def rc_worker(args: Namespace, serial_number: str) -> None:
             # once running though, don't take down all the other threads
             THREAD_BARRIER.abort()
 
+    if args.poweroff:
+        rc.set_device_on(False)
+
     with STDIO_LOCK:
         print(f"{serial_number} data collection stop - {samples} records, {samples*args.interval:.1f}s", file=stderr)
 
-    if args.poweroff:
-        rc.set_device_on(False)
+    return
 
 
 def log_worker(args: Namespace) -> None:
@@ -336,6 +341,8 @@ def log_worker(args: Namespace) -> None:
             msg = DATA_QUEUE.get()
             if msg is SHUTDOWN_OBJECT:
                 running = False  # bail out once this batch of messages is done
+                with STDIO_LOCK:
+                    print("log_worker detected SHUTDOWN_OBJECT, scheduling shutdown")
                 continue
 
             elif isinstance(msg, SpecData):
@@ -353,7 +360,7 @@ def log_worker(args: Namespace) -> None:
 
             else:
                 with STDIO_LOCK:
-                    print(f"ignored {msg}")
+                    print(f"ignored {msg}", file=stderr)
                 pass  # who put this junk here?
 
         sleep(MIN_POLL_INTERVAL)
@@ -363,6 +370,8 @@ def log_worker(args: Namespace) -> None:
         if sn in log_fds:
             if log_fds[sn] != stdout:
                 log_fds[sn].close()
+    with STDIO_LOCK:
+        print("log worker shutting down", file=stderr)
     return
 
 
@@ -433,6 +442,8 @@ def gps_worker(args: Namespace) -> None:
                     print(f"caught exception {e} in gps thread", file=stderr)
             sleep(1)
     #
+    with STDIO_LOCK:
+        print("gps worker shutting down", file=stderr)
     ams.flag_clear("gps_connected")
     return  # clean exit
 
@@ -510,13 +521,20 @@ def main() -> None:
 
     # Clean up
     ams.close()
-    while active_count() > 1:  # main process counts as a thread
+    while True:
+        nt = active_count()
+        if nt < 2:  # main process counts as a thread
+            break
+
         try:
             [t.join(0.1) for t in list_threads() if t.name != "MainThread"]  # type: ignore[func-returns-value]
             # FIXME print what we're still waiting for
         except RuntimeError:
             pass
-        sleep(0.1)
+
+        with STDIO_LOCK:
+            print(f"{[t.name for t in list_threads()]}", file=stderr)
+        sleep(0.5)
 
 
 if __name__ == "__main__":
