@@ -17,7 +17,7 @@ counter, flag, and gauge functions.
 
 import sys
 from functools import partial
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, HTTPServer, HTTPStatus
 from json import dumps as jdumps
 from os import getpgrp, getppid, killpg
 from signal import SIGHUP
@@ -43,6 +43,13 @@ class AppMetrics:
 
         ams = AppMetrics(port=12347)
 
+    Parameters:
+    port: TCP port on which to listen [8274]
+    local_only: bind to localhost, or expose externally [True]
+    appname: optional name of app to use [""]
+    stub: use this to declare the AMx server without starting the http server [False]
+    safe: slight protection from accidental /quitquitquit by requiring the PID as the query string [True]
+
     Some basic process metrics are created:
     - pid
     - process name
@@ -67,7 +74,9 @@ class AppMetrics:
 
     _mtypes: List[str] = [C, F, G]
 
-    def __init__(self, port: int = 8274, local_only: bool = True, appname: str = "", stub: bool = False):
+    def __init__(
+        self, port: int = 8274, local_only: bool = True, appname: str = "", stub: bool = False, safe: bool = True
+    ):
         """
         port: tcp port on which to listen
         local_only: whether or not to bind to localhost or wildcard
@@ -84,7 +93,8 @@ class AppMetrics:
         self._wall_time = time()
         self._init_proc_time = process_time()
         self._set_clocks()
-        self._server = AppMetricsServer(app_metrics=self, port=port, local_only=local_only)
+        self.safe = safe
+        self._server = AppMetricsServer(app_metrics=self, port=port, local_only=local_only, safe=safe)
 
     def _set_clocks(self):
         """Set the cpu counter elements"""
@@ -217,20 +227,38 @@ class AppMetricsBaseReqHandler(BaseHTTPRequestHandler):
 
         return "\n".join(lines) + js
 
-    def do_GET(self):
-        shutdown = False
-        content_type = "application/json"
-        if "/quitquitquit" == self.path:
-            shutdown = True
-        if self.path.startswith("/web"):
+    def do_GET(self) -> None:
+        shutdown: bool = False
+        rcode = HTTPStatus.OK
+        content_type: str = "application/json"
+        qqq: str = "/quitquitquit"
+        if self.path.startswith(qqq):  # Exit handling logic
+            if self.metrics.safe is False:
+                if self.path == qqq:
+                    shutdown = True
+                else:  # only "/quitquitquit" is allowd
+                    rcode = HTTPStatus.BAD_REQUEST
+            else:
+                if self.path == f"{qqq}?{self.metrics._stats[P]['pid']}":
+                    shutdown = True
+                else:
+                    rcode = HTTPStatus.BAD_REQUEST
+        if rcode != HTTPStatus.OK:
+            errmsg = self.metrics._stats[P].copy()
+            errmsg["httpstatus"] = rcode
+            errmsg["error"] = f"invalid shutdown command; safe mode {self.metrics.safe}"
+            content = jdumps(errmsg, indent=1).encode() + b"\r\n"
+        elif self.path.startswith("/web"):
             content_type = "text/html"
             content = self.index_html().encode()
         else:
+            if shutdown:
+                self.metrics._stats[P]["shutdown"] = True
             content = jdumps(self.metrics.get_stats(), indent=1).encode() + b"\r\n"
 
-        self.send_response(200)
+        self.send_response(rcode)
         self.send_header("Content-Type", content_type)
-        self.send_header("Content-Length", len(content))
+        self.send_header("Content-Length", str(len(content)))
         self.end_headers()
         self.wfile.write(content)
         self.wfile.flush()
@@ -239,12 +267,14 @@ class AppMetricsBaseReqHandler(BaseHTTPRequestHandler):
             killpg(getpgrp(), SIGHUP)
 
     def log_message(self, format: str, *args: Any) -> None:
-        "Ingentional log suppression"
+        "Intentional log suppression"
         pass
 
 
 class AppMetricsServer:
-    def __init__(self, app_metrics: AppMetrics, port: int = 8274, local_only: bool = True, appname: str = ""):
+    def __init__(
+        self, app_metrics: AppMetrics, port: int = 8274, local_only: bool = True, appname: str = "", safe: bool = True
+    ):
         address = "localhost" if local_only else "0.0.0.0"
         self._server_thread: Optional[Thread] = Thread(
             # deepcode ignore MissingAPI: Thread is joined below..
