@@ -15,7 +15,7 @@ from typing import Any, Dict, List
 
 from radiacode import RadiaCode
 
-from rctypes import Number, SpecData
+from rctypes import Number, SpecData, TimeRange
 
 # The spectrogram format uses FileTime, the number of 100ns intervals since the
 # beginning of 1600 CE. On a linux/unix/bsd host, we get the number of (fractional)
@@ -144,3 +144,29 @@ def specdata_to_dict(data: SpecData) -> Dict[str, Any]:
         "counts": data.spectrum.counts,
     }
     return rec
+
+
+localtz = datetime.now(timezone.utc).astimezone().tzinfo
+_DATEFMT: str = "%Y-%m-%dT%H:%M:%S"
+_BEGINNING_OF_TIME: datetime = datetime.strptime("1945-07-16T11:29:21", _DATEFMT).replace(tzinfo=localtz)
+# https://pumas.nasa.gov/examples/how-many-days-are-year says approximately 365.25 days per year
+_THE_END_OF_DAYS: datetime = _BEGINNING_OF_TIME + timedelta(days=250 * 365.25)
+
+
+def timerange(s: str) -> TimeRange:
+    """
+    helper to validate a timerange (a pair of datetimes)
+
+    Either end can be unspecified, in which case it will be treated
+    as the start or end of time (or at least the unix epoch).
+    """
+    w = s.split("~")
+    if len(w) != 2:
+        raise ValueError
+    a = _BEGINNING_OF_TIME
+    b = _THE_END_OF_DAYS
+    if w[0]:
+        a = datetime.strptime(w[0], _DATEFMT).replace(tzinfo=localtz)
+    if w[1]:
+        b = datetime.strptime(w[1], _DATEFMT).replace(tzinfo=localtz)
+    return TimeRange(a, b)
