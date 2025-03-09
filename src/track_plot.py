@@ -17,7 +17,7 @@ import plotly.express as px
 
 # Load the RadiaCode tools
 from rcfiles import RcTrack
-from rctypes import Number, TrackPoint
+from rctypes import Number, TrackPoint, palettes
 
 # Figure out what the local timezone is, once, because I use it so often
 localtz = datetime.now(timezone.utc).astimezone().tzinfo
@@ -62,7 +62,7 @@ def get_args() -> Namespace:
     ap.add_argument(
         "--palette",
         default="turbo",
-        choices=["magma", "rainbow", "thermal", "turbo", "viridis"],
+        choices=palettes],
         help="see https://plotly.com/python/builtin-colorscales/ [%(default)s]",
     )
     ap.add_argument("--renderer", choices=["plotly", "hvplot"], default="plotly")
