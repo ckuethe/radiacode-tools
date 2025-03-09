@@ -6,8 +6,6 @@
 
 import os
 from argparse import ArgumentParser, Namespace, RawDescriptionHelpFormatter
-from collections import namedtuple
-from datetime import datetime, timedelta, timezone
 from math import atan2, cos, pow, radians, sin, sqrt
 from tempfile import mkstemp
 from textwrap import dedent
