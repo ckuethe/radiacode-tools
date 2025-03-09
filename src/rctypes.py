@@ -9,9 +9,12 @@ All the special namedtuples used elsewhere
 """
 
 from collections import namedtuple
-from typing import Union
+from typing import List, Union
 
 Number = Union[int, float]
+
+# preferred color palette choices for plotting
+palettes: List[str] = ["jet", "plasma", "magma", "rainbow", "thermal", "turbo", "viridis"]
 
 _nan = float("nan")
 TimeRange = namedtuple("TimeRange", ["t_start", "t_end"], defaults=[None, None])
