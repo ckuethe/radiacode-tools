@@ -38,6 +38,7 @@ n42convert = "n42convert:main"
 n42validate = "n42validate:main"
 radiacode-poll = "radiacode_poll:main"
 spectrogram-energy = "spectrogram_energy:main"
+rcspectrogram = "rcspectroplot:main"
 
 [tool.black]
 line-length = 120
