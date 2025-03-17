@@ -5,7 +5,7 @@
 
 import unittest
 
-import rc_codecs
+from radiacode_tools import rc_codecs
 
 
 class TestRcCodecs(unittest.TestCase):

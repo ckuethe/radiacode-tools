@@ -5,31 +5,16 @@
 # SPDX-License-Identifier: MIT
 
 import os
-import re
 from argparse import ArgumentParser, Namespace
-from datetime import datetime
 from hashlib import sha256 as hf
 
-from rcfiles import RcTrack
-from rctypes import RangeFinder
+from radiacode_tools.rc_files import RcTrack
+from radiacode_tools.rc_types import RangeFinder
+from radiacode_tools.rc_validators import _isotime, _rcsn
 
 
 def get_args() -> Namespace:
     "The usual argument parsing stuff"
-
-    def _timestamp(s: str) -> str:
-        "helper to enforce time string format"
-        m = re.match("^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})Z?$", s.strip())
-        if m:
-            return datetime(*[int(x) for x in m.groups()])
-        else:
-            raise ValueError("Invalid time format")
-
-    def _rcsn(s: str) -> str:
-        "helper to check the format of a radiacode serial number"
-        if re.match("RC-\d{3}[G]?-\d{6}", s.strip()):
-            return s
-        return ""
 
     ap = ArgumentParser(
         description="Sanitize a Radiacode track by rebasing it (to the notional setting of Hunt for Red October)"
@@ -54,7 +39,7 @@ def get_args() -> Namespace:
         "--start-time",
         default="1984-12-05T00:00:00",
         metavar="TIME",
-        type=_timestamp,
+        type=_isotime,
         help="[%(default)s]",
     )
     ap.add_argument(  # -x base-longitude
@@ -149,7 +134,7 @@ def sanitize(args: Namespace, track: RcTrack) -> None:
         track.points[i] = tp._replace(
             datetime=tp.datetime - start_timestamp + args.start_time,
             latitude=round(tp.latitude - lat_range.min_val + args.base_latitude, 7),
-            longitude=round(tp.longitude - lon_range.min_val + args.base_latitude, 7),
+            longitude=round(tp.longitude - lon_range.min_val + args.base_longitude, 7),
         )
 
 

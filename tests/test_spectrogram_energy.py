@@ -41,7 +41,7 @@ class TestSpectrogramEnergy(unittest.TestCase):
         parsed = spectrogram_energy.parse_header("\t".join(self.header_fields))
         self.assertEqual(parsed.name, "unittest")
         self.assertEqual(parsed.channels, 1024)
-        self.assertEqual("2023-11-22 21:20:09.938000", str(parsed.timestamp))
+        self.assertEqual("2023-11-23 05:20:09.938000+00:00", str(parsed.timestamp))
 
     def test_extract_calibration(self):
         # a real spectrum line is about 12kB but we only need the first 16 hex-pairs

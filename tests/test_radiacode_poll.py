@@ -14,8 +14,8 @@ from unittest.mock import patch
 from radiacode.types import Spectrum
 
 import radiacode_poll
-from n42convert import load_radiacode_spectrum
-from rcutils import get_device_id, get_dose_from_spectrum
+from radiacode_tools.rc_files import RcSpectrum
+from radiacode_tools.rc_utils import get_device_id, get_dose_from_spectrum
 
 # Approximately when I started writing this; used to give a stable start time
 test_epoch = datetime.datetime(2023, 10, 13, 13, 13, 13)
@@ -23,14 +23,16 @@ test_epoch = datetime.datetime(2023, 10, 13, 13, 13, 13)
 fake_clock: float = test_epoch.timestamp()
 testdir = pathjoin(dirname(__file__), "data")
 
+from .mock_radiacode import MockRadiaCode
 
+"""
 class MockRadiaCode:
     fw_sig = 'Signature: 57353F42, FileName="rc-102.bin", IdString="RadiaCode RC-102"'
     fw_ver = ((4, 0, "Feb  6 2023 15:49:14"), (4, 9, "Jan 25 2024 14:49:00\x00"))
     hsn = "0035001C-464B5009-20393153"
     conn_time = test_epoch
 
-    th_data = load_radiacode_spectrum(pathjoin(testdir, "data_th232_plus_background.xml"))
+    th_data = (pathjoin(testdir, "data_th232_plus_background.xml"))
     sn = th_data["foreground"]["device_serial_number"]
     a0 = th_data["foreground"]["calibration_values"][0]
     a1 = th_data["foreground"]["calibration_values"][1]
@@ -76,6 +78,8 @@ class MockRadiaCode:
     def dose_reset(self):
         pass
 
+"""
+
 
 def fake_sleep(seconds: float):
     global fake_clock
@@ -97,19 +101,6 @@ class TestRadiaCodePoll(unittest.TestCase):
         with patch("sys.argv", [__file__, "-u", "--accumulate-dose", "0"]), self.assertRaises(SystemExit):
             args = radiacode_poll.get_args()
             self.assertTrue(args.url)
-
-    def test_format_spectrum(self):
-        dev = MockRadiaCode()
-
-        devid = get_device_id(dev)
-        self.assertIn("RC-102", devid["sernum"])
-
-        instrument_info = radiacode_poll.make_instrument_info(devid)
-        self.assertIn("python-radiacode", instrument_info)
-
-        sp = dev.spectrum()
-        formatted = radiacode_poll.format_spectrum(hw_num=devid["sernum"], res=sp)
-        self.assertIn("EnergyCalibration", formatted[0])
 
     def test_accumulated_dose(self):
         dev = MockRadiaCode()

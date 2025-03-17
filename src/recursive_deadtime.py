@@ -40,10 +40,12 @@ def process_dir(dirname, files, rate_bg=0) -> bool:
         if n1 in fn and n2 in fn:
             n12 = nuc
 
-    rates = {"bg": rate_bg}
-    rates["a"] = deadtime.get_rate_from_spectrum(os.path.join(dirname, f"{n1}.xml"))
-    rates["b"] = deadtime.get_rate_from_spectrum(os.path.join(dirname, f"{n2}.xml"))
-    rates["ab"] = deadtime.get_rate_from_spectrum(os.path.join(dirname, f"{n12}.xml"))
+    rates = {
+        "bg": rate_bg,
+        "a": deadtime.get_rate_from_spectrum(os.path.join(dirname, f"{n1}.xml")),
+        "b": deadtime.get_rate_from_spectrum(os.path.join(dirname, f"{n2}.xml")),
+        "ab": deadtime.get_rate_from_spectrum(os.path.join(dirname, f"{n12}.xml")),
+    }
 
     dt = deadtime.print_deadtime(rates)
     if dt.dt_us < 0:

@@ -6,17 +6,15 @@
 
 import os
 from argparse import ArgumentParser, Namespace
-from io import TextIOWrapper
-from typing import Any, Dict, List, Optional
 from uuid import UUID
 
-from rcfiles import RcN42, RcSpectrum
+from radiacode_tools.rc_files import RcN42, RcSpectrum
 
 
 def get_args() -> Namespace:
     ap = ArgumentParser()
 
-    def _uuid(s) -> UUID:
+    def _uuid(s) -> UUID | None:
         if s.strip():
             return UUID(s)
         return None

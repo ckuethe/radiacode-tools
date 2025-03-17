@@ -14,7 +14,8 @@ from typing import Iterable, List, NoReturn, Tuple
 from numpy import corrcoef
 from numpy.polynomial import Polynomial
 
-from rctypes import Number
+from radiacode_tools.rc_types import Number
+from radiacode_tools.rc_validators import _positive_int
 
 
 def template_calibration(args: Namespace) -> NoReturn:
@@ -113,15 +114,6 @@ def load_calibration(args: Namespace) -> List[Tuple[Number, Number]]:
 
 
 def get_args() -> Namespace:
-    def _positive_int(s) -> int:
-        f = float(s)  # catch non-numeric
-        i = int(f)
-        if f < 1:  # catch non-positive
-            raise ValueError
-        if f - i != 0:  # catch fractional part != 0
-            raise ValueError
-        return i
-
     ap = ArgumentParser()
     ap.add_argument(
         "-z",
@@ -174,7 +166,7 @@ def rsquared(xlist: Iterable[Number], ylist: Iterable[Number], coeffs: Iterable[
     """
     chan2kev = Polynomial(coeffs)
     computed: List[Number] = [chan2kev(i) for i in xlist]
-    corr_matrix = corrcoef(ylist, computed)
+    corr_matrix = corrcoef(ylist, computed)  # type:ignore
     r_squared = corr_matrix[0, 1] ** 2
 
     print(f"R^2: {r_squared:.5f}")

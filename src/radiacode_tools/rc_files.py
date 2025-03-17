@@ -8,6 +8,7 @@
 Interfaces to Radiacode File Formats: tracks, spectra, spectrograms, and N42 conversion
 """
 
+import importlib
 from binascii import hexlify, unhexlify
 from datetime import datetime, timedelta
 from hashlib import sha256
@@ -19,29 +20,26 @@ from uuid import uuid4
 
 import xmltodict
 
-from rctypes import (
+from .rc_types import (
+    DATEFMT,
+    DATEFMT_T,
+    DATEFMT_TZ,
     EnergyCalibration,
     Number,
     SpectrogramPoint,
     SpectrumLayer,
     TrackPoint,
 )
-from rcutils import DateTime2FileTime, FileTime2DateTime
+from .rc_utils import (
+    UTC,
+    DateTime2FileTime,
+    FileTime2DateTime,
+    format_datetime,
+    parse_datetime,
+)
 
 TimeStampish = Union[Number, datetime]
 TimeDurationish = Union[Number, timedelta]
-
-# there's enough datetime mangling that it's worth making a few helpers
-_datestr: str = "%Y-%m-%d %H:%M:%S"
-_datestr_T: str = _datestr.replace(" ", "T")
-
-
-def _parse_datetime(ds: str, fmt: str = _datestr) -> datetime:
-    return datetime.strptime(ds, fmt)
-
-
-def _format_datetime(dt: datetime, fmt: str = _datestr) -> str:
-    return dt.strftime(fmt)
 
 
 class RcTrack:
@@ -105,19 +103,30 @@ class RcTrack:
         self.serialnumber = d["serialnumber"]
         self.comment = d["comment"]
         self.flags = d["flags"]
-        for p in d["points"]:
-            if isinstance(p[1], str):
-                p[1] = _parse_datetime(p[1])
-            for i in range(2, 7):
-                p[i] = float(p[i])
-        self.points = [TrackPoint(*x[1:]) for x in d["points"]]
+        _trackpoint_fields = ["datetime", "latitude", "longitude", "accuracy", "doserate", "countrate", "comment"]
+
+        self.points = [
+            TrackPoint(
+                parse_datetime(p["datetime"], DATEFMT_TZ),
+                p["latitude"],
+                p["longitude"],
+                p["accuracy"],
+                p["doserate"],
+                p["countrate"],
+                p["comment"],
+            )
+            for p in d["points"]
+        ]
         return True
 
-    def _format_trackpoint(self, tp: TrackPoint):
-        fz = [None] + list(tp._asdict().values())
-        fz[0] = DateTime2FileTime(fz[1])
-        fz[1] = _format_datetime(fz[1])
-        return "\t".join([str(x) for x in fz])
+    def _format_trackpoint(self, tp: TrackPoint) -> Dict[str, Any]:
+        "render a trackpoint as a simple dict"
+        # fz = [None] + list(tp._asdict().values())
+        rv = {"filetime": -1}
+        rv.update(tp._asdict())
+        rv["filetime"] = DateTime2FileTime(rv["datetime"])
+        rv["datetime"] = format_datetime(rv["datetime"], DATEFMT_TZ)
+        return rv
 
     def write_file(self, filename: str) -> None:
         "Write the in-memory representation to filesystem"
@@ -148,7 +157,9 @@ class RcTrack:
                 fields: List[Any] = line.split("\t")
                 if len(fields) != nf + 1:
                     raise ValueError(f"Incorrect number of values on line {n+1}")
-                fields[1] = FileTime2DateTime(fields[0])  # filetime is higher resolution than YYYY-mm-dd HH:MM:SS
+                fields[1] = FileTime2DateTime(fields[0]).replace(
+                    tzinfo=UTC
+                )  # filetime is higher resolution than YYYY-mm-dd HH:MM:SS
                 for i in range(2, 7):
                     fields[i] = float(fields[i])
                 fields[-1] = fields[-1].rstrip("\n")
@@ -167,12 +178,12 @@ class RcTrack:
         "Wrapper around TrackPoint, but accepts a DateTime which is more useful"
         self.points.append(
             TrackPoint(
-                time=dt,
+                datetime=dt,
                 latitude=latitude,
                 longitude=longitude,
                 accuracy=accuracy,
-                dose_rate=dose_rate,
-                count_rate=count_rate,
+                doserate=dose_rate,
+                countrate=count_rate,
                 comment=comment,
             )
         )
@@ -239,8 +250,8 @@ class RcSpectrum:
         # older versions of data files don't have start and end times
         if tmp:
             try:
-                az = [_parse_datetime(s, _datestr_T) for s in sp.get("StartTime", None)]
-                bz = [_parse_datetime(s, _datestr_T) for s in sp.get("EndTime", None)]
+                az = [parse_datetime(s, DATEFMT_T) for s in sp.get("StartTime", None)]
+                bz = [parse_datetime(s, DATEFMT_T) for s in sp.get("EndTime", None)]
                 self.fg_spectrum = self.fg_spectrum._replace(timestamp=az[0], duration=bz[0] - az[0])
                 if isinstance(self.bg_spectrum, SpectrumLayer):
                     self.bg_spectrum = self.bg_spectrum._replace(timestamp=az[1], duration=bz[1] - az[1])
@@ -248,8 +259,8 @@ class RcSpectrum:
                 pass
         else:
             try:
-                a = _parse_datetime(sp.get("StartTime", None), _datestr_T)
-                b = _parse_datetime(sp.get("EndTime", None), _datestr_T)
+                a = parse_datetime(sp.get("StartTime", None), DATEFMT_T)
+                b = parse_datetime(sp.get("EndTime", None), DATEFMT_T)
                 d = b - a
                 self.fg_spectrum = self.fg_spectrum._replace(timestamp=a, duration=d)
             except (KeyError, TypeError, AttributeError):
@@ -263,8 +274,8 @@ class RcSpectrum:
 
         b = "Background" if bg else ""
         rv = [
-            f"<StartTime>{st.strftime(_datestr_T)}</StartTime>",
-            f"<EndTime>{et.strftime(_datestr_T)}</EndTime>\n",
+            f"<StartTime>{st.strftime(DATEFMT_T)}</StartTime>",
+            f"<EndTime>{et.strftime(DATEFMT_T)}</EndTime>\n",
             f"<{b}EnergySpectrum>",
             f"<NumberOfChannels>{sl.channels}</NumberOfChannels>",
             "<ChannelPitch>1</ChannelPitch>",
@@ -351,7 +362,7 @@ class RcSpectrum:
                 device_model=d["device_model"],
                 serial_number=d["serial_number"],
                 calibration=EnergyCalibration(d["calibration"]),
-                timestamp=datetime.strptime(d["timestamp"], _datestr),
+                timestamp=datetime.strptime(d["timestamp"], DATEFMT),
                 duration=timedelta(seconds=float(d["duration"])),
                 channels=int(d["channels"]),
                 counts=[int(i) for i in d["counts"]],
@@ -458,7 +469,7 @@ class RcSpectrogram:
         """
 
         timestamp = DateTime2FileTime(self.timestamp)
-        tstr = _format_datetime(self.timestamp)
+        tstr = format_datetime(self.timestamp)
 
         self.name = self.name.strip()
         if not self.name:
@@ -594,9 +605,6 @@ class RcSpectrogram:
 
 class RcN42:
     "Minimal N42 implementation that can transcode to/from dual layer RadiaCode XML spectrum"
-    rad_detector_information: Dict[str, Any] = {}
-    rad_instrument_information: Dict[str, Any] = {}
-    _rdi: str = "radiacode-scinitillator-sipm"
 
     def __init__(self, filename: str = "") -> None:
         self.serial_number: str = ""
@@ -604,6 +612,9 @@ class RcN42:
         self.header: Dict[str, str] = {}
         self.uuid: str = ""
         self.spectrum_data: RcSpectrum = RcSpectrum()
+        self.rad_detector_information: Dict[str, Any] = {}
+        self.rad_instrument_information: Dict[str, Any] = {}
+        self._rdi: str = "radiacode-scinitillator-sipm"
 
         self._populate_header()
         if filename:
@@ -627,7 +638,7 @@ class RcN42:
             device_model=self.model,
             serial_number=self.serial_number,
             calibration=ec,
-            timestamp=_parse_datetime(rm["StartDateTime"], _datestr_T),
+            timestamp=parse_datetime(rm["StartDateTime"], DATEFMT_T),
             duration=timedelta(seconds=int(rm["RealTimeDuration"].strip("PTS"))),
             channels=len(counts),
             counts=counts,
@@ -663,12 +674,14 @@ class RcN42:
 
     def _populate_rad_instrument_information(self, serial_number: str = "") -> bool:
         "Fill in the RadiationInstrumentInformation element, mostly for the scintillator type"
-        if serial_number is None and self.serial_number is None:
+        if not self.serial_number and not serial_number:
             raise ValueError
         if serial_number:
             self.serial_number = serial_number
         self.model = f"RadiaCode-{self.serial_number.split('-')[1]}"
 
+        radiacode_ver = importlib.metadata.version("radiacode")
+        rctools_ver = importlib.metadata.version("radiacode-tools")
         self.rad_instrument_information = {
             "@id": "radiacode-instrument-info",
             "RadInstrumentManufacturerName": "Radiacode",
@@ -678,10 +691,10 @@ class RcN42:
             "RadInstrumentVersion": [
                 {"RadInstrumentComponentName": "Radiacode-Firmware", "RadInstrumentComponentVersion": "unknown"},
                 {"RadInstrumentComponentName": "Radiacode-App", "RadInstrumentComponentVersion": "unknown"},
-                {"RadInstrumentComponentName": "Radiacode-Tools", "RadInstrumentComponentVersion": "0.1.2"},
+                {"RadInstrumentComponentName": "Radiacode-Python", "RadInstrumentComponentVersion": radiacode_ver},
+                {"RadInstrumentComponentName": "Radiacode-Tools", "RadInstrumentComponentVersion": rctools_ver},
             ],
         }
-
         return self._populate_rad_detector_information()
 
     def _populate_rad_detector_information(self) -> bool:
@@ -791,7 +804,8 @@ class RcN42:
         return self.spectrum_data
 
     def from_rcspectrum(self, s: RcSpectrum) -> bool:
+        "Pass in a dual layer spectrum if you want a dual layer N42 output"
         self.uuid = s.uuid()
         self.spectrum_data = s
-        self._populate_rad_instrument_information(s.fg_spectrum.serial_number)
+        self._populate_rad_instrument_information(s.fg_spectrum.serial_number)  # type:ignore
         return True

@@ -7,62 +7,47 @@
 
 import os
 from argparse import ArgumentParser, Namespace
-from datetime import datetime, timezone
-from math import ceil, floor, log10, sqrt
+from datetime import datetime
+from math import log10, sqrt
 from typing import Any, Dict, List
 
-import kaleido as kd  # plotly does this automatically, but this is a dependency check
-import pandas as pd  # kaleido does this automatically, but this is a dependency check
 import plotly.express as px
 
 # Load the RadiaCode tools
-from rcfiles import RcTrack
-from rctypes import Number, TrackPoint, palettes
-
-# Figure out what the local timezone is, once, because I use it so often
-localtz = datetime.now(timezone.utc).astimezone().tzinfo
+from radiacode_tools.rc_files import RcTrack
+from radiacode_tools.rc_types import Number, TrackPoint, palettes
+from radiacode_tools.rc_utils import localtz
+from radiacode_tools.rc_validators import (
+    _geometry,
+    _positive_float,
+    _positive_int,
+    _rcsn,
+)
 
 
 def get_args() -> Namespace:
     "The usual argument handling stuff"
-
-    def PositiveInt(s: str) -> int:
-        rv = int(s)
-        if rv > 0:
-            return rv
-        raise ValueError()
-
-    def PositiveFloat(s: str) -> float:
-        rv = float(s)
-        if rv > 0:
-            return rv
-        raise ValueError()
-
-    def Geometry(s: str):
-        n = s.strip().split("x")
-        if len(n) != 2:
-            raise ValueError()
-        return PositiveInt(n[0]), PositiveInt(n[1])
 
     ap = ArgumentParser()
     ap.add_argument("-o", "--output-file", type=str, metavar="FILE", help="[<input_file>.png]")
     ap.add_argument(
         "-a",
         "--accuracy",
-        type=PositiveFloat,
+        type=_positive_float,
         default=15.0,
         help="Maximum point error in meters [%(default)s]",
     )
-    ap.add_argument("-d", "--downsample", type=PositiveInt, default=16, help="[%(default)s]")
-    ap.add_argument("-r", "--min-count-rate", type=PositiveFloat)
-    ap.add_argument("-R", "--max-count-rate", type=PositiveFloat)
-    ap.add_argument("-g", "--geometry", type=Geometry, default="1600x1024", help="Image size [%(default)s]")
+    ap.add_argument("-d", "--downsample", type=_positive_int, default=16, help="[%(default)s]")
+    ap.add_argument("-r", "--min-count-rate", type=_positive_float)
+    ap.add_argument("-R", "--max-count-rate", type=_positive_float)
+    ap.add_argument("-g", "--geometry", type=_geometry, default="1600x1024", help="Image size [%(default)s]")
+    ap.add_argument("-s", "--serial-number", dest="sn", type=_rcsn, metavar="STR")
     ap.add_argument("--interactive", default=False, action="store_true", help="Open an interactive plot in a browser")
-    ap.add_argument("--opacity", type=PositiveFloat, default=0.25, help="Marker opacity [%(default)s]")
+    ap.add_argument("--opacity", type=_positive_float, default=0.25, help="Marker opacity [%(default)s]")
     ap.add_argument(
         "--palette",
         default="turbo",
-        choices=palettes],
+        choices=[palettes],
         help="see https://plotly.com/python/builtin-colorscales/ [%(default)s]",
     )
     ap.add_argument("--renderer", choices=["plotly", "hvplot"], default="plotly")
@@ -86,7 +71,7 @@ def mean(l: List[Number]) -> float:
     return sum(l) / len(l)
 
 
-def range_probe(l: List[TrackPoint]):
+def tracklist_range_probe(l: List[TrackPoint]):
     "Find the range of all the fields in a list of TrackPoints"
     ranges = {"len": len(l)}
     for f in l[0]._fields:
@@ -123,12 +108,11 @@ def downsample_trackpoints(l: List[TrackPoint], factor=4) -> List[TrackPoint]:
 
         return TrackPoint(dt, lat, lon, accuracy, doserate, countrate)
 
-    for i in range(0, len(l), factor):
+    for i in range(0, len(l) + 1, factor):
         samples = l[i : i + factor]
-        rv.append(_sl2tp(samples))
+        if samples:
+            rv.append(_sl2tp(samples))
 
-    samples = l[i:]
-    rv.append(_sl2tp(samples))
     return rv
 
 
@@ -146,12 +130,12 @@ def osm_zoom(bbx: Dict[str, Any]) -> int:
     # experimentally derived coefficients that work well for me. Plug them into
     # the "y = mx+b" equation of a line and you get a pretty good conversion from
     # the diagonal size of the bounding box in decimal degrees to zoom level.
-    m = -3.27
-    b = 9.32
+    m = -3.0
+    b = 9.6
     dx = bbx["longitude"][1] - bbx["longitude"][0]
     dy = bbx["latitude"][1] - bbx["latitude"][0]
     x = log10(sqrt(dx**2 + dy**2))
-    return ceil(m * x + b)  # which is better: ceil, floor, round?
+    return round(m * x + b)
 
 
 def render_plotly(tk: RcTrack, args: Namespace, bbx: Dict[str, Any]):
@@ -210,7 +194,7 @@ def main() -> None:
         if tk.points[i].accuracy > 15:
             tk.points.pop(i)
 
-    bounding_box = range_probe(tk.points)
+    bounding_box = tracklist_range_probe(tk.points)
 
     if "plotly" == args.renderer:
         render_plotly(tk, args, bounding_box)

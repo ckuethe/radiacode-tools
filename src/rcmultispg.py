@@ -34,9 +34,13 @@ import usb.core  # type: ignore
 from radiacode import RadiaCode  # type: ignore
 from radiacode.transports.usb import DeviceNotFound  # type: ignore
 
-from appmetrics import AppMetrics  # type: ignore
-from rctypes import GpsData, RtData, SpecData  # type: ignore
-from rcutils import find_radiacode_devices, specdata_to_dict  # type: ignore
+from radiacode_tools.appmetrics import AppMetrics  # type: ignore
+from radiacode_tools.rc_types import GpsData, RtData, SpecData  # type: ignore
+from radiacode_tools.rc_utils import (  # type: ignore
+    find_radiacode_devices,
+    specdata_to_dict,
+)
+from radiacode_tools.rc_validators import _gpsd
 
 ams = AppMetrics(stub=True)
 
@@ -78,13 +82,6 @@ def get_args() -> Namespace:
         if f < 0.0:
             raise ValueError("value cannot be less than 0")
         return f
-
-    def _gpsd(s):
-        m = re_match(r"^gpsd://(?P<host>[a-zA-Z0-9_.-]+)(:(?P<port>\d+))?(?P<device>/.+)?", s)
-        if m:
-            return m.groupdict()
-        else:
-            return None
 
     ap = ArgumentParser(description="Poll all connected RadiaCode PSRDs and produce spectrograms")
     ap.add_argument(
@@ -382,6 +379,10 @@ def gps_worker(args: Namespace) -> None:
     GPS data enrichment is ... a polite request. If GPSD goes down, navigation
     solutions are unavailable or invalid, etc. we don't want to take quit the
     whole process.
+
+    FIXME this does not tolerate gps disconnect/reconnect very well. I should
+    FIXME reuse the logic from webcgps or refactor this function to handle that
+    FIXME more robustly
     """
     BAD_GPS_ALT: float = -6378  # center of earth
     DFLT_GPSD_PORT: int = 2947
@@ -397,14 +398,14 @@ def gps_worker(args: Namespace) -> None:
     if args.gpsd["device"]:
         watch_args["device"] = args.gpsd["device"]
     watch = "?WATCH=" + jdumps(watch_args)
-    while CTRL_QUEUE.qsize() == 0:
+    while CTRL_QUEUE.qsize() == 0:  # reconnect loop
         try:
             with socket.create_connection(srv, timeout=3) as s:
                 gpsfd = s.makefile("rw")
                 print(watch, file=gpsfd, flush=True)
                 ams.flag_set("gps_connected")
                 dedup = None
-                while CTRL_QUEUE.qsize() == 0:  # Check the control queue every line
+                while True:
                     line = gpsfd.readline().strip()
                     try:
                         x = jloads(line)
@@ -429,19 +430,26 @@ def gps_worker(args: Namespace) -> None:
                         ams.gauge_update("longitude", tpv.payload["lon"])
                         ams.gauge_update("altitude", tpv.payload.get("alt", BAD_GPS_ALT))
                         DATA_QUEUE.put(tpv)
-                    except (KeyError, JSONDecodeError) as e:  # skip bad messages, no fix, etc.
-                        print(f"JSON processing error {e} in gps thread", file=stderr)
+                    except KeyError as e:  # skip no fix, etc.
                         pass
-                # Control Queue is non-empty, shutting down
-                ams.flag_clear("gps_connected")
-                return  # clean exit
-        except (socket.error, TimeoutError) as e:
+
+                    # Control Queue is non-empty, shutting down
+                    if CTRL_QUEUE.qsize():  # Check the control queue every line
+                        ams.flag_clear("gps_connected")
+                        return  # clean exit
+        except (
+            socket.error,
+            TimeoutError,
+            IOError,
+            JSONDecodeError,
+        ) as e:  # network error, complete garbage... give up and reconnect
             DATA_QUEUE.put(GpsData(payload={"gnss": False, "mode": 0}))
             with STDIO_LOCK:
-                if e.errno != 111:  # FIXME is ECONNREFUSED always 111? Is there a macro?
-                    print(f"caught exception {e} in gps thread", file=stderr)
+                # if e.errno != 111:  # FIXME is ECONNREFUSED always 111? Is there a macro?
+                print(f"caught exception {e} in gps thread, reconnecting", file=stderr)
             sleep(1)
-    #
+    # end reconnect loop
+
     with STDIO_LOCK:
         print("gps worker shutting down", file=stderr)
     ams.flag_clear("gps_connected")
@@ -453,8 +461,6 @@ def main() -> None:
     global ams
     global THREAD_BARRIER
 
-    ams = AppMetrics(port=6853, local_only=False, appname="rcmultispg")
-    ams.flag_create("gps_connected")
     try:
         dev_names = find_radiacode_devices()
     except Exception:
@@ -464,6 +470,8 @@ def main() -> None:
             print("No devices Found", file=stderr)
             exit(1)
 
+    ams = AppMetrics(port=6853, local_only=False, appname="rcmultispg")
+    ams.flag_create("gps_connected")
     missing = set(args.devs).difference(set(dev_names))
     if missing:
         if args.require_all:

@@ -4,21 +4,37 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "radiacode_tools"
-dynamic = ['version', 'dependencies']
 authors = [
   { name="Chris Kuethe", email="chris.kuethe@gmail.com" },
 ]
 description = "Interfacing RadiaCode PSRDs to other gamma ray spectroscopy tools"
 readme = "README.md"
 license = {file = "LICENSE"}
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 classifiers = [
     "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
     "Operating System :: POSIX",
     "Development Status :: 4 - Beta",
     "Topic :: Scientific/Engineering :: Physics",
     "Topic :: Utilities"
+]
+version = "0.1.3"
+dependencies = [
+  "radiacode>=0.3.4",
+  "flask",
+  "tqdm",
+  "qrcode",
+  "requests",
+  "xmlschema",
+  "xmltodict",
+  "defusedxml",
+  "dateutils",
 ]
 
 [project.urls]
@@ -39,6 +55,30 @@ n42validate = "n42validate:main"
 radiacode-poll = "radiacode_poll:main"
 spectrogram-energy = "spectrogram_energy:main"
 rcspectrogram = "rcspectroplot:main"
+gpsled = "gpsled:main"
+recursivedeadtime = "recursive_deadtime:main"
 
 [tool.black]
 line-length = 120
+
+[tool.flake8]
+max-line-length = 120
+
+[project.optional-dependencies]
+graphical = [
+  "plotly.express",
+  "matplotlib"
+]
+
+[tool.uv]
+package = true
+dev-dependencies = [
+ "pytest",
+ "pytest-cov",
+ "black",
+ "flake8",
+ "bpython",
+ "isort",
+ "mypy",
+ "tox"
+]

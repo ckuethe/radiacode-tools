@@ -13,7 +13,7 @@ from urllib.parse import unquote_plus
 
 from dateutil.parser import parse as dateparse
 
-from rc_codecs import (
+from .rc_codecs import (
     b45_decode,
     b45_encode,
     rle0_decode,
@@ -21,7 +21,7 @@ from rc_codecs import (
     vbyte_decode,
     vbyte_encode,
 )
-from rcutils import Number
+from .rc_utils import Number
 
 OPT_NO_DEFLATE = 0x01
 OPT_NO_BASE_X = 0x02

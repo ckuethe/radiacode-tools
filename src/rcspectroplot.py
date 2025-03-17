@@ -7,48 +7,16 @@
 
 import os
 from argparse import ArgumentParser, Namespace
-from datetime import datetime, timedelta
+from datetime import datetime
 from json import loads as jloads
-from typing import Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
 
 # Load the RadiaCode tools
-from rcfiles import RcSpectrogram
-from rctypes import EnergyCalibration, palettes
-from rcutils import timerange
-
-
-def _dt_range(s: str) -> Tuple[float, float]:
-    """
-    Validate a range like
-    00:00:00~23:19:00
-    12:34:56~
-    ~12:34:56
-    """
-    w = s.split("~")
-    a = 0.0
-    b = 2.0**32
-    if w[0]:
-        t = [int(x, 10) for x in w[0].split(":")]
-        a = timedelta(hours=t[0], minutes=t[1], seconds=t[2]).total_seconds()
-    if w[1]:
-        t = [int(x, 10) for x in w[1].split(":")]
-        b = timedelta(hours=t[0], minutes=t[1], seconds=t[2]).total_seconds()
-    return a, b
-
-
-def _samp_range(s: str) -> Tuple[int, int]:
-    w = s.split("~")
-    a = 0
-    b = 2**32
-    if w[0]:
-        a = int(w[0], 10)
-    if w[1]:
-        b = int(w[1], 10)
-
-    return a, b
+from radiacode_tools.rc_files import RcSpectrogram
+from radiacode_tools.rc_types import EnergyCalibration, palettes
+from radiacode_tools.rc_validators import _duration_range, _samp_range, _timerange
 
 
 def get_args() -> Namespace:
@@ -67,21 +35,21 @@ def get_args() -> Namespace:
     mtx = ap.add_mutually_exclusive_group()
     mtx.add_argument(
         "--sample",
-        type=str,
+        type=_samp_range,
         dest="sample_filter",
         metavar="N~N",
         help="select spectrogram samples by sample number",
     )
     mtx.add_argument(
         "--duration",
-        type=str,
+        type=_duration_range,
         dest="duration_filter",
         metavar="H:M:S~H:M:S",
         help="select spectrogram sample by time since recording start",
     )
     mtx.add_argument(
         "--time",
-        type=str,
+        type=_timerange,
         dest="time_filter",
         metavar="Y-M-DTh:m:s~Y-M-DTh:m:s",
         help="select spectrogram sample by absolute timestamp",
@@ -101,27 +69,27 @@ def get_args() -> Namespace:
     if rv.output_file is None:
         rv.output_file = rv.input_file + ".png"
 
-    if False:
-        pass
-    elif rv.duration_filter:
-        try:
-            rv.duration_filter = _dt_range(rv.duration_filter)
-        except Exception:
-            print(f"Unable to parse relative time range: {rv.duration_filter}")
-            exit(1)
-    elif rv.time_filter:
-        try:
-            tmp = timerange(rv.time_filter)
-            rv.time_filter = tmp[0].timestamp(), tmp[1].timestamp()
-        except Exception:
-            print(f"Unable to parse timestamp range: {rv.time_filter}")
-            exit(1)
-    elif rv.sample_filter:
-        try:
-            rv.sample_filter = _samp_range(rv.sample_filter)
-        except Exception:
-            print(f"Unable to parse sample number range: {rv.sample_filter}")
-            exit(1)
+    # if True:
+    #     pass
+    # elif rv.duration_filter:
+    #     try:
+    #         rv.duration_filter = _duration_range(rv.duration_filter)
+    #     except Exception:
+    #         print(f"Unable to parse relative time range: {rv.duration_filter}")
+    #         exit(1)
+    # elif rv.time_filter:
+    #     try:
+    #         tmp = _timerange(rv.time_filter)
+    #         rv.time_filter = tmp[0].timestamp(), tmp[1].timestamp()
+    #     except Exception:
+    #         print(f"Unable to parse timestamp range: {rv.time_filter}")
+    #         exit(1)
+    # elif rv.sample_filter:
+    #     try:
+    #         rv.sample_filter = _samp_range(rv.sample_filter)
+    #     except Exception:
+    #         print(f"Unable to parse sample number range: {rv.sample_filter}")
+    #         exit(1)
     return rv
 
 
@@ -160,45 +128,62 @@ def plot_spectrogram(
     plt.show()
 
 
+def load_spectrogram_from_ndjson(args: Namespace) -> RcSpectrogram:
+    """
+    The newline delimited JSON produced by rcmultlog takes a bit of processing
+    to turn it into an RcSpectrogram, for example filtering for a selected device
+    serial number, but after that it's just like the regular radiacode format.
+    """
+    spg = RcSpectrogram()
+    with open(args.input_file) as ifd:
+        sn = None or args.serial_number
+        records = [jloads(l) for l in ifd if "counts" in l]
+
+    if sn is None:
+        sn = records[0]["serial_number"]
+        print(f"Assuming serial number {sn}")
+    spg.add_calibration(EnergyCalibration(*records[0]["calibration"]))
+    spg.serial_number = sn
+
+    # Filter serial number
+    records = [x for x in records if x["serial_number"] == sn]
+    if len(records) == 0:
+        print("No data after filtering")
+        exit()
+    # Assume the timestamp of this spectrogram is the time the first record was saved
+    spg.timestamp = datetime.fromtimestamp(records[0]["timestamp"])
+    _ = [spg.add_point(timestamp=p["timestamp"], counts=p["counts"]) for p in records]
+
+    return spg
+
+
+def filter_spectrogram(args: Namespace, spg: RcSpectrogram) -> None:
+    "it may be desirable to select just a subset of points. spectrogram is edited in place"
+    if args.sample_filter:
+        spg.samples = spg.samples[args.sample_filter[0] : args.sample_filter[1] + 1]
+    if args.time_filter:
+        spg.samples = [x for x in spg.samples if (args.time_filter.t_start <= x.datetime <= args.time_filter.t_end)]
+    if args.duration_filter:
+        t0 = spg.samples[0].datetime
+        spg.samples = [
+            x
+            for x in spg.samples
+            if (args.duration_filter[0] <= (x.datetime - t0).total_seconds() <= args.duration_filter[1])
+        ]
+
+
 def main() -> None:
     args = get_args()
-    spg = RcSpectrogram()
     if args.input_file.endswith(".rcspg"):
+        spg = RcSpectrogram()
         spg.load_file(args.input_file)
     elif args.input_file.endswith(".ndjson"):
-        with open(args.input_file) as ifd:
-            sn = None or args.serial_number
-            records = [jloads(l) for l in ifd if "counts" in l]
-
-        if sn is None:
-            sn = records[0]["serial_number"]
-            print(f"Assuming serial number {sn}")
-        spg.add_calibration(EnergyCalibration(*records[0]["calibration"]))
-        spg.serial_number = sn
-
-        # Filter serial number
-        records = [x for x in records if x["serial_number"] == sn]
-        # Assume the timestamp of this spectrogram is the time the first record was saved
-        spg.timestamp = datetime.fromtimestamp(records[0]["timestamp"])
-
-        # Selecting a subset of samples
-        if args.sample_filter:
-            records = records[args.sample_filter[0] : args.sample_filter[1]]
-        if args.time_filter:
-            records = [x for x in records if args.time_filter[0] <= x["timestamp"] <= args.time_filter[1]]
-        if args.duration_filter:
-            records = [
-                x
-                for x in records
-                if args.duration_filter[0] <= (x["timestamp"] - records[0]["timestamp"]) <= args.duration_filter[1]
-            ]
-
-        # spg.name = "iad ct scan"
-        _ = [spg.add_point(timestamp=p["timestamp"], counts=p["counts"]) for p in records]
-
+        spg = load_spectrogram_from_ndjson(args)
     else:
         print(f"Not sure how to handle {args.input_file}")
         return
+
+    filter_spectrogram(args, spg)
 
     plot_spectrogram(spg, args)
 

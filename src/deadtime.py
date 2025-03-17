@@ -6,10 +6,10 @@
 
 from argparse import ArgumentParser, Namespace
 from math import pow, sqrt
-from typing import Dict, Union
+from typing import Dict
 
-from rcfiles import RcSpectrum
-from rctypes import DTstats, Number
+from radiacode_tools.rc_files import RcSpectrum
+from radiacode_tools.rc_types import DTstats, Number
 
 
 def get_args() -> Namespace:
@@ -29,6 +29,10 @@ def get_args() -> Namespace:
     return ap.parse_args()
 
 
+def get_rate_from_spectrum(fn: str) -> float:
+    return RcSpectrum(fn).count_rate()
+
+
 def load_spectra(args) -> Dict[str, float]:
     rv = {}
 
@@ -36,23 +40,23 @@ def load_spectra(args) -> Dict[str, float]:
         rv["a"] = float(args.first) / args.interval
     except ValueError:
         # file deepcode ignore PT: CLI tool intentionally opening the files the user asked for
-        rv["a"] = RcSpectrum(args.first).count_rate()
+        rv["a"] = get_rate_from_spectrum(args.first)
 
     try:
         rv["b"] = float(args.second) / args.interval
     except ValueError:
-        rv["b"] = RcSpectrum(args.second).count_rate()
+        rv["b"] = get_rate_from_spectrum(args.second)
 
     try:
         rv["ab"] = float(args.combined) / args.interval
     except ValueError:
-        rv["ab"] = RcSpectrum(args.combined).count_rate()
+        rv["ab"] = get_rate_from_spectrum(args.combined)
 
     if args.background is not None:
         try:
             rv["bg"] = float(args.background) / args.interval
         except ValueError:
-            rv["bg"] = RcSpectrum(args.background).count_rate()
+            rv["bg"] = get_rate_from_spectrum(args.background)
     else:
         rv["bg"] = 0
 

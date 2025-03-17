@@ -15,7 +15,7 @@ from typing import Any, Dict, List
 
 from radiacode import RadiaCode
 
-from rctypes import Number, SpecData, TimeRange
+from .rc_types import DATEFMT, DATEFMT_TZ, Number, SpecData
 
 # The spectrogram format uses FileTime, the number of 100ns intervals since the
 # beginning of 1600 CE. On a linux/unix/bsd host, we get the number of (fractional)
@@ -25,6 +25,22 @@ _filetime_quantum = 1e-7
 _filetime_epoch_offset = 116444736000000000
 
 UTC = timezone(timedelta(0))
+localtz = datetime.now(timezone.utc).astimezone().tzinfo
+
+# guess what happened here
+_BEGINNING_OF_TIME_STR: str = "1945-07-16T11:29:21Z"
+_BEGINNING_OF_TIME: datetime = datetime.strptime(_BEGINNING_OF_TIME_STR, DATEFMT_TZ).replace(tzinfo=UTC)
+# https://pumas.nasa.gov/examples/how-many-days-are-year says approximately 365.25 days per year
+# If you're still using python3 in 200 years, that's some serious retrocomputing
+_THE_END_OF_DAYS: datetime = _BEGINNING_OF_TIME + timedelta(days=250 * 365.25)
+
+
+def parse_datetime(ds: str, fmt: str = DATEFMT) -> datetime:
+    return datetime.strptime(ds, fmt).replace(tzinfo=UTC)
+
+
+def format_datetime(dt: datetime, fmt: str = DATEFMT) -> str:
+    return dt.strftime(fmt)
 
 
 def FileTime2UnixTime(x: Number) -> float:
@@ -44,7 +60,7 @@ def UnixTime2FileTime(x: Number) -> int:
 
 def DateTime2FileTime(dt: datetime) -> int:
     "Convert a Python DateTime to FileTime"
-    return UnixTime2FileTime(dt.timestamp())
+    return UnixTime2FileTime(dt.replace(tzinfo=UTC).timestamp())
 
 
 def stringify(a: List[Any], c: str = " ") -> str:
@@ -94,13 +110,18 @@ def find_radiacode_devices() -> List[str]:
 
 
 def get_device_id(dev: RadiaCode) -> Dict[str, str]:
-    "Poll the device for all its identifiers"
+    """ "
+    Poll the device for all its identifiers. Returns a dict with keys:
+
+    fw, fv, hw_num, sernum, model, boot_ver, boot_date, fw_ver, fw_date
+    """
     rv = {
         "fw": dev.fw_signature(),
         "fv": dev.fw_version(),
         "hw_num": dev.hw_serial_number(),
         "sernum": dev.serial_number(),
     }
+    rv["model"] = "-".join(rv["sernum"].split("-")[:2])
     f = re_search(
         r'Signature: (?P<fw_signature>[0-9A-F]{8}), FileName="(?P<fw_file>.+?)", IdString="(?P<product>.+?)"',
         rv["fw"],
@@ -144,29 +165,3 @@ def specdata_to_dict(data: SpecData) -> Dict[str, Any]:
         "counts": data.spectrum.counts,
     }
     return rec
-
-
-localtz = datetime.now(timezone.utc).astimezone().tzinfo
-_DATEFMT: str = "%Y-%m-%dT%H:%M:%S"
-_BEGINNING_OF_TIME: datetime = datetime.strptime("1945-07-16T11:29:21", _DATEFMT).replace(tzinfo=localtz)
-# https://pumas.nasa.gov/examples/how-many-days-are-year says approximately 365.25 days per year
-_THE_END_OF_DAYS: datetime = _BEGINNING_OF_TIME + timedelta(days=250 * 365.25)
-
-
-def timerange(s: str) -> TimeRange:
-    """
-    helper to validate a timerange (a pair of datetimes)
-
-    Either end can be unspecified, in which case it will be treated
-    as the start or end of time (or at least the unix epoch).
-    """
-    w = s.split("~")
-    if len(w) != 2:
-        raise ValueError
-    a = _BEGINNING_OF_TIME
-    b = _THE_END_OF_DAYS
-    if w[0]:
-        a = datetime.strptime(w[0], _DATEFMT).replace(tzinfo=localtz)
-    if w[1]:
-        b = datetime.strptime(w[1], _DATEFMT).replace(tzinfo=localtz)
-    return TimeRange(a, b)

@@ -57,7 +57,9 @@ class TestN42Www(unittest.TestCase):
             response = self.client.post("/convert", data={"file-input": (am241, fn)})
             self.assertEqual(response.status_code, 200)
             self.assertIn(dfn, str(response.headers))
-            self.assertIn('radDetectorInformationReference="radiacode-csi-sipm"', response.get_data(as_text=True))
+            self.assertIn(
+                'radDetectorInformationReference="radiacode-scinitillator-sipm"', response.get_data(as_text=True)
+            )
 
     def test_convert_bad_field(self):
         fn = "data_am241.xml"
@@ -72,6 +74,12 @@ class TestN42Www(unittest.TestCase):
             self.assertEqual(response.status_code, 400)
 
     def test_main(self):
-        with patch("sys.argv", [__file__, "-vvv", "-b", "255.255.255.255"]):
+        with patch("sys.argv", [__file__, "-vvv", "-b", "255.255.255.255", "-p", "1"]):
+            with self.assertRaises(SystemExit):
+                n42www.main()
+        with patch("sys.argv", [__file__, "-v", "-b", "255.255.255.255", "-p", "1"]):
+            with self.assertRaises(SystemExit):
+                n42www.main()
+        with patch("sys.argv", [__file__, "-b", "255.255.255.255", "-p", "1"]):
             with self.assertRaises(SystemExit):
                 n42www.main()

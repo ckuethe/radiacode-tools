@@ -9,12 +9,17 @@ All the special namedtuples used elsewhere
 """
 
 from collections import namedtuple
-from typing import List, Union
+from typing import Any, Iterable, List, Tuple, Union
 
 Number = Union[int, float]
 
 # preferred color palette choices for plotting
 palettes: List[str] = ["jet", "plasma", "magma", "rainbow", "thermal", "turbo", "viridis"]
+
+# there's enough time conversion it's worth having common definitions of the formats
+DATEFMT: str = "%Y-%m-%d %H:%M:%S"
+DATEFMT_T: str = DATEFMT.replace(" ", "T")
+DATEFMT_TZ: str = DATEFMT_T + "Z"
 
 _nan = float("nan")
 TimeRange = namedtuple("TimeRange", ["t_start", "t_end"], defaults=[None, None])
@@ -92,16 +97,19 @@ TrackPoint = namedtuple("TrackPoint", _trackpoint_fields, defaults=[None] * len(
 class RangeFinder:
     "A helper class to determine the range of a list"
 
-    def __init__(self, name: str = "RangeFinder"):
+    def __init__(self, name: str = "RangeFinder") -> None:
         self.name = name
         self.min_val = None
         self.max_val = None
+
+    def add(self, l: Iterable) -> None:
+        _ = [self.update(x) for x in l]
 
     def update(self, x):
         self.min_val = x if self.min_val is None else min(x, self.min_val)
         self.max_val = x if self.max_val is None else max(x, self.max_val)
 
-    def get(self):
+    def get(self) -> Tuple[Any, Any]:
         return (self.min_val, self.max_val)
 
     def __str__(self):

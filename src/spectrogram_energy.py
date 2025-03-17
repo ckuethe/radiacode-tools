@@ -12,8 +12,8 @@ import sys
 from argparse import ArgumentParser, Namespace
 from binascii import unhexlify
 
-from rctypes import EnergyCalibration, SGHeader, SpecEnergy
-from rcutils import FileTime2DateTime, get_dose_from_spectrum
+from radiacode_tools.rc_types import EnergyCalibration, SGHeader, SpecEnergy
+from radiacode_tools.rc_utils import FileTime2DateTime, get_dose_from_spectrum
 
 
 def get_args() -> Namespace:
@@ -68,8 +68,8 @@ def load_spectrogram(fn: str) -> SpecEnergy:
             elif line.startswith("Spectrum:") and cal is None:
                 cal = extract_calibration_from_spectrum(line)
             else:
-                _, acc_time, *counts = line.strip().split("\t")
-                acc_time = int(acc_time)
+                _, t, *counts = line.strip().split("\t")
+                acc_time = int(t)
                 counts = [int(c) for c in counts]
                 if len(counts) < header.channels:  # pad to the right number of channels
                     counts.extend([0] * (header.channels - len(counts)))

@@ -84,9 +84,6 @@ class AppMetrics:
         stub: create a dummy that doesn't do anything, but can at least be used for prototyping
         """
         self._stub = False
-        if stub:
-            self._stub = stub
-            return
         self.am_mutex: Lock = Lock()
         self._stats: Dict[str, Any] = {P: {"pid": getppid(), "appname": appname}, C: {}, F: {}, G: {}}
         self._init_real_time = monotonic()
@@ -94,6 +91,9 @@ class AppMetrics:
         self._init_proc_time = process_time()
         self._set_clocks()
         self.safe = safe
+        if stub:
+            self._stub = stub
+            return
         self._server = AppMetricsServer(app_metrics=self, port=port, local_only=local_only, safe=safe)
 
     def _set_clocks(self):

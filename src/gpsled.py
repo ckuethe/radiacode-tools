@@ -13,8 +13,9 @@ from argparse import ArgumentParser, Namespace
 from json import JSONDecodeError
 from json import dumps as jdumps
 from json import loads as jloads
-from re import match as re_match
 from time import sleep
+
+from radiacode_tools.rc_validators import _gpsd
 
 _example_systemd_unit = """
 [Unit]
@@ -46,13 +47,6 @@ def configure_led(args: Namespace, enable: bool = True):
 
 
 def get_args() -> Namespace:
-    def _gpsd(s):
-        m = re_match(r"^gpsd://(?P<host>[a-zA-Z0-9_.-]+)(:(?P<port>\d+))?(?P<dev>/.+)?", s)
-        if m:
-            return m.groupdict()
-        else:
-            return None
-
     def _led(s):
         "check for /trigger because it's available in all modes"
         if isinstance(s, list):

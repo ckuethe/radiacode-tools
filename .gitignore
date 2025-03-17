@@ -1,5 +1,5 @@
 __pycache__
-*.pyc
+*.py[co]
 .*.sw?
 .vscode
 *.json
@@ -13,3 +13,4 @@ dist
 *venv*
 .*cache
 *~
+build

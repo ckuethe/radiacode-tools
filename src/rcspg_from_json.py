@@ -16,8 +16,8 @@ from os.path import basename, dirname
 from os.path import join as pathjoin
 from os.path import realpath
 
-from rcfiles import RcSpectrogram
-from rctypes import EnergyCalibration
+from radiacode_tools.rc_files import RcSpectrogram
+from radiacode_tools.rc_types import EnergyCalibration
 
 
 def get_args() -> Namespace:

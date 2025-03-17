@@ -6,7 +6,7 @@
 import datetime
 import unittest
 
-import radqr
+from radiacode_tools import rc_radqr
 
 
 class TestRadqr(unittest.TestCase):
@@ -75,7 +75,7 @@ class TestRadqr(unittest.TestCase):
 
     def test_radqr_decode(self):
         for x in self.qr_tests:
-            fields = radqr.decode_qr_data(x[0], debug=True)
+            fields = rc_radqr.decode_qr_data(x[0], debug=True)
             x[1]["counts"] = [int(i) for i in x[1]["counts"].split(",")]
             self.assertDictEqual(fields, x[1])
 
@@ -83,66 +83,66 @@ class TestRadqr(unittest.TestCase):
         for x in self.qr_tests:
             # Scheme is should be case-insensitive
             msg = x[0].replace("RADDATA", "raddata")
-            fields = radqr.decode_qr_data(msg)
+            fields = rc_radqr.decode_qr_data(msg)
             self.assertEqual(fields["model"], x[1]["model"])
 
             # "interspec" and "raddata" are both valid schemes
             msg = x[0].replace("RADDATA", "interspec")
-            fields = radqr.decode_qr_data(msg)
+            fields = rc_radqr.decode_qr_data(msg)
             self.assertEqual(fields["model"], x[1]["model"])
 
     def test_radqr_decode_fail(self):
         # Check URI schem
         with self.assertRaises(AttributeError):
             msg = self.qr_tests[0][0].replace("RADDATA", "http")
-            _ = radqr.decode_qr_data(msg)
+            _ = rc_radqr.decode_qr_data(msg)
         with self.assertRaises(AttributeError):
             msg = self.qr_tests[0][0].replace("RADDATA", "Xraddata")
-            _ = radqr.decode_qr_data(msg)
+            _ = rc_radqr.decode_qr_data(msg)
         with self.assertRaises(AttributeError):
             msg = self.qr_tests[0][0].replace("RADDATA", "interspecX")
-            _ = radqr.decode_qr_data(msg)
+            _ = rc_radqr.decode_qr_data(msg)
 
         # Check URI version
         with self.assertRaises(ValueError) as cm:
             msg = self.qr_tests[0][0].replace("/G0/", "/G1/")
-            _ = radqr.decode_qr_data(msg)
+            _ = rc_radqr.decode_qr_data(msg)
         self.assertEqual("Unsupported Version", cm.exception.args[0])
 
         # Check Flags - most of these will throw AttributeError when the regex doesn't match
         with self.assertRaises(AttributeError):
             msg = self.qr_tests[0][0].replace("/000/", "//")  # can't be empty
-            _ = radqr.decode_qr_data(msg)
+            _ = rc_radqr.decode_qr_data(msg)
         with self.assertRaises(AttributeError):
             msg = self.qr_tests[0][0].replace("/000/", "/00/")  # less than 3 characters is too short
-            _ = radqr.decode_qr_data(msg)
+            _ = rc_radqr.decode_qr_data(msg)
         with self.assertRaises(AttributeError):
             msg = self.qr_tests[0][0].replace("/000/", "/00000/")  # more than 4 characters is too long
-            _ = radqr.decode_qr_data(msg)
+            _ = rc_radqr.decode_qr_data(msg)
         with self.assertRaises(AttributeError):
             msg = self.qr_tests[0][0].replace("/000/", "/X000/")  # Only hexchars [0-9a-f]
-            _ = radqr.decode_qr_data(msg)
+            _ = rc_radqr.decode_qr_data(msg)
         with self.assertRaises(ValueError) as cm:
             msg = self.qr_tests[0][0].replace("/000/", "/ffff/")  # undefined flags
-            _ = radqr.decode_qr_data(msg)
+            _ = rc_radqr.decode_qr_data(msg)
         self.assertEqual("Undefined option bits set", cm.exception.args[0])
 
     def test_radqr_encode_fail_bad_times(self):
         with self.assertRaises(ValueError) as cm:
-            radqr.make_qr_payload(lr_times=(1, 0), spectrum=[0])
+            rc_radqr.make_qr_payload(lr_times=(1, 0), spectrum=[0])
         self.assertEqual(cm.exception.args[0], "live time cannot be greater than real time")
 
     def test_radqr_encode_minimum(self):
-        result = radqr.make_qr_payload(lr_times=(0, 0), spectrum=[0], options=radqr.OPT_CSV_SPECTRUM)
+        result = rc_radqr.make_qr_payload(lr_times=(0, 0), spectrum=[0], options=rc_radqr.OPT_CSV_SPECTRUM)
         # my encoder won't use  CountedZeros compression ("RLE0") if it doesn't save space. It will
         # signal this by setting the NO_SPEC_RLE0 option in the return value
-        self.assertEqual(result[0], radqr.OPT_CSV_SPECTRUM | radqr.OPT_NO_SPEC_RLE0)
+        self.assertEqual(result[0], rc_radqr.OPT_CSV_SPECTRUM | rc_radqr.OPT_NO_SPEC_RLE0)
         self.assertEqual(result[1], b"T:0,0 S:0")
 
     def test_radqr_encode_tiny(self):
         # bigger payload, 1024 channels ... all zero
-        options = radqr.OPT_CSV_SPECTRUM | radqr.OPT_NO_DEFLATE | radqr.OPT_NO_BASE_X
-        result = radqr.make_qr_payload(
+        options = rc_radqr.OPT_CSV_SPECTRUM | rc_radqr.OPT_NO_DEFLATE | rc_radqr.OPT_NO_BASE_X
+        result = rc_radqr.make_qr_payload(
             lr_times=(0, 0),
             spectrum=[0] * 1024,
             comments="no comment",
@@ -156,17 +156,17 @@ class TestRadqr(unittest.TestCase):
         lr_times = (0, 0)
         spectrum = [0] * 256
         with self.assertRaises(ValueError):
-            radqr.make_qr_payload(lr_times=[1], spectrum=spectrum)
+            rc_radqr.make_qr_payload(lr_times=[1], spectrum=spectrum)
         with self.assertRaises(ValueError):
-            radqr.make_qr_payload(lr_times=lr_times, spectrum=spectrum, mclass="?")
+            rc_radqr.make_qr_payload(lr_times=lr_times, spectrum=spectrum, mclass="?")
         with self.assertRaises(ValueError):
-            radqr.make_qr_payload(lr_times=lr_times, spectrum=spectrum, neutron_count=-1)
+            rc_radqr.make_qr_payload(lr_times=lr_times, spectrum=spectrum, neutron_count=-1)
         with self.assertRaises(ValueError):
-            radqr.make_qr_payload(lr_times=lr_times, spectrum=spectrum, deviations=[(0, 0), (1,)])
+            rc_radqr.make_qr_payload(lr_times=lr_times, spectrum=spectrum, deviations=[(0, 0), (1,)])
         with self.assertRaises(ValueError):
-            radqr.make_qr_payload(lr_times=lr_times, spectrum=spectrum, deviations="foo")
+            rc_radqr.make_qr_payload(lr_times=lr_times, spectrum=spectrum, deviations="foo")
         with self.assertRaises(ValueError):
-            radqr.make_qr_payload(lr_times=lr_times, spectrum=spectrum, location=[0])
+            rc_radqr.make_qr_payload(lr_times=lr_times, spectrum=spectrum, location=[0])
 
     def test_radqr_encode_full(self):
         # bigger payload, 1024 channels ... all zero
@@ -175,7 +175,7 @@ class TestRadqr(unittest.TestCase):
         timestamp = datetime.datetime(1945, 7, 15, 11, 29, 21)
         tstr = timestamp.strftime("%Y%m%dT%H%M%S")
 
-        result = radqr.make_qr_payload(
+        result = rc_radqr.make_qr_payload(
             lr_times=(0, 0),
             spectrum=[0] * 1024,
             calibration=[1, 2, 3],
@@ -192,11 +192,11 @@ class TestRadqr(unittest.TestCase):
         self.assertIn(member=detector_model.encode(), container=result[1])
         self.assertIn(member=tstr.encode(), container=result[1])
 
-        decoded = radqr.parse_payload_fields(result[1])
+        decoded = rc_radqr.parse_payload_fields(result[1])
         self.assertEqual(decoded["model"], detector_model)
 
     def test_radqr_decode_invalid_field(self):
         # check that invalid fields are rejected
         with self.assertRaises(ValueError) as cm:
-            radqr.parse_payload_fields(b"T:0,0 Z:INVALID S:0")
+            rc_radqr.parse_payload_fields(b"T:0,0 Z:INVALID S:0")
         self.assertEqual(cm.exception.args[0], "Unknown field: Z")

@@ -2,3 +2,4 @@
 # Protection from commiting random garbage test data.
 *
 !*.py
+!radiacode_tools

@@ -8,11 +8,11 @@ import os
 from argparse import ArgumentParser, Namespace
 from io import BytesIO
 from logging import DEBUG, INFO, WARNING, Logger, basicConfig, getLogger
-from re import sub as resub
+from re import sub as re_sub
 
 from flask import Flask, abort, request, send_file
 
-from rcfiles import RcN42, RcSpectrum
+from radiacode_tools.rc_files import RcN42, RcSpectrum
 
 appname = "N42Server"
 logger: Logger = getLogger(appname)
@@ -58,8 +58,8 @@ def handle_convert():
         abort(400)
 
     filename = os.path.basename(upload.filename).removesuffix(".xml")
-    filename = resub("[^a-zA-Z0-9_.-]", "_", filename)
-    filename = resub("_+", "_", filename) + ".n42"
+    filename = re_sub("[^a-zA-Z0-9_.-]", "_", filename)
+    filename = re_sub("_+", "_", filename) + ".n42"
 
     return send_file(
         BytesIO(converted.encode()),

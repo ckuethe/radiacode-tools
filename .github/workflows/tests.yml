@@ -1,0 +1,30 @@
+name: Tests
+
+on:
+  - push
+  - pull_request
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.10']
+    steps:
+    - uses: actions/checkout@v3 # check out this source code
+    
+    - name: Install OS Packages
+      uses: ConorMacBride/install-package@v1
+      with:
+          apt: libglib2.0-dev # needed for radiacode->bluepy
+          
+    - name: Install UV
+      uses: astral-sh/setup-uv@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+        enable-cache: true
+
+    - name: Run tests using ${{ matrix.python-version }}
+      run: |
+        uv sync --all-extras
+        env TZ=UTC uv run --frozen pytest

@@ -11,41 +11,10 @@ from tempfile import mkstemp
 from textwrap import dedent
 from typing import List, Tuple
 
-from rcfiles import RcTrack
-from rctypes import GeoBox, GeoCircle, GeoPoint, TimeRange, TrackPoint
-from rcutils import localtz, timerange
-
-
-def _geobox(s: str) -> GeoBox:
-    "helper to validate a box geometry"
-    points = s.split("~")
-    p0 = [float(f) for f in points[0].split(",")]
-    p1 = [float(f) for f in points[1].split(",")]
-
-    if (
-        True  # just for the formatting
-        and (2 == len(points))
-        and (-90 <= p0[0] <= 90)
-        and (-90 <= p1[0] <= 90)
-        and (-180 <= p0[1] <= 180)
-        and (-180 <= p1[1] <= 180)
-    ):
-        return GeoBox(GeoPoint(*p0), GeoPoint(*p1))
-    raise ValueError
-
-
-def _geocircle(s: str) -> GeoCircle:
-    "helper to validate a geocircle; a radius around a point"
-    rv = [float(f) for f in s.split(",")]
-    if (
-        True
-        and (3 == len(rv))
-        and (-90 <= rv[0] <= 90)
-        and (-180 <= rv[1] <= 180)
-        and (0 < rv[2] <= 40030e3)  # 3.1416 * 2 * 6371km
-    ):
-        return GeoCircle(GeoPoint(rv[0], rv[1]), rv[2])
-    raise ValueError
+from radiacode_tools.rc_files import RcTrack
+from radiacode_tools.rc_types import GeoBox, GeoCircle, TimeRange, TrackPoint
+from radiacode_tools.rc_utils import localtz
+from radiacode_tools.rc_validators import _geobox, _geocircle, _timerange
 
 
 def get_args() -> Namespace:
@@ -94,7 +63,7 @@ def get_args() -> Namespace:
     ap.add_argument(  # -t include-time-range
         "-t",
         "--include-time-range",
-        type=timerange,
+        type=_timerange,
         metavar="TIMERANGE",
         default=[],
         action="append",
@@ -103,7 +72,7 @@ def get_args() -> Namespace:
     ap.add_argument(  # -T exclude-time-range
         "-T",
         "--exclude-time-range",
-        type=timerange,
+        type=_timerange,
         metavar="TIMERANGE",
         default=[],
         action="append",
@@ -212,7 +181,7 @@ def check_geobox(member: TrackPoint, container: GeoBox) -> bool:
         <= max(container.p1.longitude, container.p2.longitude)
     )
     y = (
-        min(container.p1.latitude, container.p2.llatitude)
+        min(container.p1.latitude, container.p2.latitude)
         <= member.longitude
         <= max(container.p1.latitude, container.p2.latitude)
     )
@@ -220,7 +189,7 @@ def check_geobox(member: TrackPoint, container: GeoBox) -> bool:
 
 
 def check_geocircle(member: TrackPoint, container: GeoCircle) -> bool:
-    """
+    r"""
     Check if a point is within a circle
        ________
       /        \
