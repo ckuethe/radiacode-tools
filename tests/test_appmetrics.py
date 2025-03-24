@@ -3,72 +3,73 @@
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syn=python
 # SPDX-License-Identifier: MIT
 
-import unittest
 from time import sleep
+
+import pytest
 
 from radiacode_tools import appmetrics
 
 
-class TestAppMetrics(unittest.TestCase):
-    def test_stub(self):
-        name = "foobar"
-        amx = appmetrics.AppMetrics(stub=True, appname=name)
+@pytest.mark.slow
+def test_stub():
+    name = "foobar"
+    amx = appmetrics.AppMetrics(stub=True, appname=name)
 
-        d = amx.get_stats()
-        self.assertEqual(d["process"]["appname"], name)
-        self.assertGreater(d["process"]["pid"], 0)
+    d = amx.get_stats()
+    assert d["process"]["appname"] == name
+    assert d["process"]["pid"] > 0
 
-        cv = 42
-        cn = "a"
-        amx.counter_create(cn, cv)
-        self.assertEqual(d["counter"][cn], cv)
-        amx.counter_increment(cn)
-        self.assertEqual(d["counter"][cn], cv + 1)
+    cv = 42
+    cn = "a"
+    amx.counter_create(cn, cv)
+    assert d["counter"][cn] == cv
+    amx.counter_increment(cn)
+    assert d["counter"][cn] == cv + 1
 
-        gn = "b"
-        gv = 13
-        amx.gauge_create(gn)
-        self.assertEqual(d["gauge"][gn], 0)
-        amx.gauge_update(gn, gv)
-        self.assertEqual(d["gauge"][gn], gv)
+    gn = "b"
+    gv = 13
+    amx.gauge_create(gn)
+    assert d["gauge"][gn] == 0
+    amx.gauge_update(gn, gv)
+    assert d["gauge"][gn] == gv
 
-        fn = "c"
-        amx.flag_create(fn)
-        self.assertFalse(d["flag"][fn])
-        amx.flag_set(fn)
-        self.assertTrue(d["flag"][fn])
-        amx.flag_clear(fn)
-        self.assertFalse(d["flag"][fn])
+    fn = "c"
+    amx.flag_create(fn)
+    assert d["flag"][fn] is False
+    amx.flag_set(fn)
+    assert d["flag"][fn] is True
+    amx.flag_clear(fn)
+    assert d["flag"][fn] is False
 
-        sleep(0.1)
-        b = amx.get_stats()
-        self.assertEqual(d["process"]["pid"], b["process"]["pid"])
-        # self.assertLess(d["process"]["real"], b["process"]["real"])
+    sleep(0.1)
+    b = amx.get_stats()
+    assert d["process"]["pid"] == b["process"]["pid"]
 
-    def test_errors(self):
-        name = "foobar"
-        amx = appmetrics.AppMetrics(stub=True, appname=name)
 
-        cn = "a"
+def test_errors():
+    name = "foobar"
+    amx = appmetrics.AppMetrics(stub=True, appname=name)
+
+    cn = "a"
+    amx.counter_create(cn)
+    with pytest.raises(ValueError):  # already exists
         amx.counter_create(cn)
-        with self.assertRaises(ValueError):  # already exists
-            amx.counter_create(cn)
-        with self.assertRaises(KeyError):  # doesn't exist
-            amx.counter_decrement("x")
+    with pytest.raises(KeyError):  # doesn't exist
+        amx.counter_decrement("x")
 
-        gn = "b"
+    gn = "b"
+    amx.gauge_create(gn)
+    with pytest.raises(ValueError):  # already exists
         amx.gauge_create(gn)
-        with self.assertRaises(ValueError):  # already exists
-            amx.gauge_create(gn)
-        with self.assertRaises(KeyError):  # doesn't exist
-            amx.gauge_update("x", 0)
+    with pytest.raises(KeyError):  # doesn't exist
+        amx.gauge_update("x", 0)
 
-        fn = "c"
+    fn = "c"
+    amx.flag_create(fn)
+    with pytest.raises(ValueError):  # already exists
         amx.flag_create(fn)
-        with self.assertRaises(ValueError):  # already exists
-            amx.flag_create(fn)
-        with self.assertRaises(KeyError):  # doesn't exist
-            amx.flag_setval("x", True)
+    with pytest.raises(KeyError):  # doesn't exist
+        amx.flag_setval("x", True)
 
-        with self.assertRaises(ValueError):
-            amx._create_metric("invalid", "foo", None)
+    with pytest.raises(ValueError):
+        amx._create_metric("invalid", "foo", None)

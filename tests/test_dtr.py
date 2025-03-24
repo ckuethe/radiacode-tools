@@ -3,34 +3,36 @@
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syn=python
 # SPDX-License-Identifier: MIT
 
-import unittest
 from os.path import dirname
 from os.path import join as pathjoin
 from unittest.mock import patch
 
+import pytest
+
 import recursive_deadtime as dtr
 
 testdir = pathjoin(dirname(__file__), "data_deadtime")
+bg = pathjoin(testdir, "bg.xml")
 
 
-class TestDeadTime(unittest.TestCase):
-    bg = pathjoin(testdir, "bg.xml")
+def test_get_args():
+    with patch("sys.argv", [__file__, "-b", bg, testdir]):
+        args = dtr.get_args()
+        assert args.datadir == testdir
+        assert args.bgfile == bg
 
-    def test_get_args(self):
-        with patch("sys.argv", [__file__, "-b", self.bg, testdir]):
-            args = dtr.get_args()
-            self.assertEqual(args.datadir, testdir)
-            self.assertEqual(args.bgfile, self.bg)
 
-    def test_get_args_fail(self):
-        with patch("sys.argv", [__file__, "--foobar"]):
-            with self.assertRaises(SystemExit):
-                dtr.get_args()
+def test_get_args_fail():
+    with patch("sys.argv", [__file__, "--foobar"]):
+        with pytest.raises(SystemExit):
+            dtr.get_args()
 
-    def test_main_no_bg(self):
-        with patch("sys.argv", [__file__, testdir]):
-            self.assertIsNone(dtr.main())
 
-    def test_main(self):
-        with patch("sys.argv", [__file__, testdir, "-b", self.bg]):
-            self.assertIsNone(dtr.main())
+def test_main_no_bg():
+    with patch("sys.argv", [__file__, testdir]):
+        assert dtr.main() is None
+
+
+def test_main():
+    with patch("sys.argv", [__file__, testdir, "-b", bg]):
+        assert dtr.main() is None
