@@ -1,5 +1,6 @@
 ![Github Tests Workflow](https://github.com/ckuethe/radiacode-tools/actions/workflows/tests.yml/badge.svg)
 ![Codecov Workflow](https://github.com/ckuethe/radiacode-tools/actions/workflows/codecov.yml/badge.svg)
+![Codecov Status](https://codecov.io/gh/ckuethe/radiacode-tools/graph/badge.svg?token=IJIWGVDKTY)
 
 # Radiacode Tools
 
