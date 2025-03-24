@@ -8,99 +8,20 @@ from os.path import join as pathjoin
 
 import pytest
 
-from radiacode_tools import rc_files  # type: ignore
-from radiacode_tools.rc_types import SpectrumLayer  # type: ignore
-from radiacode_tools.rc_utils import _BEGINNING_OF_TIME  # type: ignore
+from radiacode_tools.rc_files import RcN42, RcSpectrum
+from radiacode_tools.rc_types import SpectrumLayer
 
 testdir = pathjoin(dirname(__file__), "data")
 
 
-"Testing the Spectrum interface"
-
-
-def test_rcspectrum():
-    sp = rc_files.RcSpectrum()
-    assert str(sp)
-
-    sp = rc_files.RcSpectrum(pathjoin(testdir, "data_th232_plus_background.xml"))
-    assert str(sp)
-    assert sp.as_dict()
-    # assert (sp.uuid())
-    assert "2b06cd31-3519-2ca8-c6bb-698587cbe3d3" == sp.uuid()
-    assert pytest.approx(153.2, abs=0.1) == sp.count_rate()
-    assert pytest.approx(3.5, abs=0.1) == sp.count_rate(bg=True)
-    sp.write_file("/dev/null")
-
-
-def test_rcspectrum_invalid():
-    with pytest.raises(ValueError):
-        rc_files.RcSpectrum(pathjoin(testdir, "data_invalid_spectrum.xml"))
-
-
-def test_rcspectrum_incorrect_order():
-    with pytest.raises(ValueError):
-        rc_files.RcSpectrum(pathjoin(testdir, "data_invalid_cal_incorrect_order.xml"))
-
-
-def test_rcspectrum_inconsistent():
-    with pytest.raises(ValueError):
-        rc_files.RcSpectrum(pathjoin(testdir, "data_invalid_cal_inconsistent_order.xml"))
-
-
-"Test the Spectrogram interface"
-
-
-@pytest.mark.slow
-def test_rcspg():
-    spg = rc_files.RcSpectrogram(pathjoin(testdir, "K40.rcspg"))
-    assert spg.name
-    assert str(spg)
-    spg.write_file("/dev/null")
-
-    spg2 = rc_files.RcSpectrogram()
-    spg2.add_calibration(spg.calibration)
-    # spg2.historical_spectrum = spg.historical_spectrum
-    _ = [spg2.add_point(timestamp=s.datetime, counts=s.counts) for s in spg.samples if len(s.counts) == spg.channels]
-    assert len(spg2.samples) > len(spg.samples) // 2
-
-
-"Test the Track interface"
-
-
-def test_rctrk():
-    tk = rc_files.RcTrack()
-    tk.add_point(dt=_BEGINNING_OF_TIME, latitude=0.0, longitude=0.0, accuracy=1.0, dose_rate=1.0, count_rate=1.0)
-    assert str(tk)
-    assert len(tk.points) == 1
-    tk.write_file("/dev/null")
-
-
-def test_rctrk_dict_roundtrip():
-    tk1 = rc_files.RcTrack(pathjoin(testdir, "walk.rctrk"))
-    tk2 = rc_files.RcTrack()
-
-    tk2.from_dict(tk1.as_dict())
-    assert len(tk1.points) == len(tk2.points)
-    assert tk1.points[0].datetime.timestamp() == tk2.points[0].datetime.timestamp()
-
-
-def test_rctrk_bogus():
-    tk = rc_files.RcTrack()
-    with pytest.raises(ValueError):
-        tk.from_dict(dict())
-
-
-"Test the N42 interface"
-
-
 def test_n42():
-    n42 = rc_files.RcN42(pathjoin(testdir, "data_am241.n42"))
+    n42 = RcN42(pathjoin(testdir, "data_am241.n42"))
     assert str(n42)
 
 
 def test_n42_from_spectrum():
-    n42 = rc_files.RcN42()
-    sp = rc_files.RcSpectrum(pathjoin(testdir, "data_th232_plus_background.xml"))
+    n42 = RcN42()
+    sp = RcSpectrum(pathjoin(testdir, "data_th232_plus_background.xml"))
     n42.from_rcspectrum(sp)
     assert n42.serial_number == "RC-102-000115"
     assert n42.rad_detector_information["RadDetectorKindCode"] == "CsI"
@@ -115,14 +36,14 @@ def test_n42_from_spectrum():
 
 def test_n42_invalid():
     with pytest.raises(Exception):
-        rc_files.RcN42(pathjoin(testdir, "data_invalid.n42"))
+        RcN42(pathjoin(testdir, "data_invalid.n42"))
 
 
 def test_n42_creation_errors():
-    thx = rc_files.RcSpectrum(pathjoin(testdir, "data_th232_plus_background.xml"))
+    thx = RcSpectrum(pathjoin(testdir, "data_th232_plus_background.xml"))
 
-    n42 = rc_files.RcN42()
-    sp = rc_files.RcSpectrum()
+    n42 = RcN42()
+    sp = RcSpectrum()
 
     ### missing layer ###
     with pytest.raises(AttributeError):
