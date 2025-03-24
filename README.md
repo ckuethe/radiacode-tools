@@ -1,3 +1,5 @@
+![Github Tests Workflow](https://github.com/ckuethe/radiacode-tools/actions/workflows/tests.yml/badge.svg)
+
 # Radiacode Tools
 
 Just some things for working with my RadiaCode devices from Scan-Electronics.
