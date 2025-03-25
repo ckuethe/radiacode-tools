@@ -54,6 +54,7 @@ def get_args() -> Namespace:
         metavar="Y-M-DTh:m:s~Y-M-DTh:m:s",
         help="select spectrogram sample by absolute timestamp",
     )
+    ap.add_argument("--plot-nonblocking", default=True, action="store_false", dest="blocking")
 
     ap.add_argument(
         "--palette",
@@ -125,7 +126,8 @@ def plot_spectrogram(
     if args.output_file != "/dev/null":
         plt.savefig(args.output_file)
         print(f"saved image in {args.output_file}")
-    plt.show()
+
+    plt.show(block=args.blocking)
 
 
 def load_spectrogram_from_ndjson(args: Namespace) -> RcSpectrogram:
