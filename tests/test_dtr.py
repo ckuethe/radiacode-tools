@@ -5,7 +5,6 @@
 
 from os.path import dirname
 from os.path import join as pathjoin
-from unittest.mock import patch
 
 import pytest
 
@@ -15,24 +14,24 @@ testdir = pathjoin(dirname(__file__), "data_deadtime")
 bg = pathjoin(testdir, "bg.xml")
 
 
-def test_get_args():
-    with patch("sys.argv", [__file__, "-b", bg, testdir]):
-        args = dtr.get_args()
-        assert args.datadir == testdir
-        assert args.bgfile == bg
+def test_get_args(monkeypatch):
+    monkeypatch.setattr("sys.argv", [__file__, "-b", bg, testdir])
+    args = dtr.get_args()
+    assert args.datadir == testdir
+    assert args.bgfile == bg
 
 
-def test_get_args_fail():
-    with patch("sys.argv", [__file__, "--foobar"]):
-        with pytest.raises(SystemExit):
-            dtr.get_args()
+def test_get_args_fail(monkeypatch):
+    monkeypatch.setattr("sys.argv", [__file__, "--foobar"])
+    with pytest.raises(SystemExit):
+        dtr.get_args()
 
 
-def test_main_no_bg():
-    with patch("sys.argv", [__file__, testdir]):
-        assert dtr.main() is None
+def test_main_no_bg(monkeypatch):
+    monkeypatch.setattr("sys.argv", [__file__, testdir])
+    assert dtr.main() is None
 
 
-def test_main():
-    with patch("sys.argv", [__file__, testdir, "-b", bg]):
-        assert dtr.main() is None
+def test_main(monkeypatch):
+    monkeypatch.setattr("sys.argv", [__file__, testdir, "-b", bg])
+    assert dtr.main() is None

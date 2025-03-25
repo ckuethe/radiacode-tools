@@ -6,7 +6,6 @@
 from datetime import datetime
 from os.path import dirname
 from os.path import join as pathjoin
-from unittest.mock import patch
 
 import pytest
 
@@ -25,16 +24,16 @@ from track_edit import (
 )
 
 
-def test_argparse_no_args():
-    with patch("sys.argv", [__file__]):
-        with pytest.raises(SystemExit):
-            get_args()
+def test_argparse_no_args(monkeypatch):
+    monkeypatch.setattr("sys.argv", [__file__])
+    with pytest.raises(SystemExit):
+        get_args()
 
 
-def test_argparse_filename():
-    with patch("sys.argv", [__file__, testfile]):
-        a = get_args()
-        assert testfile == a.filename
+def test_argparse_filename(monkeypatch):
+    monkeypatch.setattr("sys.argv", [__file__, testfile])
+    a = get_args()
+    assert testfile == a.filename
 
 
 def test_earthdistance1():
@@ -106,106 +105,106 @@ def test_timeranges():
         check_timeranges(tp_in, containers[0])
 
 
-def test_edit_track_noop():
-    with patch("sys.argv", [__file__, testfile]):
-        args = get_args()
-        track = RcTrack(args.filename)
-        a, b = edit_track(args, track)
-        assert a == b
-        assert b > 0
+def test_edit_track_noop(monkeypatch):
+    monkeypatch.setattr("sys.argv", [__file__, testfile])
+    args = get_args()
+    track = RcTrack(args.filename)
+    a, b = edit_track(args, track)
+    assert a == b
+    assert b > 0
 
 
-def test_edit_track_exclude_timerange_all():
-    with patch("sys.argv", [__file__, "-n", "exclude_timerange_test", "-T", "~", testfile]):
-        args = get_args()
-        track = RcTrack(args.filename)
-        a, b = edit_track(args, track)
-        assert 0 == b
+def test_edit_track_exclude_timerange_all(monkeypatch):
+    monkeypatch.setattr("sys.argv", [__file__, "-n", "exclude_timerange_test", "-T", "~", testfile])
+    args = get_args()
+    track = RcTrack(args.filename)
+    a, b = edit_track(args, track)
+    assert 0 == b
 
 
-def test_edit_track_exclude_timerange_none():
-    with patch("sys.argv", [__file__, "-n", "exclude_timerange_test", "-T", "~2000-01-01T00:00:00Z", testfile]):
-        args = get_args()
-        track = RcTrack(args.filename)
-        a, b = edit_track(args, track)
-        assert a == b
+def test_edit_track_exclude_timerange_none(monkeypatch):
+    monkeypatch.setattr("sys.argv", [__file__, "-n", "exclude_timerange_test", "-T", "~2000-01-01T00:00:00Z", testfile])
+    args = get_args()
+    track = RcTrack(args.filename)
+    a, b = edit_track(args, track)
+    assert a == b
 
 
-def test_edit_track_include_timerange_all():
-    with patch("sys.argv", [__file__, "-n", "include_timerange_test", "-t", "~", testfile]):
-        args = get_args()
-        track = RcTrack(args.filename)
-        a, b = edit_track(args, track)
-        assert a == b
+def test_edit_track_include_timerange_all(monkeypatch):
+    monkeypatch.setattr("sys.argv", [__file__, "-n", "include_timerange_test", "-t", "~", testfile])
+    args = get_args()
+    track = RcTrack(args.filename)
+    a, b = edit_track(args, track)
+    assert a == b
 
 
-def test_edit_track_include_timerange_none():
-    with patch("sys.argv", [__file__, "-n", "include_timerange_test", "-t", "~2000-01-01T00:00:00Z", testfile]):
-        args = get_args()
-        track = RcTrack(args.filename)
-        a, b = edit_track(args, track)
-        assert 0 == b
+def test_edit_track_include_timerange_none(monkeypatch):
+    monkeypatch.setattr("sys.argv", [__file__, "-n", "include_timerange_test", "-t", "~2000-01-01T00:00:00Z", testfile])
+    args = get_args()
+    track = RcTrack(args.filename)
+    a, b = edit_track(args, track)
+    assert 0 == b
 
 
-def test_edit_track_include_geocircle_all():
-    with patch("sys.argv", [__file__, "-n", "include_geocircle_test", "-r", "0,0,1000", testfile]):
-        args = get_args()
-        track = RcTrack(args.filename)
-        a, b = edit_track(args, track)
-        assert a == b
+def test_edit_track_include_geocircle_all(monkeypatch):
+    monkeypatch.setattr("sys.argv", [__file__, "-n", "include_geocircle_test", "-r", "0,0,1000", testfile])
+    args = get_args()
+    track = RcTrack(args.filename)
+    a, b = edit_track(args, track)
+    assert a == b
 
 
-def test_edit_track_include_geocircle_none():
-    with patch("sys.argv", [__file__, "-n", "include_geocircle_test", "-r", "1,1,1000", testfile]):
-        args = get_args()
-        track = RcTrack(args.filename)
-        a, b = edit_track(args, track)
-        assert 0 == b
+def test_edit_track_include_geocircle_none(monkeypatch):
+    monkeypatch.setattr("sys.argv", [__file__, "-n", "include_geocircle_test", "-r", "1,1,1000", testfile])
+    args = get_args()
+    track = RcTrack(args.filename)
+    a, b = edit_track(args, track)
+    assert 0 == b
 
 
-def test_edit_track_exclude_geocircle_all():
-    with patch("sys.argv", [__file__, "-n", "exclude_geocircle_test", "-R", "0,0,1000", testfile]):
-        args = get_args()
-        track = RcTrack(args.filename)
-        a, b = edit_track(args, track)
-        assert 0 == b
+def test_edit_track_exclude_geocircle_all(monkeypatch):
+    monkeypatch.setattr("sys.argv", [__file__, "-n", "exclude_geocircle_test", "-R", "0,0,1000", testfile])
+    args = get_args()
+    track = RcTrack(args.filename)
+    a, b = edit_track(args, track)
+    assert 0 == b
 
 
-def test_edit_track_exclude_geocircle_none():
-    with patch("sys.argv", [__file__, "-n", "exclude_geocircle_test", "-R", "1,1,1000", testfile]):
-        args = get_args()
-        track = RcTrack(args.filename)
-        a, b = edit_track(args, track)
-        assert a == b
+def test_edit_track_exclude_geocircle_none(monkeypatch):
+    monkeypatch.setattr("sys.argv", [__file__, "-n", "exclude_geocircle_test", "-R", "1,1,1000", testfile])
+    args = get_args()
+    track = RcTrack(args.filename)
+    a, b = edit_track(args, track)
+    assert a == b
 
 
-def test_edit_track_include_geobox_all():
-    with patch("sys.argv", [__file__, "-n", "include_geobox_test", "-g", "0,0~1,1", testfile]):
-        args = get_args()
-        track = RcTrack(args.filename)
-        a, b = edit_track(args, track)
-        assert a == b
+def test_edit_track_include_geobox_all(monkeypatch):
+    monkeypatch.setattr("sys.argv", [__file__, "-n", "include_geobox_test", "-g", "0,0~1,1", testfile])
+    args = get_args()
+    track = RcTrack(args.filename)
+    a, b = edit_track(args, track)
+    assert a == b
 
 
-def test_edit_track_include_geobox_none():
-    with patch("sys.argv", [__file__, "-n", "include_geobox_test", "-g", "1,1~2,2", testfile]):
-        args = get_args()
-        track = RcTrack(args.filename)
-        a, b = edit_track(args, track)
-        assert 0 == b
+def test_edit_track_include_geobox_none(monkeypatch):
+    monkeypatch.setattr("sys.argv", [__file__, "-n", "include_geobox_test", "-g", "1,1~2,2", testfile])
+    args = get_args()
+    track = RcTrack(args.filename)
+    a, b = edit_track(args, track)
+    assert 0 == b
 
 
-def test_edit_track_exclude_geobox_all():
-    with patch("sys.argv", [__file__, "-n", "exclude_geobox_test", "-G", "0,0~1,1", testfile]):
-        args = get_args()
-        track = RcTrack(args.filename)
-        a, b = edit_track(args, track)
-        assert 0 == b
+def test_edit_track_exclude_geobox_all(monkeypatch):
+    monkeypatch.setattr("sys.argv", [__file__, "-n", "exclude_geobox_test", "-G", "0,0~1,1", testfile])
+    args = get_args()
+    track = RcTrack(args.filename)
+    a, b = edit_track(args, track)
+    assert 0 == b
 
 
-def test_edit_track_exclude_geobox_none():
-    with patch("sys.argv", [__file__, "-n", "exclude_geobox_test", "-G", "1,1~2,2", testfile]):
-        args = get_args()
-        track = RcTrack(args.filename)
-        a, b = edit_track(args, track)
-        assert a == b
+def test_edit_track_exclude_geobox_none(monkeypatch):
+    monkeypatch.setattr("sys.argv", [__file__, "-n", "exclude_geobox_test", "-G", "1,1~2,2", testfile])
+    args = get_args()
+    track = RcTrack(args.filename)
+    a, b = edit_track(args, track)
+    assert a == b

@@ -6,7 +6,6 @@
 import datetime
 from argparse import Namespace
 from collections import namedtuple
-from unittest.mock import patch
 
 import pytest
 
@@ -18,38 +17,39 @@ a = [-10, 2.5, 4.5e-4]
 channels = 1024
 
 
-def test_get_args():
+def test_get_args(monkeypatch):
     # arbitrary
-    with patch(
+    monkeypatch.setattr(
         "sys.argv",
         [__file__, "-a", "-d", devs[0], "-d", devs[1], "-d", devs[2], "-i", "60"],
-    ):
-        args = rcmultispg.get_args()
-        assert args.require_all is True
-        assert len(args.devs) == 3
-        assert args.interval == 60
+    )
+    args = rcmultispg.get_args()
+    assert args.require_all is True
+    assert len(args.devs) == 3
+    assert args.interval == 60
 
     # deduplicate devices, clamp polling time
-    with patch(
+    monkeypatch.setattr(
         "sys.argv",
         [__file__, "-d", devs[1], "-d", devs[2], "-d", devs[1], "-i", "0"],
-    ):
-        args = rcmultispg.get_args()
-        assert args.require_all is False
-        assert len(args.devs) == 2
-        assert args.interval == 0.5
+    )
+    args = rcmultispg.get_args()
+    assert args.require_all is False
+    assert len(args.devs) == 2
+    assert args.interval == 0.5
 
     # Reject negative times
-    with patch("sys.argv", [__file__, "-i", "-10"]), pytest.raises(SystemExit):
+    monkeypatch.setattr("sys.argv", [__file__, "-i", "-10"])
+    with pytest.raises(SystemExit):
         args = rcmultispg.get_args()
 
 
-def test_get_radiacode_devices():
+def test_get_radiacode_devices(monkeypatch):
     FakeUsb = namedtuple("FakeUsb", ["serial_number"])
 
-    with patch("usb.core.find", return_value=[FakeUsb(x) for x in devs]):
-        found_devs = rcmultispg.find_radiacode_devices()
-        assert devs == found_devs
+    monkeypatch.setattr("usb.core.find", lambda idVendor, idProduct, find_all: [FakeUsb(x) for x in devs])
+    found_devs = rcmultispg.find_radiacode_devices()
+    assert devs == found_devs
 
 
 # def test_save_data():
@@ -90,17 +90,17 @@ def test_get_radiacode_devices():
 #     # wr_calls[2].assert_called_with(payload)
 
 
-def test_main_fails():
+def test_main_fails(monkeypatch):
     FakeUsb = namedtuple("FakeUsb", ["serial_number"])
 
-    with (
-        patch("sys.argv", [__file__, "-a", "-d", devs[0]]),
-        patch("usb.core.find", return_value=[FakeUsb(x) for x in devs[1:]]),
-        pytest.raises(SystemExit),
-    ):
+    monkeypatch.setattr("sys.argv", [__file__, "-a", "-d", devs[0]])
+    monkeypatch.setattr("usb.core.find", lambda: [FakeUsb(x) for x in devs[1:]])
+    with pytest.raises(SystemExit):
         rcmultispg.main()
 
-    with patch("sys.argv", [__file__, "-i", "1"]), patch("usb.core.find", return_value=[]), pytest.raises(SystemExit):
+    monkeypatch.setattr("sys.argv", [__file__, "-i", "1"])
+    monkeypatch.setattr("usb.core.find", lambda: [])
+    with pytest.raises(SystemExit):
         rcmultispg.main()
 
 

@@ -8,7 +8,6 @@ import sys
 from io import StringIO
 from os.path import dirname
 from os.path import join as pathjoin
-from unittest.mock import patch
 
 import pytest
 from radiacode.types import Spectrum
@@ -37,14 +36,14 @@ def fake_time_time():
 test_timeofday = fake_time_time()
 
 
-def test_get_args():
-    with patch("sys.argv", [__file__, "-u", "--accumulate-dose", "10"]):
-        args = radiacode_poll.get_args()
-        assert args.url is True
+def test_get_args(monkeypatch):
+    monkeypatch.setattr("sys.argv", [__file__, "-u", "--accumulate-dose", "10"])
+    args = radiacode_poll.get_args()
+    assert args.url is True
 
-    with patch("sys.argv", [__file__, "-u", "--accumulate-dose", "0"]), pytest.raises(SystemExit):
+    monkeypatch.setattr("sys.argv", [__file__, "-u", "--accumulate-dose", "0"])
+    with pytest.raises(SystemExit):
         args = radiacode_poll.get_args()
-        assert args.url is True
 
 
 def test_accumulated_dose():
@@ -59,10 +58,10 @@ def test_accumulated_dose():
     assert pytest.approx(303.20, abs=1e-2) == get_dose_from_spectrum(s.counts, s.a0, s.a1, s.a2)
 
 
-def test_main():
-    with patch("sys.stdout", new=StringIO()) as mock_stdout:
-        with patch("radiacode.RadiaCode", MockRadiaCode):
-            with patch("sys.argv", [__file__, "-u", "--reset-spectrum", "--reset-dose"]):
-                assert radiacode_poll.main() is None
+def test_main(monkeypatch):
+    monkeypatch.setattr(sys, "stdout", StringIO())
+    monkeypatch.setattr("radiacode.RadiaCode", MockRadiaCode)
+    monkeypatch.setattr("sys.argv", [__file__, "-u", "--reset-spectrum", "--reset-dose"])
+    assert radiacode_poll.main() is None
     expected = "RADDATA://G0/0400/6BFH"
-    assert expected in mock_stdout.getvalue()
+    assert expected in sys.stdout.getvalue()

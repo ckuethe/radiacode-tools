@@ -5,7 +5,6 @@
 
 from os.path import dirname
 from os.path import join as pathjoin
-from unittest.mock import patch
 
 import pytest
 
@@ -15,20 +14,20 @@ testfile = pathjoin(testdir, "xray.ndjson")
 import rcspg_from_json
 
 
-def test_argparse_no_args():
-    with patch("sys.argv", [__file__, "-o", ""]):
-        a = rcspg_from_json.get_args()
-        assert a.input == "/dev/stdin"
-        assert a.output == "/dev/stdout"
+def test_argparse_no_args(monkeypatch):
+    monkeypatch.setattr("sys.argv", [__file__, "-o", ""])
+    a = rcspg_from_json.get_args()
+    assert a.input == "/dev/stdin"
+    assert a.output == "/dev/stdout"
 
 
-def test_argparse_default():
-    with patch("sys.argv", [__file__, "-i", testfile]):
-        a = rcspg_from_json.get_args()
-        assert a.input == testfile
+def test_argparse_default(monkeypatch):
+    monkeypatch.setattr("sys.argv", [__file__, "-i", testfile])
+    a = rcspg_from_json.get_args()
+    assert a.input == testfile
 
 
 @pytest.mark.slow
-def test_main():
-    with patch("sys.argv", [__file__, "-i", testfile, "-o", "-"]):
-        assert rcspg_from_json.main() is None
+def test_main(monkeypatch):
+    monkeypatch.setattr("sys.argv", [__file__, "-i", testfile, "-o", "-"])
+    assert rcspg_from_json.main() is None

@@ -6,7 +6,6 @@
 import unittest
 from os.path import dirname
 from os.path import join as pathjoin
-from unittest.mock import patch
 
 import pytest
 
@@ -53,39 +52,39 @@ class TestN42Www(unittest.TestCase):
             self.assertEqual(response.status_code, 400)
 
 
-def test_main():
-    with patch("sys.argv", [__file__, "-vvv", "-b", "255.255.255.255", "-p", "1"]):
-        with pytest.raises(SystemExit):
-            n42www.main()
-    with patch("sys.argv", [__file__, "-v", "-b", "255.255.255.255", "-p", "1"]):
-        with pytest.raises(SystemExit):
-            n42www.main()
-    with patch("sys.argv", [__file__, "-b", "255.255.255.255", "-p", "1"]):
-        with pytest.raises(SystemExit):
-            n42www.main()
+def test_main(monkeypatch):
+    monkeypatch.setattr("sys.argv", [__file__, "-vvv", "-b", "255.255.255.255", "-p", "1"])
+    with pytest.raises(SystemExit):
+        n42www.main()
+    monkeypatch.setattr("sys.argv", [__file__, "-v", "-b", "255.255.255.255", "-p", "1"])
+    with pytest.raises(SystemExit):
+        n42www.main()
+    monkeypatch.setattr("sys.argv", [__file__, "-b", "255.255.255.255", "-p", "1"])
+    with pytest.raises(SystemExit):
+        n42www.main()
 
 
-def test_argparse_invalid_port():
-    with patch("sys.argv", [__file__, "-p", "1000000"]):
-        with pytest.raises(SystemExit):
-            n42www.get_args()
+def test_argparse_invalid_port(monkeypatch):
+    monkeypatch.setattr("sys.argv", [__file__, "-p", "1000000"])
+    with pytest.raises(SystemExit):
+        n42www.get_args()
 
 
-def test_argparse_no_args():
-    with patch("sys.argv", [__file__]):
-        parsed_args = n42www.get_args()
-        assert parsed_args.bind_addr == "127.0.0.1"
-        assert parsed_args.port == 6853
-        assert parsed_args.max_size == 128 * 1024
+def test_argparse_no_args(monkeypatch):
+    monkeypatch.setattr("sys.argv", [__file__])
+    parsed_args = n42www.get_args()
+    assert parsed_args.bind_addr == "127.0.0.1"
+    assert parsed_args.port == 6853
+    assert parsed_args.max_size == 128 * 1024
 
 
-def test_argparse_has_args():
+def test_argparse_has_args(monkeypatch):
     addr = "0.0.0.0"
     port = 4242
     size = 160000
-    with patch("sys.argv", [__file__, "-b", addr, "-p", str(port), "-m", str(size), "-vvv"]):
-        parsed_args = n42www.get_args()
-        assert parsed_args.bind_addr == addr
-        assert parsed_args.port == port
-        assert parsed_args.max_size == size
-        assert parsed_args.verbose == 3
+    monkeypatch.setattr("sys.argv", [__file__, "-b", addr, "-p", str(port), "-m", str(size), "-vvv"])
+    parsed_args = n42www.get_args()
+    assert parsed_args.bind_addr == addr
+    assert parsed_args.port == port
+    assert parsed_args.max_size == size
+    assert parsed_args.verbose == 3

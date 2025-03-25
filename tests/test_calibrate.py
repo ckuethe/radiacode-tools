@@ -7,29 +7,28 @@ import json
 import os
 from argparse import Namespace
 from tempfile import mkstemp
-from unittest.mock import patch
 
 import pytest
 
 import calibrate
 
 
-def test_argparse_fail():
-    with patch("sys.argv", [__file__, "-o", "-1"]):
-        with pytest.raises(SystemExit):
-            calibrate.get_args()
+def test_argparse_fail(monkeypatch):
+    monkeypatch.setattr("sys.argv", [__file__, "-o", "-1"])
+    with pytest.raises(SystemExit):
+        calibrate.get_args()
 
 
-def test_argparse_fail2():
-    with patch("sys.argv", [__file__, "-o", "2.5"]):
-        with pytest.raises(SystemExit):
-            calibrate.get_args()
+def test_argparse_fail2(monkeypatch):
+    monkeypatch.setattr("sys.argv", [__file__, "-o", "2.5"])
+    with pytest.raises(SystemExit):
+        calibrate.get_args()
 
 
-def test_argparse():
-    with patch("sys.argv", [__file__, "-o", "2"]):
-        parsed_args = calibrate.get_args()
-        assert parsed_args.order == 2
+def test_argparse(monkeypatch):
+    monkeypatch.setattr("sys.argv", [__file__, "-o", "2"])
+    parsed_args = calibrate.get_args()
+    assert parsed_args.order == 2
 
 
 def test_load_calibration_devnull_fail():
@@ -52,7 +51,7 @@ def test_cal_file_unconfigured_fail():
     os.unlink(cal_file)
 
 
-def test_cal_file():
+def test_cal_file(monkeypatch):
     fd, cal_file = mkstemp(prefix="pytest")
     os.close(fd)
     args = Namespace(cal_file=cal_file, order=2, precision=8, zero_start=True)
@@ -88,16 +87,16 @@ def test_cal_file():
     rsq = calibrate.rsquared(chan, energy, pf)
     assert pytest.approx(rsq, rel=1e-5) == expected_rsq  #
 
-    with patch("sys.argv", [__file__, "-f", cal_file]):
-        assert calibrate.main() is None
+    monkeypatch.setattr("sys.argv", [__file__, "-f", cal_file])
+    assert calibrate.main() is None
 
     os.unlink(cal_file)
 
 
-def test_main_file():
+def test_main_file(monkeypatch):
     with pytest.raises(SystemExit):
-        with patch("sys.argv", [__file__, "-f", "/dev/null"]):
-            calibrate.main()
+        monkeypatch.setattr("sys.argv", [__file__, "-f", "/dev/null"])
+        calibrate.main()
     with pytest.raises(SystemExit):
-        with patch("sys.argv", [__file__, "-f", "./nonexistent"]):
-            calibrate.main()
+        monkeypatch.setattr("sys.argv", [__file__, "-f", "./nonexistent"])
+        calibrate.main()

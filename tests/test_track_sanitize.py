@@ -5,7 +5,6 @@
 
 from os.path import dirname
 from os.path import join as pathjoin
-from unittest.mock import patch
 
 import pytest
 
@@ -16,16 +15,16 @@ from radiacode_tools.rc_files import RcTrack
 from track_sanitize import RangeFinder, get_args, sanitize
 
 
-def test_argparse_no_args():
-    with patch("sys.argv", [__file__]):
-        with pytest.raises(SystemExit):
-            get_args()
+def test_argparse_no_args(monkeypatch):
+    monkeypatch.setattr("sys.argv", [__file__])
+    with pytest.raises(SystemExit):
+        get_args()
 
 
-def test_default_sanitize():
-    with patch("sys.argv", [__file__, testfile]):
-        a = get_args()
-        assert testfile == a.files[0]
+def test_default_sanitize(monkeypatch):
+    monkeypatch.setattr("sys.argv", [__file__, testfile])
+    a = get_args()
+    assert testfile == a.files[0]
 
     track = RcTrack(a.files[0])
 
@@ -50,10 +49,10 @@ def test_default_sanitize():
     assert rf_time.min_val == a.start_time
 
 
-def test_limited_sanitize():
-    with patch("sys.argv", [__file__, "-CNS", testfile]):
-        a = get_args()
-        assert testfile == a.files[0]
+def test_limited_sanitize(monkeypatch):
+    monkeypatch.setattr("sys.argv", [__file__, "-CNS", testfile])
+    a = get_args()
+    assert testfile == a.files[0]
 
     track = RcTrack(a.files[0])
     orig_comment = track.comment

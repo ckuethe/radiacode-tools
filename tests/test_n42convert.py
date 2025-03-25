@@ -5,7 +5,6 @@
 
 from os.path import dirname
 from os.path import join as pathjoin
-from unittest.mock import patch
 
 import pytest
 
@@ -45,28 +44,28 @@ def test_load_spectrum_filename():
     )
 
 
-def test_argparse_no_uuid():
-    with patch("sys.argv", [__file__, "-i", INPUTFILE, "-b", BGFILE, "-o", OUTPUTFILE]):
-        parsed_args = n42convert.get_args()
-        assert parsed_args.input == INPUTFILE
-        assert parsed_args.background == BGFILE
-        assert parsed_args.output == OUTPUTFILE
-        assert parsed_args.uuid is None
+def test_argparse_no_uuid(monkeypatch):
+    monkeypatch.setattr("sys.argv", [__file__, "-i", INPUTFILE, "-b", BGFILE, "-o", OUTPUTFILE])
+    parsed_args = n42convert.get_args()
+    assert parsed_args.input == INPUTFILE
+    assert parsed_args.background == BGFILE
+    assert parsed_args.output == OUTPUTFILE
+    assert parsed_args.uuid is None
 
 
-def test_argparse_has_uuid():
-    with patch("sys.argv", [__file__, "-i", INPUTFILE, "-b", BGFILE, "-o", OUTPUTFILE, "-u", UUID]):
-        parsed_args = n42convert.get_args()
-        assert str(parsed_args.uuid) == UUID
+def test_argparse_has_uuid(monkeypatch):
+    monkeypatch.setattr("sys.argv", [__file__, "-i", INPUTFILE, "-b", BGFILE, "-o", OUTPUTFILE, "-u", UUID])
+    parsed_args = n42convert.get_args()
+    assert str(parsed_args.uuid) == UUID
 
 
-def test_argparse_empty_uuid():
-    with patch("sys.argv", [__file__, "-i", INPUTFILE, "-b", BGFILE, "-o", OUTPUTFILE, "-u", ""]):
-        parsed_args = n42convert.get_args()
-        assert parsed_args.uuid is None
+def test_argparse_empty_uuid(monkeypatch):
+    monkeypatch.setattr("sys.argv", [__file__, "-i", INPUTFILE, "-b", BGFILE, "-o", OUTPUTFILE, "-u", ""])
+    parsed_args = n42convert.get_args()
+    assert parsed_args.uuid is None
 
 
-def test_argparse_invalid_uuid():
-    with patch("sys.argv", [__file__, "-i", INPUTFILE, "-b", BGFILE, "-o", OUTPUTFILE, "-u", NOTUUID]):
-        with pytest.raises(SystemExit):
-            n42convert.get_args()
+def test_argparse_invalid_uuid(monkeypatch):
+    monkeypatch.setattr("sys.argv", [__file__, "-i", INPUTFILE, "-b", BGFILE, "-o", OUTPUTFILE, "-u", NOTUUID])
+    with pytest.raises(SystemExit):
+        n42convert.get_args()

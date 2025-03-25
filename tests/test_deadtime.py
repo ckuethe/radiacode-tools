@@ -5,7 +5,6 @@
 
 from os.path import dirname
 from os.path import join as pathjoin
-from unittest.mock import patch
 
 import pytest
 
@@ -33,56 +32,56 @@ expected_lost_cps = 684
 expected_loss_fraction = 0.07
 
 
-def test_get_args():
+def test_get_args(monkeypatch):
     "does get_args() work?"
-    with patch("sys.argv", [__file__, "-a", f_a, "-b", f_b, "-c", f_ab, "-g", f_bg]):
-        args = deadtime.get_args()
-        assert args.first == f_a
-        assert args.second == f_b
-        assert args.combined == f_ab
-        assert args.background == f_bg
+    monkeypatch.setattr("sys.argv", [__file__, "-a", f_a, "-b", f_b, "-c", f_ab, "-g", f_bg])
+    args = deadtime.get_args()
+    assert args.first == f_a
+    assert args.second == f_b
+    assert args.combined == f_ab
+    assert args.background == f_bg
 
-        # Also check that file vs float input works
-        rates = deadtime.load_spectra(args)
-        # Right now, I don't care how much greater than zero
-        assert rates["a"] > 0
-        assert rates["b"] > 0
-        assert rates["ab"] > 0
-        assert rates["bg"] > 0
+    # Also check that file vs float input works
+    rates = deadtime.load_spectra(args)
+    # Right now, I don't care how much greater than zero
+    assert rates["a"] > 0
+    assert rates["b"] > 0
+    assert rates["ab"] > 0
+    assert rates["bg"] > 0
 
 
-def test_get_args_nobg():
+def test_get_args_nobg(monkeypatch):
     "does get_args() correctly handle no background?"
-    with patch("sys.argv", [__file__, "-a", f_a, "-b", f_b, "-c", f_ab]):
-        args = deadtime.get_args()
-        assert args.first == f_a
-        assert args.second == f_b
-        assert args.combined == f_ab
-        assert args.background is None
+    monkeypatch.setattr("sys.argv", [__file__, "-a", f_a, "-b", f_b, "-c", f_ab])
+    args = deadtime.get_args()
+    assert args.first == f_a
+    assert args.second == f_b
+    assert args.combined == f_ab
+    assert args.background is None
 
 
-def test_get_args_numeric():
-    with patch(
+def test_get_args_numeric(monkeypatch):
+    monkeypatch.setattr(
         "sys.argv",
         [__file__, "-a", f"{r_Ba}", "-b", f"{r_Eu}", "-c", f"{r_Ba_Eu}", "-g", f"{r_bg}"],
-    ):
-        args = deadtime.get_args()
-        assert pytest.approx(float(args.first), abs=1e-5) == r_Ba
-        assert pytest.approx(float(args.second), abs=1e-5) == r_Eu
-        assert pytest.approx(float(args.combined), abs=1e-5) == r_Ba_Eu
-        assert pytest.approx(float(args.background), abs=1e-5) == r_bg
+    )
+    args = deadtime.get_args()
+    assert pytest.approx(float(args.first), abs=1e-5) == r_Ba
+    assert pytest.approx(float(args.second), abs=1e-5) == r_Eu
+    assert pytest.approx(float(args.combined), abs=1e-5) == r_Ba_Eu
+    assert pytest.approx(float(args.background), abs=1e-5) == r_bg
 
     count_rates = deadtime.load_spectra(args)
     dt = deadtime.compute_deadtime(**count_rates)
     assert pytest.approx(dt.dt_us, abs=1e-5) == expected_dt_w_bg
 
 
-def test_get_args_numeric_nobg():
-    with patch(
+def test_get_args_numeric_nobg(monkeypatch):
+    monkeypatch.setattr(
         "sys.argv",
         [__file__, "-a", f"{r_Ba}", "-b", f"{r_Eu}", "-c", f"{r_Ba_Eu}"],
-    ):
-        args = deadtime.get_args()
+    )
+    args = deadtime.get_args()
 
     count_rates = deadtime.load_spectra(args)
     dt = deadtime.compute_deadtime(**count_rates)
@@ -91,10 +90,10 @@ def test_get_args_numeric_nobg():
     assert pytest.approx(dt.lost_cps, abs=0.5) == expected_lost_cps
 
 
-def test_get_args_fail():
-    with patch("sys.argv", [__file__, "-a", f_a, "-b", f_b, "-g", f_bg]):
-        with pytest.raises(SystemExit):
-            deadtime.get_args()
+def test_get_args_fail(monkeypatch):
+    monkeypatch.setattr("sys.argv", [__file__, "-a", f_a, "-b", f_b, "-g", f_bg])
+    with pytest.raises(SystemExit):
+        deadtime.get_args()
 
 
 def test_compute_deadtime_bg_fail():
@@ -107,9 +106,9 @@ def test_compute_deadtime_fg_fail():
         deadtime.compute_deadtime(a=0, b=1, ab=1, bg=0)
 
 
-def test_main():
-    with patch(
+def test_main(monkeypatch):
+    monkeypatch.setattr(
         "sys.argv",
         [__file__, "-a", f"{r_Ba}", "-b", f"{r_Eu}", "-c", f"{r_Ba_Eu}", "-g", f"{r_bg}"],
-    ):
-        assert deadtime.main() is None
+    )
+    assert deadtime.main() is None

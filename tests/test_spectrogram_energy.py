@@ -3,10 +3,10 @@
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syn=python
 # SPDX-License-Identifier: MIT
 
+import sys
 from io import StringIO
 from os.path import dirname
 from os.path import join as pathjoin
-from unittest.mock import patch
 
 import pytest
 
@@ -27,17 +27,17 @@ header_fields = [
 ]
 
 
-def test_argparse_fail():
-    with patch("sys.argv", [__file__, "--foobar"]):
-        with pytest.raises(SystemExit):
-            spectrogram_energy.get_args()
+def test_argparse_fail(monkeypatch):
+    monkeypatch.setattr("sys.argv", [__file__, "--foobar"])
+    with pytest.raises(SystemExit):
+        spectrogram_energy.get_args()
 
 
-def test_argparse():
-    with patch("sys.argv", [__file__, "--recursive", test_dir]):
-        parsed_args = spectrogram_energy.get_args()
-        assert parsed_args.recursive is True
-        assert parsed_args.files == [test_dir]
+def test_argparse(monkeypatch):
+    monkeypatch.setattr("sys.argv", [__file__, "--recursive", test_dir])
+    parsed_args = spectrogram_energy.get_args()
+    assert parsed_args.recursive is True
+    assert parsed_args.files == [test_dir]
 
 
 def test_filetime_to_unixtime():
@@ -86,11 +86,11 @@ def test_load_spectrogram():
 
 
 @pytest.mark.slow
-def test_main():
-    with patch("sys.argv", [__file__, "-v", "-r", test_dir]):
-        with patch("sys.stdout", new=StringIO()) as mock_stdout:
-            with patch("sys.stderr", new=StringIO()) as mock_stderr:
-                spectrogram_energy.main()
+def test_main(monkeypatch):
+    monkeypatch.setattr("sys.argv", [__file__, "-v", "-r", test_dir])
+    monkeypatch.setattr(sys, "stdout", StringIO())
+    monkeypatch.setattr(sys, "stderr", StringIO())
+    spectrogram_energy.main()
 
-    assert "K40.rcspg: 2.12uSv in 43510s" in mock_stdout.getvalue()  # from the K40 spectrogram
-    assert "not enough values to unpack" in mock_stderr.getvalue()  # from all the other test stuff
+    assert "K40.rcspg: 2.12uSv in 43510s" in sys.stdout.getvalue()  # from the K40 spectrogram
+    assert "not enough values to unpack" in sys.stderr.getvalue()  # from all the other test stuff

@@ -5,7 +5,6 @@
 
 from os.path import dirname
 from os.path import join as pathjoin
-from unittest.mock import patch
 
 import pytest
 
@@ -23,16 +22,16 @@ from track_plot import (
 )
 
 
-def test_argparse_no_args():
-    with patch("sys.argv", [__file__]):
-        with pytest.raises(SystemExit):
-            get_args()
+def test_argparse_no_args(monkeypatch):
+    monkeypatch.setattr("sys.argv", [__file__])
+    with pytest.raises(SystemExit):
+        get_args()
 
 
-def test_argparse_default():
-    with patch("sys.argv", [__file__, testfile]):
-        a = get_args()
-        assert a.input_file == testfile
+def test_argparse_default(monkeypatch):
+    monkeypatch.setattr("sys.argv", [__file__, testfile])
+    a = get_args()
+    assert a.input_file == testfile
 
 
 def test_map_ctr():
