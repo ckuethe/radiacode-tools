@@ -80,12 +80,33 @@ def get_args() -> Namespace:
         action="store_true",
         help="Preserve original track name [%(default)s]",
     )
+    ap.add_argument(  # -P allow-unsanitized-position
+        "-P",
+        "--allow-unsanitized-position",
+        default=False,
+        action="store_true",
+        help="Preserve original position measurements [%(default)s]",
+    )
+    ap.add_argument(  # -R reverse-route
+        "-R",
+        "--reverse-route",
+        default=False,
+        action="store_true",
+        help="Reverse the order of the points, eg. northbound becomes southbound, or clockwise becomes counterclockwise [%(default)s]",
+    )
     ap.add_argument(  # -S allow-unsanitized-serial
         "-S",
         "--allow-unsanitized-serial",
         default=False,
         action="store_true",
         help="Preserve original serial number [%(default)s]",
+    )
+    ap.add_argument(  # -S allow-unsanitized-serial
+        "-T",
+        "--allow-unsanitized-time",
+        default=False,
+        action="store_true",
+        help="Preserve original timestamps [%(default)s]",
     )
     ap.add_argument(  # -f force-overwrite
         "-f",
@@ -105,9 +126,21 @@ def get_args() -> Namespace:
     return ap.parse_args()
 
 
+def reverse_route(track: RcTrack) -> None:
+    timestamps = [x.datetime for x in track.points]  # type: ignore
+    track.points.reverse()  # reverse items in place
+    for i, p in enumerate(track.points):
+        # I wish I could do this in-place.
+        track.points[i] = p._replace(datetime=timestamps[i])  # type: ignore
+
+
 def sanitize(args: Namespace, track: RcTrack) -> None:
     """
     Iterate over the points in an RcTrack, and mask the selected data
+
+    This generally works by finding the minimum value of a series, subtracting it
+    to shift the series to start at 0, then adding a new base offset:
+        [5,6,7,8] + -5 -> [0,1,2,3] + 42 -> [42,43,44,45]
     """
     lat_range = RangeFinder("Lat")
     lon_range = RangeFinder("Lon")
@@ -126,16 +159,26 @@ def sanitize(args: Namespace, track: RcTrack) -> None:
     if args.allow_unsanitized_serial is False:
         track.serialnumber = args.serial_number
 
+    start_timestamp = track.points[0].datetime
+    if args.allow_unsanitized_time:
+        args.start_time = start_timestamp
+
     if args.allow_unsanitized_name is False:
         track.name = f"{args.prefix}{header_hash.hexdigest()[:32]}"
 
-    start_timestamp = track.points[0].datetime
+    if args.allow_unsanitized_position:
+        args.base_latitude = lat_range.min_val
+        args.base_longitude = lon_range.min_val
+
     for i, tp in enumerate(track.points):
         track.points[i] = tp._replace(
             datetime=tp.datetime - start_timestamp + args.start_time,
             latitude=round(tp.latitude - lat_range.min_val + args.base_latitude, 7),
             longitude=round(tp.longitude - lon_range.min_val + args.base_longitude, 7),
         )
+
+    if args.reverse_route:
+        reverse_route(track)
 
 
 def main() -> None:
