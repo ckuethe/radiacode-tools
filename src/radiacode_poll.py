@@ -104,7 +104,7 @@ def get_args() -> Namespace:
     rv = ap.parse_args()
 
     # post-processing stages.
-    rv.a = any([rv.accumulate, rv.accumulate_time, rv.accumulate_dose])
+    rv.want_accumulation = any([rv.accumulate, rv.accumulate_time, rv.accumulate_dose])
     if rv.qrcode:
         rv.bgsub = True
 
@@ -129,7 +129,7 @@ def main() -> None:
     obs_start = datetime.utcnow()
     n42_writer = RcN42()
     sp = RcSpectrum()
-    if args.a:  # are we accumulating measurements over time?
+    if args.want_accumulation:  # are we accumulating measurements over time?
         # suppress tqdm warnings when we exceed the expected maximum
         warnings.filterwarnings("ignore", module="tqdm")
         if args.accumulate:  # yep, until ^C
