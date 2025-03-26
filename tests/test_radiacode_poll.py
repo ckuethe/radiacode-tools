@@ -80,6 +80,23 @@ def test_wait_time():
     assert pytest.approx(t_run, abs=1.0) == 2.0
 
 
+@pytest.mark.slow
+def test_wait_dose():
+    dev = MockRadiaCode()
+    m0 = Spectrum(
+        duration=datetime.timedelta(seconds=dev.th232_duration),
+        a0=dev.a0,
+        a1=dev.a1,
+        a2=dev.a2,
+        counts=[0] * len(dev.counts),
+    )
+    args = Namespace(accumulate_dose=0.01)  # there's at least 0.01uSv in this thorium spectrum
+    t_start = datetime.datetime.now().timestamp()
+    assert radiacode_poll.wait_for_dose(args, m0, dev) >= args.accumulate_dose
+    t_run = datetime.datetime.now().timestamp() - t_start
+    assert pytest.approx(t_run, abs=1.0) == 2.0
+
+
 def test_main(monkeypatch):
     monkeypatch.setattr(sys, "stdout", StringIO())
     monkeypatch.setattr("radiacode.RadiaCode", MockRadiaCode)

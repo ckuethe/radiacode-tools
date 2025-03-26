@@ -134,6 +134,29 @@ def wait_for_time(args: Namespace) -> None:
             t.close()
 
 
+def wait_for_dose(args: Namespace, m0: radiacode.Spectrum, dev: radiacode.RadiaCode) -> float:
+    initial_energy = get_dose_from_spectrum(m0.counts, m0.a0, m0.a1, m0.a2)
+    recv_dose = 0.0
+    with tqdm(
+        desc=f"Target Dose ({args.accumulate_dose:.3f}uSv)",
+        unit="uSv",
+        total=round(args.accumulate_dose, 3),
+    ) as t:
+        try:
+            waiting = True
+            while waiting:
+                sleep(1)
+                s = dev.spectrum()
+                recv_dose = get_dose_from_spectrum(s.counts, s.a0, s.a1, s.a2) - initial_energy
+                t.n = round(recv_dose, 3)
+                t.display()
+                if recv_dose >= args.accumulate_dose:
+                    waiting = False
+        except KeyboardInterrupt:
+            t.close()
+    return recv_dose
+
+
 def main() -> None:
     args = get_args()
 
@@ -160,25 +183,7 @@ def main() -> None:
         elif args.accumulate_time:  # yep, for a fixed duration
             wait_for_time(args)
         elif args.accumulate_dose:  # yep, until a set dose is reached
-            e0 = get_dose_from_spectrum(measurement.counts, measurement.a0, measurement.a1, measurement.a2)
-            with tqdm(
-                desc=f"Target Dose ({args.accumulate_dose:.3f}uSv)",
-                unit="uSv",
-                total=round(args.accumulate_dose, 3),
-            ) as t:
-                try:
-                    waiting = True
-                    while waiting:
-                        sleep(1)
-                        s = dev.spectrum()
-                        recv_dose = get_dose_from_spectrum(s.counts, s.a0, s.a1, s.a2) - e0
-                        t.n = round(recv_dose, 3)
-                        t.display()
-                        if recv_dose >= args.accumulate_dose:
-                            waiting = False
-                except KeyboardInterrupt:
-                    t.close()
-
+            wait_for_dose(args, measurement, dev)
         # Cool, we've waited long enough, grab the end spectrum
         measurement1 = dev.spectrum()
 
