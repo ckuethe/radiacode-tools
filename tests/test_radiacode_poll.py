@@ -8,6 +8,7 @@ import sys
 from io import StringIO
 from os.path import dirname
 from os.path import join as pathjoin
+from signal import SIGALRM, alarm, signal
 
 import pytest
 from radiacode.types import Spectrum
@@ -56,6 +57,16 @@ def test_accumulated_dose():
         counts=dev.th232,
     )
     assert pytest.approx(303.20, abs=1e-2) == get_dose_from_spectrum(s.counts, s.a0, s.a1, s.a2)
+
+
+@pytest.mark.slow
+def test_wait():
+    def catch_sigalrm(*unused):
+        raise KeyboardInterrupt
+
+    signal(SIGALRM, catch_sigalrm)
+    alarm(2)
+    assert radiacode_poll.wait_for_keyboard_interrupt() is None
 
 
 def test_main(monkeypatch):

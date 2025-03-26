@@ -111,6 +111,16 @@ def get_args() -> Namespace:
     return rv
 
 
+def wait_for_keyboard_interrupt() -> None:
+    with tqdm(desc="Integration time", unit="s", total=float("inf")) as t:
+        try:
+            while True:
+                sleep(1)
+                t.update()
+        except KeyboardInterrupt:
+            t.close()
+
+
 def main() -> None:
     args = get_args()
 
@@ -132,14 +142,8 @@ def main() -> None:
     if args.want_accumulation:  # are we accumulating measurements over time?
         # suppress tqdm warnings when we exceed the expected maximum
         warnings.filterwarnings("ignore", module="tqdm")
-        if args.accumulate:  # yep, until ^C
-            with tqdm(desc="Integration time", unit="s", total=float("inf")) as t:
-                try:
-                    while True:
-                        sleep(1)
-                        t.update()
-                except KeyboardInterrupt:
-                    t.close()
+        if args.accumulate:
+            wait_for_keyboard_interrupt()
         elif args.accumulate_time:  # yep, for a fixed duration
             tx = dp(args.accumulate_time).time()
             tx = int(timedelta(hours=tx.hour, minutes=tx.minute, seconds=tx.second).total_seconds())
