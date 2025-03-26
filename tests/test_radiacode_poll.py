@@ -5,6 +5,7 @@
 
 import datetime
 import sys
+from argparse import Namespace
 from io import StringIO
 from os.path import dirname
 from os.path import join as pathjoin
@@ -60,13 +61,23 @@ def test_accumulated_dose():
 
 
 @pytest.mark.slow
-def test_wait():
+def test_wait_for_keyboard_interrupt():
     def catch_sigalrm(*unused):
         raise KeyboardInterrupt
 
     signal(SIGALRM, catch_sigalrm)
     alarm(2)
     assert radiacode_poll.wait_for_keyboard_interrupt() is None
+
+
+@pytest.mark.slow
+def test_wait_time():
+    args = Namespace(accumulate_time="0:00:02")
+
+    t_start = datetime.datetime.now().timestamp()
+    assert radiacode_poll.wait_for_time(args) is None
+    t_run = datetime.datetime.now().timestamp() - t_start
+    assert pytest.approx(t_run, abs=1.0) == 2.0
 
 
 def test_main(monkeypatch):

@@ -121,6 +121,19 @@ def wait_for_keyboard_interrupt() -> None:
             t.close()
 
 
+def wait_for_time(args: Namespace) -> None:
+    tx = dp(args.accumulate_time).time()
+    tx = int(timedelta(hours=tx.hour, minutes=tx.minute, seconds=tx.second).total_seconds())
+
+    with tqdm(desc="Integration time", unit="s", total=tx) as t:
+        try:
+            for _ in range(tx):
+                sleep(1)
+                t.update()
+        except KeyboardInterrupt:
+            t.close()
+
+
 def main() -> None:
     args = get_args()
 
@@ -145,16 +158,7 @@ def main() -> None:
         if args.accumulate:
             wait_for_keyboard_interrupt()
         elif args.accumulate_time:  # yep, for a fixed duration
-            tx = dp(args.accumulate_time).time()
-            tx = int(timedelta(hours=tx.hour, minutes=tx.minute, seconds=tx.second).total_seconds())
-
-            with tqdm(desc="Integration time", unit="s", total=tx) as t:
-                try:
-                    for _ in range(tx):
-                        sleep(1)
-                        t.update()
-                except KeyboardInterrupt:
-                    t.close()
+            wait_for_time(args)
         elif args.accumulate_dose:  # yep, until a set dose is reached
             e0 = get_dose_from_spectrum(measurement.counts, measurement.a0, measurement.a1, measurement.a2)
             with tqdm(
