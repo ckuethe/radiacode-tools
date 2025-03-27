@@ -302,19 +302,7 @@ def main() -> None:
     duration = T_end - T_start
     print(f"track times: {T_start} -> {T_end}, duration={duration}")
 
-    backup_file = f"{args.output}~"
-    try:
-        os.unlink(backup_file)
-    except FileNotFoundError:
-        pass
-    try:
-        os.link(args.output, backup_file)
-    except FileNotFoundError:
-        pass
-    tfd, tfn = mkstemp(dir=os.path.dirname(args.filename))
-    os.close(tfd)
-    track.write_file(tfn)
-    os.rename(tfn, args.output)
+    track.write_file(args.output)
 
 
 if __name__ == "__main__":

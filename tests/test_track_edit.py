@@ -21,6 +21,7 @@ from track_edit import (
     earthdistance,
     edit_track,
     get_args,
+    main,
 )
 
 
@@ -103,6 +104,11 @@ def test_timeranges():
     assert any(check_timeranges(tp_out, containers)) is False
     with pytest.raises(ValueError):
         check_timeranges(tp_in, containers[0])
+
+
+def test_edit_main(monkeypatch):
+    monkeypatch.setattr("sys.argv", [__file__, "-o", "/dev/null", testfile])
+    assert main() is None
 
 
 def test_edit_track_noop(monkeypatch):
