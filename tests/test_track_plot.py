@@ -15,6 +15,7 @@ from radiacode_tools.rc_files import RcTrack
 from track_plot import (
     downsample_trackpoints,
     get_args,
+    main,
     map_ctr,
     mean,
     osm_zoom,
@@ -32,6 +33,12 @@ def test_argparse_default(monkeypatch):
     monkeypatch.setattr("sys.argv", [__file__, testfile])
     a = get_args()
     assert a.input_file == testfile
+
+
+def test_main_bad_renderer(monkeypatch):
+    monkeypatch.setattr("sys.argv", [__file__, "--renderer", "hvplot", testfile])
+    with pytest.raises(NotImplementedError):
+        main()
 
 
 def test_map_ctr():
