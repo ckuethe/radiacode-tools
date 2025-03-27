@@ -65,10 +65,11 @@ def get_args() -> Namespace:
     return ap.parse_args()
 
 
-def process_single_file(fg_file=None, bg_file=None, out_file=None, uuid=None, overwrite=False) -> None:
+def process_single_file(fg_file=None, bg_file=None, out_file=None, uuid=None, overwrite=False) -> bool:
     "Read a data file and convert it"
     if out_file and os.path.exists(out_file) and overwrite is False:
-        return  # shortcut for recursive mode
+        print(f"Not overwriting {out_file}")
+        return False  # shortcut for recursive mode
 
     fg_spec = RcSpectrum(fg_file)
     bg_spec = RcSpectrum(bg_file)
@@ -92,6 +93,7 @@ def process_single_file(fg_file=None, bg_file=None, out_file=None, uuid=None, ov
 
     # file deepcode ignore PT: CLI tool intentionally opening the files the user asked for
     n42.write_file(out_file)
+    return True
 
 
 def main() -> None:

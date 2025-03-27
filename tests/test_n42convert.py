@@ -33,15 +33,95 @@ BGFILE = "bgfile"
 OUTPUTFILE = "outputfile"
 UUID = "a86fbd68-14b5-4a14-a325-50472cf1bb2c"
 NOTUUID = "thisIsNotAValidUuid"
+AM241 = pathjoin(testdir, "data_am241.xml")
+TH232 = pathjoin(testdir, "data_th232_plus_background.xml")
 
 
-def test_load_spectrum_filename():
-    n42convert.process_single_file(
-        fg_file=pathjoin(testdir, "data_am241.xml"),
-        bg_file=pathjoin(testdir, "data_am241.xml"),
-        out_file="/dev/null",
-        overwrite=True,
+def test_convert_spectrum_with_overwrite():
+    assert (
+        n42convert.process_single_file(
+            fg_file=pathjoin(testdir, AM241),
+            bg_file=pathjoin(testdir, AM241),
+            out_file="/dev/null",
+            overwrite=True,
+        )
+        is True
     )
+
+
+def test_convert_spectrum_bg_from_dual_layer():
+    assert (
+        n42convert.process_single_file(
+            fg_file=pathjoin(testdir, TH232),
+            bg_file=pathjoin(testdir, TH232),
+            out_file="/dev/null",
+            overwrite=True,
+        )
+        is True
+    )
+
+
+def test_convert_spectrum_implicit_bg_from_dual_layer():
+    assert (
+        n42convert.process_single_file(
+            fg_file=pathjoin(testdir, TH232),
+            out_file="/dev/null",
+            overwrite=True,
+        )
+        is True
+    )
+
+
+def test_convert_spectrum_bg_from_second_dual_layer():
+    assert (
+        n42convert.process_single_file(
+            fg_file=pathjoin(testdir, AM241),
+            bg_file=pathjoin(testdir, TH232),
+            out_file="/dev/null",
+            overwrite=True,
+        )
+        is True
+    )
+
+
+def test_convert_spectrum_bg_from_single_layer():
+    assert (
+        n42convert.process_single_file(
+            fg_file=pathjoin(testdir, TH232),
+            bg_file=pathjoin(testdir, AM241),
+            out_file="/dev/null",
+            overwrite=True,
+        )
+        is True
+    )
+
+
+def test_convert_spectrum_no_overwrite():
+    assert (
+        n42convert.process_single_file(
+            fg_file=pathjoin(testdir, AM241),
+            bg_file=pathjoin(testdir, AM241),
+            out_file="/dev/null",
+            overwrite=False,
+        )
+        is False
+    )
+
+
+def test_main_simple(monkeypatch):
+    monkeypatch.setattr("sys.argv", [__file__, "-i", AM241, "-o", "/dev/null"])
+    assert n42convert.main() is None
+
+
+def test_main_recursive(monkeypatch):
+    def dummy_convert(fg_file="", bg_file="", out_file="", overwrite=False):
+        print(f"dummy_convert {fg_file=} {bg_file=} {out_file=} {overwrite=}")
+        return True
+
+    monkeypatch.setattr("sys.argv", [__file__, "-r", "-i", testdir])
+    monkeypatch.setattr("n42convert.process_single_file", dummy_convert)
+
+    assert n42convert.main() is None
 
 
 def test_argparse_no_uuid(monkeypatch):
