@@ -29,6 +29,7 @@ dependencies = [
   "dateutils>=0.6.12",
   "defusedxml>=0.7.1",
   "flask>=3.1.0",
+  "kaleido==0.2.0", # something is busted between uv and pypi...
   "qrcode>=8.0",
   "radiacode>=0.3.4",
   "requests>=2.32.3",
@@ -68,6 +69,7 @@ max-line-length = 120
 graphical = [
     "matplotlib>=3.10.1",
     "plotly-express>=0.4.1",
+    "kaleido==0.2.0",
 ]
 
 [tool.uv]

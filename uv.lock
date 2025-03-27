@@ -445,6 +445,19 @@ wheels = [
 ]
 
 [[package]]
+name = "kaleido"
+version = "0.2.0"
+source = { registry = "https://pypi.org/simple" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/0a/8e/06188d282d20584509be97fb42e8d162210bb8789e3c12cd76fde65441b7/kaleido-0.2.0-py2.py3-none-macosx_10_11_x86_64.whl", hash = "sha256:73f46490168f9af7aac3b01035ad8851457e5b0088bc61425ae3c56bf0968065", size = 85153678 },
+    { url = "https://files.pythonhosted.org/packages/d9/55/014a1a52866c3d62cdbe59c0fa1de2830ca30d4dc50695e8705d406bf232/kaleido-0.2.0-py2.py3-none-macosx_11_0_arm64.whl", hash = "sha256:3af187bf6cc2b3af61f5737bf1b10f4ea75ba53391ae20e6df96784f6ca0a9a1", size = 85808191 },
+    { url = "https://files.pythonhosted.org/packages/a9/69/978291fd5da1075c4e4aca3e4a6909411609a669ef5f94332fc4f9925b0d/kaleido-0.2.0-py2.py3-none-manylinux1_x86_64.whl", hash = "sha256:9db17625f5c6ae4600762b97c1d8296d67be20f34a8854ebe5fb264acb5eed97", size = 79902474 },
+    { url = "https://files.pythonhosted.org/packages/c0/93/a8be41b9c0e0eab39ecc0424ecb5fd6e97767e3933c7e026b82f746eb231/kaleido-0.2.0-py2.py3-none-manylinux2014_aarch64.whl", hash = "sha256:f264b876c7ea6622425fe25db8731e8dff4308a9e5a8753bdc78cdb4ffa1aadd", size = 83711743 },
+    { url = "https://files.pythonhosted.org/packages/6b/62/d9cc7b2c750114fad8bfaccb6bc3cca7160232edf8ba3f69a18ac330b9f3/kaleido-0.2.0-py2.py3-none-win32.whl", hash = "sha256:54f41f426d18ff3cecf42549ff122fa841f15ab75c8fa8e19b40c3b282d19e8b", size = 62260634 },
+    { url = "https://files.pythonhosted.org/packages/dc/53/173caf3d8e474d1cdcd89859f0acd4b26940ef39c5431d16276c135e7870/kaleido-0.2.0-py2.py3-none-win_amd64.whl", hash = "sha256:e083250f8a7b950fcb3978655960662aed74926629f2a278b4ad83787ce22020", size = 65882326 },
+]
+
+[[package]]
 name = "kiwisolver"
 version = "1.4.8"
 source = { registry = "https://pypi.org/simple" }
@@ -1055,6 +1068,7 @@ dependencies = [
     { name = "dateutils" },
     { name = "defusedxml" },
     { name = "flask" },
+    { name = "kaleido" },
     { name = "qrcode" },
     { name = "radiacode" },
     { name = "requests" },
@@ -1065,6 +1079,7 @@ dependencies = [
 
 [package.optional-dependencies]
 graphical = [
+    { name = "kaleido" },
     { name = "matplotlib" },
     { name = "plotly-express" },
 ]
@@ -1084,6 +1099,8 @@ requires-dist = [
     { name = "dateutils", specifier = ">=0.6.12" },
     { name = "defusedxml", specifier = ">=0.7.1" },
     { name = "flask", specifier = ">=3.1.0" },
+    { name = "kaleido", specifier = "==0.2.0" },
+    { name = "kaleido", marker = "extra == 'graphical'", specifier = "==0.2.0" },
     { name = "matplotlib", marker = "extra == 'graphical'", specifier = ">=3.10.1" },
     { name = "plotly-express", marker = "extra == 'graphical'", specifier = ">=0.4.1" },
     { name = "qrcode", specifier = ">=8.0" },
