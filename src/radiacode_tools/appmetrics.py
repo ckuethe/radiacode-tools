@@ -283,16 +283,22 @@ class AppMetricsServer:
             daemon=True,
             name="varz_server",
         )
-        self._server_thread.start()
         self._server: Optional[HTTPServer] = None
+        self.port = port
+        self._server_thread.start()
 
     def __del__(self) -> None:
         self._close()
 
     def _make_http_thread(self, server_address, metrics: AppMetrics) -> None:
-        print(f"Starting AppMetrics server on {server_address}", file=sys.stderr)
         AppMetricsReqHandler = partial(AppMetricsBaseReqHandler, metrics)
         self._server = HTTPServer(server_address=server_address, RequestHandlerClass=AppMetricsReqHandler)
+
+        self.port = self._server.server_address[1]
+        print(
+            f"Started AppMetrics server on {self._server.server_address}",
+            file=sys.stderr,
+        )
         self._server.serve_forever()
 
     def _close(self) -> None:

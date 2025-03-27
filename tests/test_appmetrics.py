@@ -6,13 +6,15 @@
 from time import sleep
 
 import pytest
+import requests
 
 from radiacode_tools import appmetrics
+
+name: str = "appmetrics_test"
 
 
 @pytest.mark.slow
 def test_stub():
-    name = "foobar"
     amx = appmetrics.AppMetrics(stub=True, appname=name)
 
     d = amx.get_stats()
@@ -73,3 +75,45 @@ def test_errors():
 
     with pytest.raises(ValueError):
         amx._create_metric("invalid", "foo", None)
+
+
+@pytest.mark.slow
+def test_server():
+    amx = appmetrics.AppMetrics(appname=name, port=0)  # 0 = random port
+    n = 20
+    while True:
+        assert n > 0, "Timed out waiting for server to start"
+        sleep(0.05)
+        if amx._server.port:
+            break
+
+    srv = f"http://127.0.0.1:{amx._server.port}"
+
+    # HTML index page
+    resp = requests.get(f"{srv}/web")
+    assert resp.ok
+    assert resp.headers["Content-Type"] == "text/html"
+    assert "Application Metrics" in resp.text
+
+    # data
+    resp = requests.get(f"{srv}/")
+    assert resp.ok
+    d = resp.json()
+    assert resp.headers["Content-Type"] == "application/json"
+    assert d["process"]["appname"] == name
+    assert d["process"]["pid"]
+    assert d["process"]["real"]
+    assert d["process"]["wall"]
+
+    # anything else should also return valid json
+    resp = requests.get(f"{srv}/fail")
+    assert resp.ok
+    assert resp.json()
+
+    # shutdown command in safe mode requires the PID
+    resp = requests.get(f"{srv}/quitquitquit")
+    assert resp.ok is False
+    assert resp.status_code == appmetrics.HTTPStatus.BAD_REQUEST
+    assert "invalid shutdown command" in resp.text
+
+    assert amx.close() is None
