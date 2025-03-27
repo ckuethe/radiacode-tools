@@ -18,6 +18,7 @@ palettes: List[str] = ["jet", "plasma", "magma", "rainbow", "thermal", "turbo", 
 
 # there's enough time conversion it's worth having common definitions of the formats
 DATEFMT: str = "%Y-%m-%d %H:%M:%S"
+DATEFMT_Z: str = DATEFMT + "%z"
 DATEFMT_T: str = DATEFMT.replace(" ", "T")
 DATEFMT_TZ: str = DATEFMT_T + "Z"
 
@@ -39,20 +40,23 @@ GpsData = namedtuple("GpsData", ["payload"])
 # Real Time data that the device produces more or less gratuitously.
 # Some subset of these fields are present in each of the data types,
 # this is just a convenient way to represent whatever is going on.
-_rtdata_fields = [
-    "time",
-    "dt",
-    "serial_number",
-    "type",
-    "count_rate",
-    "count",
-    "dose_rate",
-    "dose",
-    "charge_level",
-    "temperature",
-    "duration",
-]
-RtData = namedtuple("RtData", _rtdata_fields, defaults=[None] * len(_rtdata_fields))  # type: ignore[misc]
+RtData = namedtuple(
+    "RtData",
+    [
+        "time",
+        "dt",
+        "serial_number",
+        "type",
+        "count_rate",
+        "count",
+        "dose_rate",
+        "dose",
+        "charge_level",
+        "temperature",
+        "duration",
+    ],
+    defaults=[None, None, None, None, None, None, None, None, None, None, None],
+)
 
 # Just like radiacode.types.Spectrum, but without having to import radiacode.
 Spectrum = namedtuple("Spectrum", ["duration", "a0", "a1", "a2", "counts"])
@@ -62,26 +66,32 @@ Spectrum = namedtuple("Spectrum", ["duration", "a0", "a1", "a2", "counts"])
 # since the radiacode app supports that, I have to as well. Also, you may have slightly
 # calibrations between the foreground and background, so those are part of the layer as
 # well.
-_sl_fields = [
-    "spectrum_name",
-    "device_model",
-    "serial_number",
-    "comment",
-    "calibration",
-    "timestamp",
-    "duration",
-    "channels",
-    "counts",
-]
-SpectrumLayer = namedtuple("SpectrumLayer", _sl_fields, defaults=[None] * len(_sl_fields))  # type: ignore[misc]
+SpectrumLayer = namedtuple(
+    "SpectrumLayer",
+    [
+        "device_model",
+        "serial_number",
+        "calibration",
+        "timestamp",
+        "duration",
+        "counts",
+        "channels",
+        "spectrum_name",
+        "comment",
+    ],
+    defaults=[None, None, None, None, None, None, None, "Unnamed Spectrum", ""],
+)
 
 # A single
 SpecData = namedtuple("SpecData", ["time", "serial_number", "spectrum"])
 
 SpecEnergy = namedtuple("SpecEnergy", ["dose", "duration", "peak_dose"])
 
-_sgheader_fields = ["name", "time", "timestamp", "channels", "duration", "flags", "comment"]
-SGHeader = namedtuple("SGHeader", _sgheader_fields, defaults=[None] * len(_sgheader_fields))  # type: ignore[misc]
+SGHeader = namedtuple(
+    "SGHeader",
+    ["name", "time", "timestamp", "channels", "duration", "flags", "comment"],
+    defaults=[None, None, None, None, None, None, None],
+)
 
 # A single datapoint, at least in this implementaton, is a timestamp and a collection of counts per channel.
 # No integration time, since that's kind of implicit from the inter-sample timing
@@ -90,8 +100,11 @@ SpectrogramPoint = namedtuple("SpectrogramPoint", ["datetime", "timedelta", "cou
 
 # As you might expect a trackpoint is a datapoint from a radiacode track
 # storing datetime as the canonical timestamp. It'll be transcoded for output
-_trackpoint_fields = ["datetime", "latitude", "longitude", "accuracy", "doserate", "countrate", "comment"]
-TrackPoint = namedtuple("TrackPoint", _trackpoint_fields, defaults=[None] * len(_trackpoint_fields))  # type: ignore[misc]
+TrackPoint = namedtuple(
+    "TrackPoint",
+    ["datetime", "latitude", "longitude", "accuracy", "doserate", "countrate", "comment"],
+    defaults=[None, None, None, None, None, None, None],
+)
 
 
 class RangeFinder:
