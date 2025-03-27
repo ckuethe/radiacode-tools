@@ -21,9 +21,9 @@ from uuid import uuid4
 import xmltodict
 
 from .rc_types import (
-    DATEFMT,
     DATEFMT_T,
     DATEFMT_TZ,
+    DATEFMT_Z,
     EnergyCalibration,
     Number,
     SpectrogramPoint,
@@ -216,6 +216,8 @@ class RcSpectrum:
             duration=int(spectrum["MeasurementTime"]),
             channels=int(spectrum["NumberOfChannels"]),
             counts=[int(i) for i in spectrum["Spectrum"]["DataPoint"]],
+            comment=spectrum.get("Comment", ""),
+            timestamp=None,
         )
 
         if len(rv.counts) != rv.channels:
@@ -242,22 +244,26 @@ class RcSpectrum:
         self.fg_spectrum = self._parse_spectrum(tmp)._replace(device_model=sp["DeviceConfigReference"]["Name"])
 
         try:
-            tmp = sp.get("BackgroundEnergySpectrum")
-            self.bg_spectrum = self._parse_spectrum(tmp)
+            background_spectrum = sp.get("BackgroundEnergySpectrum")
+            self.bg_spectrum = self._parse_spectrum(background_spectrum)
         except (KeyError, AttributeError, TypeError):
-            tmp = None
+            background_spectrum = None
 
         # older versions of data files don't have start and end times
-        if tmp:
+        if background_spectrum:
             try:
-                az = [parse_datetime(s, DATEFMT_T) for s in sp.get("StartTime", None)]
-                bz = [parse_datetime(s, DATEFMT_T) for s in sp.get("EndTime", None)]
-                self.fg_spectrum = self.fg_spectrum._replace(timestamp=az[0], duration=bz[0] - az[0])
+                start_times = [parse_datetime(s, DATEFMT_T) for s in sp.get("StartTime", None)]
+                end_times = [parse_datetime(s, DATEFMT_T) for s in sp.get("EndTime", None)]
+                self.fg_spectrum = self.fg_spectrum._replace(
+                    timestamp=start_times[0], duration=end_times[0] - start_times[0]
+                )
                 if isinstance(self.bg_spectrum, SpectrumLayer):
-                    self.bg_spectrum = self.bg_spectrum._replace(timestamp=az[1], duration=bz[1] - az[1])
+                    self.bg_spectrum = self.bg_spectrum._replace(
+                        timestamp=start_times[1], duration=end_times[1] - start_times[1]
+                    )
             except (KeyError, TypeError, AttributeError):
                 pass
-        else:
+        else:  # no background spectrum in this file
             try:
                 a = parse_datetime(sp.get("StartTime", None), DATEFMT_T)
                 b = parse_datetime(sp.get("EndTime", None), DATEFMT_T)
@@ -337,6 +343,17 @@ class RcSpectrum:
         print("\n".join(trailer))
 
     def as_dict(self) -> Dict[str, Any]:
+        """
+        Convert an RcSpectrum into a dict that could be safely jsonified.
+        That looks like:
+        {
+            "fg": { ... },    #  SpectrumLayer._asdict()
+            "bg": { ... },    #  SpectrumLayer._asdict()
+            "note": ""        #  descriptive note
+        }
+
+        See `make_layer_from_dict` for more details
+        """
         rv: Dict[str, Any] = {
             "fg": None,
             "bg": None,
@@ -354,34 +371,50 @@ class RcSpectrum:
             rv["bg"]["duration"] = rv["bg"]["duration"].total_seconds()
         return rv
 
-    def _make_layer_from_dict(self, d: Dict[str, Any]) -> SpectrumLayer:
-        rv = None
-        try:
-            rv = SpectrumLayer(
-                spectrum_name=d["spectrum_name"],
-                device_model=d["device_model"],
-                serial_number=d["serial_number"],
-                calibration=EnergyCalibration(d["calibration"]),
-                timestamp=datetime.strptime(d["timestamp"], DATEFMT),
-                duration=timedelta(seconds=float(d["duration"])),
-                channels=int(d["channels"]),
-                counts=[int(i) for i in d["counts"]],
-            )
-        except Exception:
-            pass
+    def make_layer_from_dict(self, d: Dict[str, Any]) -> SpectrumLayer:
+        """
+        Convert a dict into a SpectrumLayer which can then be used in an RcSpectrum.
+        The dict must look like this
+
+        {
+            "spectrum_name": "",         # str
+            "device_model: "",           # str
+            "serial_number: "",          # str
+            "calibration: [a0, a1, a2],  # list|tuple, float*3
+            "timestamp": t,              # str, parseable by strptime with %Y-%m-%dT%H:%M%S%z
+            "duration": d,               # float
+            "channels: n,                # int
+            "counts: [int, ... , int],   # list|tuple, length must equal the number of channels
+            "comment: "",                # str, optional
+        }
+        """
+
+        if len(d["counts"]) != d["channels"]:
+            raise ValueError("Inconsistent channel count in layer dict")
+        rv = SpectrumLayer(
+            spectrum_name=d["spectrum_name"],
+            device_model=d["device_model"],
+            serial_number=d["serial_number"],
+            calibration=EnergyCalibration(*d["calibration"]),
+            timestamp=datetime.strptime(d["timestamp"], DATEFMT_Z),
+            duration=timedelta(seconds=float(d["duration"])),
+            channels=int(d["channels"]),
+            counts=[int(i) for i in d["counts"]],
+            comment=d.get("comment", ""),
+        )
+
         return rv
 
     def from_dict(self, d: Dict[str, Any]) -> None:
+        """
+        The inverse of `as_dict`. Use this to load a jsonified RcSpectrum
+        """
         self.note = d.get("note", "")
-        self.fg_spectrum = self._make_layer_from_dict(d["fg"])
-        if len(self.fg_spectrum.counts) != self.fg_spectrum.channels:
-            raise ValueError("Inconsistent channel counts in foreground")
+        self.fg_spectrum = self.make_layer_from_dict(d["fg"])
 
-        bg = self._make_layer_from_dict(d["bg"])
+        bg = self.make_layer_from_dict(d["bg"])
         if bg:
             self.bg_spectrum = bg
-            if len(self.bg_spectrum.counts) != self.bg_spectrum.channels:
-                raise ValueError("Inconsistent channel counts in background")
 
     def uuid(self) -> str:
         "generate a uuid-shaped string based on the content of the spectrum file"
@@ -766,7 +799,7 @@ class RcN42:
         dest can be a file-like object, and if not given a string representation will be returned.
         """
         if not self.uuid:
-            self.uuid = uuid4()
+            self.uuid = str(uuid4())
 
         data = self.header.copy()
         data["@n42DocUUID"] = self.uuid
