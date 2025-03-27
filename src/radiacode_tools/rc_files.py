@@ -134,8 +134,9 @@ class RcTrack:
             print("Track: " + "\t".join([self.name, self.serialnumber, self.comment, self.flags]), file=ofd)
             # Patch column names in output file.
             print("\t".join(["Timestamp", "Time"] + self._columns[1:]), file=ofd)
+            line = "{filetime}\t{datetime}\t{latitude}\t{longitude}\t{accuracy}\t{doserate}\t{countrate}\t{comment}"
             for p in self.points:
-                print(self._format_trackpoint(p), file=ofd)
+                print(line.format_map(self._format_trackpoint(p)), file=ofd)
 
     def load_file(self, filename: str) -> None:
         "Load a track from the filesystem"
