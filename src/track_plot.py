@@ -19,8 +19,8 @@ from radiacode_tools.rc_types import Number, TrackPoint, palettes
 from radiacode_tools.rc_utils import localtz
 from radiacode_tools.rc_validators import (
     _geometry,
+    _non_negative_int,
     _positive_float,
-    _positive_int,
     _rcsn,
 )
 
@@ -37,7 +37,9 @@ def get_args() -> Namespace:
         default=15.0,
         help="Maximum point error in meters [%(default)s]",
     )
-    ap.add_argument("-d", "--downsample", type=_positive_int, default=16, help="[%(default)s]")
+    ap.add_argument(
+        "-d", "--downsample", type=_non_negative_int, default=16, help="0 or 1 means no downsampling, [%(default)s]"
+    )
     ap.add_argument("-r", "--min-count-rate", type=_positive_float)
     ap.add_argument("-R", "--max-count-rate", type=_positive_float)
     ap.add_argument("-g", "--geometry", type=_geometry, default="1600x1024", help="Image size [%(default)s]")
@@ -138,9 +140,20 @@ def osm_zoom(bbx: Dict[str, Any]) -> int:
     return round(m * x + b)
 
 
+def _infer_plot_format_from_fn(fn: str) -> str | None:
+    allowed = ["jpg", "jpeg", "png", "svg", "webp", "pdf"]
+    ext = fn.lower()
+    i = ext.rfind(".")
+    if i >= 0:
+        ext = ext[i + 1 :]
+        if ext in allowed:
+            return ext
+    return "png"
+
+
 def render_plotly(tk: RcTrack, args: Namespace, bbx: Dict[str, Any]):
     zoom = osm_zoom(bbx)
-    fig = px.scatter_mapbox(
+    fig = px.scatter_map(
         tk.points,
         lat="latitude",
         lon="longitude",
@@ -154,9 +167,10 @@ def render_plotly(tk: RcTrack, args: Namespace, bbx: Dict[str, Any]):
         width=args.geometry[0],
         height=args.geometry[1],
     )
-    fig.update_layout(mapbox_style="open-street-map")
+    fig.update_layout(map_style="open-street-map")
     fig.update_layout(margin={"r": 0, "t": 0, "l": 0, "b": 0})
-    fig.write_image(args.output_file)
+
+    fig.write_image(args.output_file, format=_infer_plot_format_from_fn(args.output_file))
     if args.interactive:
         fig.show()
 

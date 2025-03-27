@@ -13,6 +13,7 @@ testfile = pathjoin(testdir, "walk.rctrk")
 
 from radiacode_tools.rc_files import RcTrack
 from track_plot import (
+    _infer_plot_format_from_fn,
     downsample_trackpoints,
     get_args,
     main,
@@ -30,13 +31,33 @@ def test_argparse_no_args(monkeypatch):
 
 
 def test_argparse_default(monkeypatch):
-    monkeypatch.setattr("sys.argv", [__file__, testfile])
+    monkeypatch.setattr("sys.argv", [__file__, "--downsample", "10", testfile])
     a = get_args()
     assert a.input_file == testfile
+    assert a.downsample == 10
+
+
+def test_infer_plot_format():
+    assert _infer_plot_format_from_fn("") == "png"
+    assert _infer_plot_format_from_fn("/dev/null") == "png"
+    assert _infer_plot_format_from_fn("one.jpg") == "jpg"
+    assert _infer_plot_format_from_fn("two.jpeg") == "jpeg"
+    assert _infer_plot_format_from_fn("THREE.JPG") == "jpg"
+    assert _infer_plot_format_from_fn("four.PnG") == "png"
+    assert _infer_plot_format_from_fn("five.PDf") == "pdf"
+
+
+@pytest.mark.slow
+@pytest.mark.filterwarnings("ignore::DeprecationWarning")  # kaleido uses deprecated setDaemon()
+def test_main_default(monkeypatch):
+    monkeypatch.setattr("sys.argv", [__file__, "-o", "/dev/null", testfile])
+    assert main() is None
 
 
 def test_main_bad_renderer(monkeypatch):
-    monkeypatch.setattr("sys.argv", [__file__, "--renderer", "hvplot", testfile])
+    monkeypatch.setattr(
+        "sys.argv", [__file__, "--downsample", "1", "--min-count-rate", "5", "--renderer", "hvplot", testfile]
+    )
     with pytest.raises(NotImplementedError):
         main()
 
