@@ -21,7 +21,6 @@ from json import JSONDecodeError
 from json import dumps as jdumps
 from json import loads as jloads
 from queue import Queue
-from re import match as re_match
 from signal import SIGHUP, SIGINT, signal
 from sys import exit, stderr, stdout
 from tempfile import mkstemp
@@ -35,11 +34,8 @@ from radiacode import RadiaCode  # type: ignore
 from radiacode.transports.usb import DeviceNotFound  # type: ignore
 
 from radiacode_tools.appmetrics import AppMetrics  # type: ignore
-from radiacode_tools.rc_types import GpsData, RtData, SpecData  # type: ignore
-from radiacode_tools.rc_utils import (  # type: ignore
-    find_radiacode_devices,
-    specdata_to_dict,
-)
+from radiacode_tools.rc_types import GpsData, RtData, SpecData
+from radiacode_tools.rc_utils import find_radiacode_devices, specdata_to_dict
 from radiacode_tools.rc_validators import _gpsd
 
 ams = AppMetrics(stub=True)
