@@ -4,6 +4,8 @@
 # SPDX-License-Identifier: MIT
 
 import datetime
+import signal
+import threading
 from argparse import Namespace
 from collections import namedtuple
 
@@ -42,6 +44,39 @@ def test_get_args(monkeypatch):
     monkeypatch.setattr("sys.argv", [__file__, "-i", "-10"])
     with pytest.raises(SystemExit):
         args = rcmultispg.get_args()
+
+
+@pytest.mark.slow
+def test_handle_shutdown():
+    # it doesn't really matter what signal is triggers the shutdown signal
+    # so use SIGALRM. Then I don't have to figure out which thread or process
+    # this test runner is - alarm will deliver it to the right place. The only
+    # drawback is that it'll take up to one second to deliver.
+    signal.signal(signal.SIGALRM, rcmultispg.handle_shutdown_signal)
+    assert rcmultispg.CTRL_QUEUE.qsize() == 0
+    assert rcmultispg.DATA_QUEUE.qsize() == 0
+    signal.alarm(1)
+
+    # ,get() is blocking so these will just wait until the signal handler
+    # runs to put SHUTDOWN_OBJECT in the queues. It's an object that can
+    # compared with "is". Using the blocking call means I don't have to
+    # busy-wait or sleep
+    assert rcmultispg.DATA_QUEUE.get() is rcmultispg.SHUTDOWN_OBJECT
+    assert rcmultispg.CTRL_QUEUE.get() is rcmultispg.SHUTDOWN_OBJECT
+
+
+@pytest.mark.slow
+def test_tbar():
+    # tbar is a synchronizaton primitive I use to ensure that all device readers
+    # have connected and are ready, which allows synchronized measurements.
+    # Ensure that an exception is raised if time expires before everyone
+    # checks in
+    with pytest.raises(threading.BrokenBarrierError):
+        rcmultispg.tbar(1)
+
+    # But if everyone does check in on time, then proceed
+    rcmultispg.THREAD_BARRIER = threading.Barrier(1)
+    assert rcmultispg.tbar() is None
 
 
 def test_get_radiacode_devices(monkeypatch):
