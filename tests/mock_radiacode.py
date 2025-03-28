@@ -69,3 +69,9 @@ class MockRadiaCode:
 
     def dose_reset(self):
         pass
+
+    def set_device_on(self, on: bool):
+        pass
+
+    def set_local_time(self, dt: datetime.datetime):
+        pass
