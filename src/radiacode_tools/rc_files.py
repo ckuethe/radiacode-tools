@@ -42,6 +42,10 @@ TimeStampish = Union[Number, datetime]
 TimeDurationish = Union[Number, timedelta]
 
 
+_RCTRK_DEFAULT_NO_SERIAL_NUMBER: str = "Unknown Device"  # Radiacode app accepts this
+_RCTRK_DEFAULT_FLAGS: str = "EC"  # Not sure what this does
+
+
 class RcTrack:
     "Radiacode Track (.rctrk) interface"
 
@@ -49,15 +53,18 @@ class RcTrack:
         self._clear_data()
         self._columns = ["DateTime", "Latitude", "Longitude", "Accuracy", "DoseRate", "CountRate", "Comment"]
         self.filename = filename
+
+        self._clear_data()
         if filename:
             self.load_file(filename)
 
     def _clear_data(self) -> None:
         "Clear out the header, in preparation for loading"
+        self.timestamp: datetime = datetime.now(UTC)
         self.name: str = ""
-        self.serialnumber: str = ""
+        self.serialnumber: str = _RCTRK_DEFAULT_NO_SERIAL_NUMBER
         self.comment: str = ""
-        self.flags: str = ""
+        self.flags: str = _RCTRK_DEFAULT_FLAGS
         self.points: List[TrackPoint] = []
 
     def as_dict(self) -> Dict[str, Any]:
@@ -130,6 +137,8 @@ class RcTrack:
 
     def write_file(self, filename: str) -> None:
         "Write the in-memory representation to filesystem"
+        if not self.name:
+            self.name = f"Track {self.timestamp.replace(tzinfo=None,microsecond=0)}"
         with open(filename, "wt") as ofd:
             print("Track: " + "\t".join([self.name, self.serialnumber, self.comment, self.flags]), file=ofd)
             # Patch column names in output file.
@@ -166,6 +175,24 @@ class RcTrack:
                 fields[-1] = fields[-1].rstrip("\n")
                 self.points.append(TrackPoint(*fields[1:]))
 
+    def add_point_dict(self, d) -> None:
+        """
+        Add a track point from a dict with the following keys
+
+        ["DateTime", "Latitude", "Longitude", "Accuracy", "DoseRate", "CountRate", "Comment"]
+
+        Spelling counts - that's the way they are in the .rcspg header
+        """
+        self.add_point(
+            dt=d["DateTime"],
+            latitude=d["Latitude"],
+            longitude=d["Longitude"],
+            accuracy=d["Accuracy"],
+            dose_rate=d["DoseRate"],
+            count_rate=d["CountRate"],
+            comment=d.get("Comment", ""),
+        )
+
     def add_point(
         self,
         dt: datetime,
@@ -188,6 +215,12 @@ class RcTrack:
                 comment=comment,
             )
         )
+        if len(self.points) < 2:
+            if dt.tzinfo is None:
+                raise TypeError("offset-aware datetime required")  # similar to the comparison below
+            self.timestamp = dt
+        else:
+            self.timestamp = min(self.timestamp, dt)
 
 
 class RcSpectrum:
