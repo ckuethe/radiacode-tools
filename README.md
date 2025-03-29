@@ -1,6 +1,7 @@
-![Github Tests Workflow](https://github.com/ckuethe/radiacode-tools/actions/workflows/tests.yml/badge.svg)
+[![Github Tests Workflow](https://github.com/ckuethe/radiacode-tools/actions/workflows/tests.yml/badge.svg)](https://github.com/ckuethe/radiacode-tools/actions/workflows/tests.yml)
 ![Codecov Workflow](https://github.com/ckuethe/radiacode-tools/actions/workflows/codecov.yml/badge.svg)
-![Codecov Status](https://codecov.io/gh/ckuethe/radiacode-tools/graph/badge.svg?token=IJIWGVDKTY)
+[![Codecov Status](https://codecov.io/gh/ckuethe/radiacode-tools/graph/badge.svg?token=IJIWGVDKTY)![Codecov](https://img.shields.io/codecov/c/github/ckuethe/radiacode-tools)](https://app.codecov.io/gh/ckuethe/radiacode-tools/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 # Radiacode Tools
 
@@ -17,6 +18,9 @@ $ cd radiacode-tools
 $ python -m venv venv
 $ . venv/bin/activate
 $ pip install -e .
+
+# or this if you want to plot tracks and spectrograms
+$ pip install -e .[graphical]
 ```
 
 Some convenience scripts will be installed along with the python code,
@@ -77,7 +81,7 @@ This tool converts a RadiaCode ("RC") spectrum XML file into
 format for analysis with other tools such as
 [InterSpec](https://github.com/sandialabs/InterSpec).
 For my main use case - InterSpec interoperability - this tool has been
-somewhat superseded by [sandialabs/SpecUtils#15], but not everyone will
+mostly superseded by [sandialabs/SpecUtils#15], but not everyone will
 be able to update their copy of InterSpec, and there are other tools for
 gamma spectroscopy so it's not completely useless.
 
@@ -163,7 +167,7 @@ to be conducted using just an RC detector, and a phone or tablet running the
 [RadiaCode](https://play.google.com/store/apps/details?id=com.almacode.radiacode)
 and
 [InterSpec](https://play.google.com/store/apps/details?id=gov.sandia.interspec)
-apps.
+apps. This too is mostly irrelevant now that InterSpec can read RadiaCode files.
 
 Configuring a reverse proxy and `WSGI` server for safe deployment of this server
 is beyond the scope of this document.
