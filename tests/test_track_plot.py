@@ -49,6 +49,7 @@ def test_infer_plot_format():
 
 @pytest.mark.slow
 @pytest.mark.filterwarnings("ignore::DeprecationWarning")  # kaleido uses deprecated setDaemon()
+@pytest.mark.remote_data  # renders maps, so it needs network to fetch tile :(
 def test_main_default(monkeypatch):
     monkeypatch.setattr("sys.argv", [__file__, "-o", "/dev/null", testfile])
     assert main() is None
