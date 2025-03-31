@@ -133,12 +133,6 @@ def get_args() -> Namespace:
         help="reset the currently displayed spectrum",
     )
     ap.add_argument(
-        "--reset-clock",
-        action="store_true",
-        default=False,
-        help="Set the radiacode clock to system time",
-    )
-    ap.add_argument(
         "--stdout",
         default=False,
         action="store_true",
@@ -248,8 +242,6 @@ def rc_worker(args: Namespace, serial_number: str) -> None:
             )
 
     with RC_LOCKS[serial_number], STDIO_LOCK:
-        if args.reset_clock:
-            rc.set_local_time(datetime.now())
         DATA_QUEUE.put(SpecData(time(), serial_number, rc.spectrum_accum()))
         print(f"{serial_number} Connected ", file=stderr)
 
@@ -440,7 +432,6 @@ def gps_worker(args: Namespace) -> None:
             JSONDecodeError,
         ) as e:  # network error, complete garbage... give up and reconnect
             DATA_QUEUE.put(GpsData(payload={"gnss": False, "mode": 0}))
-            with STDIO_LOCK:
                 # if e.errno != 111:  # FIXME is ECONNREFUSED always 111? Is there a macro?
                 print(f"caught exception {e} in gps thread, reconnecting", file=stderr)
             sleep(1)
