@@ -34,7 +34,7 @@ WantedBy=multi-user.target
 
 
 def configure_led(args: Namespace, enable: bool = True):
-    subprocess.run(["modprobe", "ledtrig-pattern"], check=True)
+    subprocess.run(["/usr/sbin/modprobe", "ledtrig-pattern"], check=True)
     with open(args.led_path, "w") as ofd:
         print("pattern" if enable else "none", file=ofd)
 
@@ -97,7 +97,7 @@ def gps_worker(args: Namespace) -> None:
         raise FileNotFoundError(args.led_path)
 
     watch_args = {"enable": True, "json": True}
-    if args.gpsd["dev"]:
+    if args.gpsd.get("dev", ""):
         watch_args["device"] = args.gpsd["dev"]
     watchstr = "?WATCH=" + jdumps(watch_args)
 
@@ -146,13 +146,8 @@ def gps_worker(args: Namespace) -> None:
 
 def main() -> None:
     args = get_args()
-    try:
-        configure_led(args)
-        gps_worker(args)
-    except Exception:
-        pass
-    finally:
-        configure_led(args, False)
+    configure_led(args)
+    gps_worker(args)
 
 
 if __name__ == "__main__":
