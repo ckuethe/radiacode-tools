@@ -63,13 +63,13 @@ def test_specdata_to_dict():
     t_counts = list(range(channels))
 
     sd_in = SpecData(
-        time=unix_time.timestamp(),
+        dt=unix_time.timestamp(),
         serial_number=test_serial_number,
         spectrum=Spectrum(datetime.timedelta(seconds=test_duration), *a, t_counts),
     )
 
     sd_out = sd_in.as_dict()
     assert test_serial_number == sd_out["serial_number"]
-    assert unix_time.timestamp() == sd_out["time"]
+    assert unix_time.timestamp() == sd_out["dt"]
     assert sd_out["spectrum"].counts[channels - 1] == channels - 1
     assert sd_out["spectrum"].duration == datetime.timedelta(seconds=test_duration)

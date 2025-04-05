@@ -111,7 +111,7 @@ def test_log_worker(capfd):
     rcmultispg.DATA_QUEUE.put(
         SpecData(
             monotime=monotime,
-            time=unix_time,
+            dt=unix_time,
             serial_number=devs[0],
             spectrum=Spectrum(duration=1, a0=1, a1=2, a2=3, counts=[256] * 1024),
         )

@@ -13,8 +13,10 @@ from radiacode_tools.rc_types import (
     GeoCircle,
     GeoPoint,
     GpsData,
+    RadiacodeSpectrum,
     RangeFinder,
     RcHwInfo,
+    RcJSONEncoder,
     RtData,
     SGHeader,
     SpecData,
@@ -212,7 +214,7 @@ def test_SpectrumLayer():
 def test_SpecData():
     x = SpecData(
         monotime=1.7e9,
-        time=_BEGINNING_OF_TIME,
+        dt=_BEGINNING_OF_TIME,
         serial_number="RC-100-123456",
         spectrum=Spectrum(duration=10, a0=1, a1=2, a2=3, counts=[1] * 1024),
     )
@@ -259,3 +261,28 @@ def test_GpsData():
     assert "_dataclass" in j
     assert x.__class__.__name__ in j
     assert len(x.values()) == 2
+
+
+def test_rc_json_encoder():
+    # the RadiacodeSpectrum (radiacode.types.Spectrum) doesn't have an as_dict method, so
+    # implement it in the RcJSONEncoder
+    s = RadiacodeSpectrum(timedelta(0), 0, 0, 0, [0])
+
+    assert hasattr(s, "as_dict") is False
+    enc = RcJSONEncoder()
+    js = enc.encode(s)
+    assert js == '{"duration": 0.0, "a0": 0, "a1": 0, "a2": 0, "counts": [0], "_dataclass": true, "_type": "Spectrum"}'
+
+    # These should behave
+    js = enc.encode("test")
+    assert js == '"test"'
+
+    js = enc.encode(1.0)
+    assert js == "1.0"
+
+    js = enc.encode(None)
+    assert js == "null"
+
+    # Something that my encoder is expected to not handle
+    with pytest.raises(TypeError, match="is not JSON serializable"):
+        enc.encode(enc)

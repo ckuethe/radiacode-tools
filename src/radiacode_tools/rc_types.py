@@ -13,6 +13,8 @@ from datetime import MINYEAR, datetime, timedelta
 from json import JSONEncoder
 from typing import Any, Dict, Iterable, List, Tuple, Union
 
+from radiacode.types import Spectrum as RadiacodeSpectrum
+
 Number = Union[int, float]
 
 # preferred color palette choices for plotting
@@ -39,13 +41,19 @@ class RcJSONEncoder(JSONEncoder):
             return o.isoformat()
         elif isinstance(o, timedelta):
             return o.total_seconds()
-        elif is_dataclass(o):
-            # in combination with the encoder mixin, I can easily render a dataclass as a dict. The
-            # presence of a `_dataclass` member signals that it was a dataclass and when decoded
-            # that a dataclass should be generated rather than a dict
-            return o.as_dict()
         elif hasattr(o, "as_dict"):
             return o.as_dict()
+        elif is_dataclass(o):
+            # My custom dataclasses use a mixin to add an as_dict implmentation, which will be called
+            # above. If I come across a dataclass that doesn't provide this functionality, then this
+            # encoder will perform similar operations. The presence of a `_dataclass` member tells me
+            # that the json object was a originally dataclass and when decoded that a dataclass
+            # should be generated rather than a dict.
+            rv = dict(o.__dict__)  # make a copy because I'll be adding fields
+            rv["_dataclass"] = True
+            rv["_type"] = o.__class__.__name__
+            return rv
+
         return super().default(o)
 
 
@@ -53,9 +61,10 @@ class DataclassEncoderMixin:
     """
     Helper to add as_dict() and values() to every dataclass
 
-    - as_dict() includes a `_dataclass` member to indicate the source dataclass type
-    the keys are `sorted()` for the benefit of other callers, like values()
-    - values() function returns just values of the non _'d fields
+    - as_dict() includes a `_dataclass` member to indicate the source dataclass type.
+      The keys are `sorted()` for the benefit of other callers, like values()
+    - values() function returns just values of the non metadata fields
+    - json() like a __repr__, but in json
     """
 
     def as_dict(self, hide_dataclass: bool = False) -> Dict[str, Any]:
@@ -65,8 +74,8 @@ class DataclassEncoderMixin:
             rv["_type"] = self.__class__.__name__
         return rv
 
-    def json(self):
-        return RcJSONEncoder().encode(self)
+    def json(self, **kwargs):
+        return RcJSONEncoder(**kwargs).encode(self)
 
     def values(self) -> Tuple:
         return tuple(self.as_dict(hide_dataclass=True).values())
@@ -125,7 +134,6 @@ class GpsData(DataclassEncoderMixin):
 # this is just a convenient way to represent whatever is going on.
 @dataclass(kw_only=True)
 class RtData(DataclassEncoderMixin):
-    time = None
     dt: datetime = _outtatime
     serial_number: str = ""
     type: str = ""
@@ -153,14 +161,10 @@ class RcHwInfo(DataclassEncoderMixin):
     fw_date: datetime
 
 
-# Just like radiacode.types.Spectrum, but without having to import radiacode.
+# Augment radiacode.types.Spectrum with my encoder mixin
 @dataclass
-class Spectrum(DataclassEncoderMixin):
-    duration: float
-    a0: float
-    a1: float
-    a2: float
-    counts: List[int]
+class Spectrum(RadiacodeSpectrum, DataclassEncoderMixin):
+    pass
 
 
 # Spectrum XML files can have both a foreground and a background spectrum, which I call
@@ -185,7 +189,7 @@ class SpectrumLayer(DataclassEncoderMixin):
 @dataclass(kw_only=True)
 class SpecData(DataclassEncoderMixin):
     monotime: float = _nan
-    time: datetime = _outtatime
+    dt: datetime = _outtatime
     serial_number: str
     spectrum: Spectrum
 
@@ -253,5 +257,6 @@ class RangeFinder:
         return f"{self.name}(min={self.min_val}, max={self.max_val})"
 
     def __repr__(self):
+        print(self.__str__())
         print(self.__str__())
         print(self.__str__())

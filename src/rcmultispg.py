@@ -16,6 +16,7 @@ sensor altitude, attitude, ambient temperature, humidity...
 import os
 import socket
 from argparse import ArgumentParser, Namespace
+from datetime import datetime
 from json import JSONDecodeError
 from json import dumps as jdumps
 from json import loads as jloads
@@ -34,7 +35,7 @@ from radiacode.transports.usb import DeviceNotFound  # type: ignore
 
 from radiacode_tools.appmetrics import AppMetrics  # type: ignore
 from radiacode_tools.rc_types import GpsData, RcJSONEncoder, RtData, SpecData
-from radiacode_tools.rc_utils import find_radiacode_devices
+from radiacode_tools.rc_utils import UTC, find_radiacode_devices
 from radiacode_tools.rc_validators import _gpsd
 
 ams = AppMetrics(stub=True)
@@ -183,7 +184,7 @@ def rtdata_worker(rc: RadiaCode, serial_number: str) -> None:
                 continue
             rtdata_msg = {
                 "monotime": monotonic(),
-                "time": rec.dt.timestamp(),
+                "dt": rec.dt,
                 "serial_number": serial_number,
                 "type": rtd_type,
             }
@@ -243,7 +244,12 @@ def rc_worker(args: Namespace, serial_number: str) -> None:
 
     with RC_LOCKS[serial_number]:
         DATA_QUEUE.put(
-            SpecData(monotime=monotonic(), time=time(), serial_number=serial_number, spectrum=rc.spectrum_accum())
+            SpecData(
+                monotime=monotonic(),
+                dt=datetime.now(tz=UTC),
+                serial_number=serial_number,
+                spectrum=rc.spectrum_accum(),
+            )
         )
     with STDIO_LOCK:
         print(f"{serial_number} Connected ", file=stderr)
@@ -277,7 +283,9 @@ def rc_worker(args: Namespace, serial_number: str) -> None:
         try:
             # Grab the spectrum...
             with RC_LOCKS[serial_number]:
-                sd = SpecData(monotime=monotonic(), time=time(), serial_number=serial_number, spectrum=rc.spectrum())
+                sd = SpecData(
+                    monotime=monotonic(), dt=datetime.now(tz=UTC), serial_number=serial_number, spectrum=rc.spectrum()
+                )
             DATA_QUEUE.put(sd)
             ams.counter_increment(f"num_reports_{serial_number}")
             ams.gauge_update(f"count_{serial_number}", sum(sd.spectrum.counts))
@@ -342,9 +350,8 @@ def log_worker(args: Namespace) -> None:
                 print(enc.encode(msg), file=fd, flush=True)
 
             elif isinstance(msg, GpsData):
-                gps_msg = jdumps(msg.payload)
                 for sn in log_fds:
-                    print(enc.encode(msg), file=fd, flush=True)
+                    print(enc.encode(msg), file=log_fds[sn], flush=True)
 
             else:
                 with STDIO_LOCK:
@@ -417,7 +424,7 @@ def gps_worker(args: Namespace) -> None:
                             continue
 
                         x["gnss"] = True
-                        tpv = GpsData(monotime=monotonic, payload={f: x.get(f, None) for f in gps_fields})
+                        tpv = GpsData(monotime=monotonic(), payload={f: x.get(f, None) for f in gps_fields})
                         ams.gauge_update("latitude", tpv.payload["lat"])
                         ams.gauge_update("longitude", tpv.payload["lon"])
                         ams.gauge_update("altitude", tpv.payload.get("alt", BAD_GPS_ALT))
@@ -539,4 +546,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    main()
     main()
