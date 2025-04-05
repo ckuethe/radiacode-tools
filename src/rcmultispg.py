@@ -335,18 +335,15 @@ def log_worker(args: Namespace) -> None:
 
             elif isinstance(msg, SpecData):
                 fd = log_fds[msg.serial_number]
-                # print(jdumps(msg.as_dict()), file=fd, flush=True)
                 print(enc.encode(msg), file=fd, flush=True)
 
             elif isinstance(msg, RtData):
                 fd = log_fds[msg.serial_number]
-                # print(jdumps(msg.as_dict()), file=fd, flush=True)
                 print(enc.encode(msg), file=fd, flush=True)
 
             elif isinstance(msg, GpsData):
                 gps_msg = jdumps(msg.payload)
                 for sn in log_fds:
-                    # print(gps_msg, file=log_fds[sn], flush=True)
                     print(enc.encode(msg), file=fd, flush=True)
 
             else:
