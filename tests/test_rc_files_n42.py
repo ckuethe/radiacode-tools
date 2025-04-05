@@ -9,7 +9,7 @@ from os.path import join as pathjoin
 import pytest
 
 from radiacode_tools.rc_files import RcN42, RcSpectrum
-from radiacode_tools.rc_types import SpectrumLayer
+from radiacode_tools.rc_types import EnergyCalibration, SpectrumLayer
 
 testdir = pathjoin(dirname(__file__), "data")
 
@@ -50,7 +50,11 @@ def test_n42_creation_errors():
         n42.from_rcspectrum(sp)
 
     ### layer with no serial number ###
-    sp.fg_spectrum = SpectrumLayer()
+    sp.fg_spectrum = SpectrumLayer(
+        channels=1,
+        counts=[1],
+        calibration=EnergyCalibration(a0=0, a1=0, a2=0),
+    )
     with pytest.raises(ValueError):
         n42.from_rcspectrum(sp)
 
@@ -59,7 +63,11 @@ def test_n42_creation_errors():
 
     ### no calibration ###
     sp.fg_spectrum = SpectrumLayer(
-        serial_number=thx.fg_spectrum.serial_number, timestamp=thx.fg_spectrum.timestamp, calibration=None
+        serial_number=thx.fg_spectrum.serial_number,
+        timestamp=thx.fg_spectrum.timestamp,
+        calibration=None,
+        channels=1,
+        counts=[1],
     )
     n42.from_rcspectrum(sp)
     with pytest.raises(ValueError, match="foreground calibration"):
@@ -71,6 +79,8 @@ def test_n42_creation_errors():
         timestamp=thx.fg_spectrum.timestamp,
         calibration=thx.fg_spectrum.calibration,
         duration=None,
+        channels=1,
+        counts=[1],
     )
     n42.from_rcspectrum(sp)
     with pytest.raises(AttributeError, match="total_seconds"):
@@ -81,6 +91,7 @@ def test_n42_creation_errors():
         serial_number=thx.fg_spectrum.serial_number,
         calibration=thx.fg_spectrum.calibration,
         duration=thx.fg_spectrum.duration,
+        channels=1,
         counts=[1],
     )
     n42.from_rcspectrum(sp)
@@ -93,9 +104,24 @@ def test_n42_creation_errors():
         calibration=thx.fg_spectrum.calibration,
         duration=thx.fg_spectrum.duration,
         timestamp=thx.fg_spectrum.timestamp,
+        channels=0,
+        counts=None,
     )
     n42.from_rcspectrum(sp)
     with pytest.raises(ValueError, match="spectrum layer has no counts"):
+        n42.write_file("/dev/null")
+
+    ### inconsistenct channel count ###
+    sp.fg_spectrum = SpectrumLayer(
+        serial_number=thx.fg_spectrum.serial_number,
+        calibration=thx.fg_spectrum.calibration,
+        duration=thx.fg_spectrum.duration,
+        timestamp=thx.fg_spectrum.timestamp,
+        channels=2,
+        counts=[1],
+    )
+    n42.from_rcspectrum(sp)
+    with pytest.raises(ValueError, match="spectrum layer has inconsistent channel counts"):
         n42.write_file("/dev/null")
 
     ### Success! ###
@@ -105,6 +131,7 @@ def test_n42_creation_errors():
         duration=thx.fg_spectrum.duration,
         timestamp=thx.fg_spectrum.timestamp,
         counts=thx.fg_spectrum.counts,
+        channels=thx.fg_spectrum.channels,
     )
     n42.from_rcspectrum(sp)
     buf = n42.generate_xml()

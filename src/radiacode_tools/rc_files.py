@@ -510,15 +510,18 @@ class RcSpectrogram(DataclassEncoderMixin):
         self.serial_number: str = ""
         self.flags: int = 1
         self.comment: str = ""
-        self.calibration: EnergyCalibration = EnergyCalibration()
+
+        # abusing Optional a little bit but this lets me declare the existence of
+        # instance variables while not actually setting them to a valid value
+        self.calibration: Optional[EnergyCalibration] = None
         # abusing this type a little bit, but it's not that wrong.
         # Some kind of timing indicaton, and a list of counts. In this case
         # that's total integration time for the historical spectrum.
-        self.historical_spectrum: SpectrogramPoint = SpectrogramPoint()
+        self.historical_spectrum: Optional[SpectrogramPoint] = None
         # saving spectra so that differences can be computed
         self.previous_spectrum: Optional[SpectrogramPoint] = None
         # and this is what it's really for: counts at a particular time.
-        self.samples: List[SpectrogramPoint] = []
+        self.samples: List[SpectrogramPoint] = list()
         if filename:
             self.load_file(filename)
 
@@ -669,12 +672,16 @@ class RcSpectrogram(DataclassEncoderMixin):
             self.historical_spectrum = SpectrogramPoint(dt=timestamp, counts=counts, td=duration)
 
         if self.previous_spectrum is None:
-            self.previous_spectrum = SpectrogramPoint(dt=timestamp, counts=[0] * self.channels)
+            self.previous_spectrum = SpectrogramPoint(dt=timestamp, counts=[0] * self.channels, td=0)
             return False
 
         dx = [z[0] - z[1] for z in zip(counts, self.previous_spectrum.counts)]
         self.samples.append(SpectrogramPoint(dt=timestamp, td=timestamp - self.previous_spectrum.dt, counts=dx))
-        self.previous_spectrum = SpectrogramPoint(dt=timestamp, counts=counts)
+        if len(self.samples) > 1:
+            td = (self.samples[-1].dt - self.samples[-2].dt).total_seconds()
+        else:
+            td = (self.samples[-1].dt - self.previous_spectrum.dt).total_seconds()
+        self.previous_spectrum = SpectrogramPoint(dt=timestamp, counts=counts, td=td)
         self.accumulation_time = self.samples[-1].dt - self.samples[0].dt
         return True
 
@@ -742,6 +749,8 @@ class RcN42(DataclassEncoderMixin):
             raise ValueError(f"{tag} spectrum layer has no counts")
         if not isinstance(sl.timestamp, datetime) or sl.timestamp == _outtatime:
             raise ValueError(f"{tag} spectrum layer has no timestamp")
+        if len(sl.counts) != sl.channels:
+            raise ValueError(f"{tag} spectrum layer has inconsistent channel counts")
 
         return {
             "@id": f"radmeas-{tag}",

@@ -124,7 +124,7 @@ def test_SGHeader():
 
 
 def test_SpectrogramPoint_invalid_time():
-    x = SpectrogramPoint()
+    x = SpectrogramPoint(counts=[0], td=1)
     with pytest.raises(ValueError, match="uninitialized datetime somewhere"):
         x.json()
 
@@ -192,7 +192,7 @@ def test_SpectrumLayer():
         spectrum_name="whatever",
         device_model="RC-100",
         serial_number="RC-100-123456",
-        calibration=EnergyCalibration(),
+        calibration=EnergyCalibration(a0=0, a1=1, a2=2),
         timestamp=_BEGINNING_OF_TIME,
         duration=123456,
         counts=[1] * 768,
@@ -237,7 +237,7 @@ def test_SpecEnergy():
 
 
 def test_RtData():
-    x = RtData(dt=_THE_END_OF_DAYS, temperature=-273.15, charge_level=100)
+    x = RtData(monotime=1.7e9, dt=_THE_END_OF_DAYS, temperature=-273.15, charge_level=100)
     d = x.as_dict()
     j = x.json()
     assert d["_dataclass"] is True

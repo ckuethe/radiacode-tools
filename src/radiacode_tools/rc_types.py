@@ -80,20 +80,20 @@ class TimeRange(DataclassEncoderMixin):
 
 @dataclass(kw_only=True)
 class GeoPoint(DataclassEncoderMixin):
-    latitude: float = _nan
-    longitude: float = _nan
+    latitude: float
+    longitude: float
 
 
 @dataclass(kw_only=True)
 class GeoBox(DataclassEncoderMixin):
-    p1: GeoPoint = GeoPoint()
-    p2: GeoPoint = GeoPoint()
+    p1: GeoPoint
+    p2: GeoPoint
 
 
 @dataclass(kw_only=True)
 class GeoCircle(DataclassEncoderMixin):
-    point: GeoPoint = GeoPoint()
-    radius: float = _nan
+    point: GeoPoint
+    radius: float
 
 
 # Dead Time statistics
@@ -108,16 +108,16 @@ class DTstats(DataclassEncoderMixin):
 # Channel to Energy calibration polynomial
 @dataclass(kw_only=True)
 class EnergyCalibration(DataclassEncoderMixin):
-    a0: float = 0
-    a1: float = 3000 / 1024
-    a2: float = 0
+    a0: float
+    a1: float
+    a2: float
 
 
 # Used primarily by rcmulispg to geotag measurements
 @dataclass(kw_only=True)
 class GpsData(DataclassEncoderMixin):
-    monotime: float = _nan
     payload: Dict[str, Any] = field(default_factory=dict)
+    monotime: float
 
 
 # Real Time data that the device produces more or less gratuitously.
@@ -125,7 +125,6 @@ class GpsData(DataclassEncoderMixin):
 # this is just a convenient way to represent whatever is going on.
 @dataclass(kw_only=True)
 class RtData(DataclassEncoderMixin):
-    monotime: float = _nan
     time = None
     dt: datetime = _outtatime
     serial_number: str = ""
@@ -137,6 +136,7 @@ class RtData(DataclassEncoderMixin):
     charge_level: int = 0
     temperature: float = _nan
     duration: timedelta = timedelta(0)
+    monotime: float
 
 
 @dataclass(kw_only=True)
@@ -173,12 +173,12 @@ class SpectrumLayer(DataclassEncoderMixin):
     spectrum_name: str = "Unnamed spectrum"
     device_model: str = ""
     serial_number: str = ""
-    calibration: EnergyCalibration = EnergyCalibration()
     timestamp: datetime = _outtatime
     duration: timedelta = timedelta(0)
-    counts: List[int] = field(default_factory=list)
-    channels: int = 0
     comment: str = ""
+    channels: int
+    counts: List[int]
+    calibration: EnergyCalibration
 
 
 # A single
@@ -213,22 +213,22 @@ class SGHeader(DataclassEncoderMixin):
 # "time" is kinda vague here; it could be either a timestamp of the sample or the duration
 @dataclass(kw_only=True)
 class SpectrogramPoint(DataclassEncoderMixin):
+    counts: List[int]
+    td: float
     dt: datetime = _outtatime
-    td: float = _nan
-    counts: List[int] = field(default_factory=list)
 
 
 # As you might expect a trackpoint is a datapoint from a radiacode track
 # storing datetime as the canonical timestamp. It'll be transcoded for output
 @dataclass(kw_only=True)
 class TrackPoint(DataclassEncoderMixin):
-    dt: datetime = _outtatime
-    latitude: float = _nan
-    longitude: float = _nan
-    accuracy: float = _nan
-    doserate: float = _nan
-    countrate: float = _nan
+    latitude: float
+    longitude: float
+    accuracy: float
+    doserate: float
+    countrate: float
     comment: str = ""
+    dt: datetime = _outtatime
 
 
 class RangeFinder:

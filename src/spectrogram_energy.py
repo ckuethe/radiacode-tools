@@ -12,6 +12,7 @@ import sys
 from argparse import ArgumentParser, Namespace
 from binascii import unhexlify
 from datetime import timedelta
+from typing import Optional
 
 from radiacode_tools.rc_types import EnergyCalibration, SGHeader, SpecEnergy
 from radiacode_tools.rc_utils import FileTime2DateTime, get_dose_from_spectrum
@@ -57,7 +58,7 @@ def extract_calibration_from_spectrum(s: str) -> EnergyCalibration:
 
 def load_spectrogram(fn: str) -> SpecEnergy:
     """Open a spectrogram"""
-    cal: EnergyCalibration = EnergyCalibration()
+    cal: Optional[EnergyCalibration] = None
     header: SGHeader = SGHeader()
     total_energy: float = 0.0
     peak_dose_rate: float = 0.0
@@ -66,7 +67,7 @@ def load_spectrogram(fn: str) -> SpecEnergy:
         for line in ifd:
             if line.startswith("Spectrogram:") and not header.name:
                 header = parse_header(line)
-            elif line.startswith("Spectrum:") and cal.a0 == 0.0:
+            elif line.startswith("Spectrum:") and not cal:
                 cal = extract_calibration_from_spectrum(line)
             else:
                 _, t, *raw_counts = line.strip().split("\t")

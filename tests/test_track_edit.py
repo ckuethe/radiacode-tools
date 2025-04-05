@@ -68,8 +68,8 @@ def test_earthdistance2():
 
 
 def test_geoboxes():
-    tp_in = TrackPoint(latitude=1, longitude=1)
-    tp_out = TrackPoint(latitude=20, longitude=20)
+    tp_in = TrackPoint(latitude=1, longitude=1, accuracy=1, doserate=0, countrate=0)
+    tp_out = TrackPoint(latitude=20, longitude=20, accuracy=0, doserate=0, countrate=0)
     containers = [
         GeoBox(p1=GeoPoint(latitude=0, longitude=0), p2=GeoPoint(latitude=2, longitude=2)),
         GeoBox(p1=GeoPoint(latitude=4, longitude=4), p2=GeoPoint(latitude=2, longitude=2)),
@@ -81,8 +81,8 @@ def test_geoboxes():
 
 
 def test_geocircles():
-    tp_in = TrackPoint(latitude=0.00001, longitude=0.0001)
-    tp_out = TrackPoint(latitude=20, longitude=20)
+    tp_in = TrackPoint(latitude=0.00001, longitude=0.0001, accuracy=1, doserate=0, countrate=0)
+    tp_out = TrackPoint(latitude=20, longitude=20, accuracy=1, doserate=0, countrate=0)
     containers = [
         GeoCircle(point=GeoPoint(latitude=0, longitude=0), radius=10000),
         GeoCircle(point=GeoPoint(latitude=1, longitude=1), radius=10000),
@@ -94,8 +94,8 @@ def test_geocircles():
 
 
 def test_timeranges():
-    tp_in = TrackPoint(latitude=0, longitude=0, dt=datetime(2000, 2, 1, 0, 0, 0))
-    tp_out = TrackPoint(latitude=0, longitude=0, dt=datetime(2000, 3, 15, 0, 0, 0))
+    tp_in = TrackPoint(latitude=0, longitude=0, dt=datetime(2000, 2, 1, 0, 0, 0), accuracy=1, doserate=0, countrate=0)
+    tp_out = TrackPoint(latitude=0, longitude=0, dt=datetime(2000, 3, 15, 0, 0, 0), accuracy=1, doserate=0, countrate=0)
     containers = [
         TimeRange(dt_start=datetime(2000, 1, 1, 0, 0, 0), dt_end=datetime(2000, 2, 1, 0, 0, 0)),
         TimeRange(dt_start=datetime(2000, 2, 1, 0, 0, 0), dt_end=datetime(2000, 3, 1, 0, 0, 0)),
