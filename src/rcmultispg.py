@@ -33,7 +33,7 @@ from radiacode import RadiaCode  # type: ignore
 from radiacode.transports.usb import DeviceNotFound  # type: ignore
 
 from radiacode_tools.appmetrics import AppMetrics  # type: ignore
-from radiacode_tools.rc_types import GpsData, RtData, SpecData
+from radiacode_tools.rc_types import GpsData, RcJSONEncoder, RtData, SpecData
 from radiacode_tools.rc_utils import find_radiacode_devices
 from radiacode_tools.rc_validators import _gpsd
 
@@ -322,6 +322,7 @@ def log_worker(args: Namespace) -> None:
             # deepcode ignore MissingClose: There is a matching close loop below.. snyk just can't find it
             log_fds[sn] = open(fn, "w")
 
+    enc = RcJSONEncoder()
     running = True
     while running:
         while DATA_QUEUE.qsize():
@@ -334,16 +335,19 @@ def log_worker(args: Namespace) -> None:
 
             elif isinstance(msg, SpecData):
                 fd = log_fds[msg.serial_number]
-                print(jdumps(msg.as_dict()), file=fd, flush=True)
+                # print(jdumps(msg.as_dict()), file=fd, flush=True)
+                print(enc.encode(msg), file=fd, flush=True)
 
             elif isinstance(msg, RtData):
                 fd = log_fds[msg.serial_number]
-                print(jdumps(msg.as_dict()), file=fd, flush=True)
+                # print(jdumps(msg.as_dict()), file=fd, flush=True)
+                print(enc.encode(msg), file=fd, flush=True)
 
             elif isinstance(msg, GpsData):
                 gps_msg = jdumps(msg.payload)
                 for sn in log_fds:
-                    print(gps_msg, file=log_fds[sn], flush=True)
+                    # print(gps_msg, file=log_fds[sn], flush=True)
+                    print(enc.encode(msg), file=fd, flush=True)
 
             else:
                 with STDIO_LOCK:

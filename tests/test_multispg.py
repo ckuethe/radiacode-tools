@@ -5,13 +5,17 @@
 
 import datetime
 import signal
+import sys
 import threading
 from argparse import Namespace
 from collections import namedtuple
+from io import StringIO
+from json import loads as jloads
 
 import pytest
 
 import rcmultispg
+from radiacode_tools.rc_types import GpsData, RtData, SpecData, Spectrum
 
 unix_time = datetime.datetime(2023, 12, 1, 0, 16, 11)
 devs = ["RC-101-111111", "RC-102-222222", "RC-103-333333"]
@@ -85,6 +89,56 @@ def test_get_radiacode_devices(monkeypatch):
     monkeypatch.setattr("usb.core.find", lambda idVendor, idProduct, find_all: [FakeUsb(x) for x in devs])
     found_devs = rcmultispg.find_radiacode_devices()
     assert devs == found_devs
+
+
+@pytest.mark.slow
+def test_log_worker(capfd):
+    devs = ["RC-100-123456"]
+    args = Namespace(stdout=True, devs=devs)
+    t = threading.Thread(target=rcmultispg.log_worker, args=(args,))
+    t.start()
+    monotime = 1.7e9
+    rcmultispg.DATA_QUEUE.put(
+        RtData(
+            monotime=monotime,
+            dt=unix_time,
+            serial_number=devs[0],
+            type="RareData",
+            charge_level=42,
+            temperature=23.45,
+        )
+    )
+    rcmultispg.DATA_QUEUE.put(
+        SpecData(
+            monotime=monotime,
+            time=unix_time,
+            serial_number=devs[0],
+            spectrum=Spectrum(duration=1, a0=1, a1=2, a2=3, counts=[256] * 1024),
+        )
+    )
+    rcmultispg.DATA_QUEUE.put(GpsData(monotime=monotime, payload=dict(gnss=False)))
+    rcmultispg.DATA_QUEUE.put(None)
+    rcmultispg.DATA_QUEUE.put(rcmultispg.SHUTDOWN_OBJECT)
+    rcmultispg.CTRL_QUEUE.put(rcmultispg.SHUTDOWN_OBJECT)
+    t.join(1)
+
+    captured = capfd.readouterr()
+
+    lines = captured.out.splitlines()
+    assert "SHUTDOWN_OBJECT" in lines[0]
+    for line in lines[1:]:
+        msg = jloads(line.replace("NaN", "-1"))
+        assert msg["monotime"] == monotime
+        assert msg["dataclass"] is True
+        if msg["_type"] == "GpsData":
+            assert msg["payload"]["gnss"] is False
+        elif msg["_type"] == "SpecData":
+            assert msg["serial_number"] == devs[0]
+            assert len(msg["counts"]) == 1024
+        elif msg["_type"] == "RtData":
+            assert msg["serial_number"] == devs[0]
+            assert msg["charge_level"] == 42
+            assert msg["temperature"] == 23.45
 
 
 # def test_save_data():
