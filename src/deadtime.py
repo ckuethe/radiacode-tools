@@ -94,7 +94,7 @@ def compute_deadtime(*, a: Number, b: Number, ab: Number, bg: Number = 0) -> DTs
 
     lost_counts = a + b - ab
     loss_fraction = 1 - ab / (a + b)
-    return DTstats(lost_counts, loss_fraction, tau, ab)
+    return DTstats(lost_cps=lost_counts, loss_fraction=loss_fraction, dt_us=tau, dt_cps=ab)
 
 
 def print_deadtime(rates: Dict[str, Number]) -> DTstats:

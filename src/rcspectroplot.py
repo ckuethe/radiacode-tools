@@ -112,7 +112,7 @@ def plot_spectrogram(
         return a + [0] * (l - len(a))
 
     data = np.array([array_extend(s.counts, sg.channels) for s in sg.samples])
-    ylabels = np.array([s.datetime for s in sg.samples])
+    ylabels = np.array([s.dt for s in sg.samples])
     xlabels = range(sg.channels + 1)
     cmap = plt.colormaps[args.palette]  # jet, turbo, plasma, inferno, viridis
     if args.logscale:
@@ -144,7 +144,8 @@ def load_spectrogram_from_ndjson(args: Namespace) -> RcSpectrogram:
     if sn is None:
         sn = records[0]["serial_number"]
         print(f"Assuming serial number {sn}")
-    spg.add_calibration(EnergyCalibration(*records[0]["calibration"]))
+    cal = records[0]["calibration"]
+    spg.add_calibration(EnergyCalibration(a0=cal[0], a1=cal[1], a2=cal[2]))
     spg.serial_number = sn
 
     # Filter serial number
@@ -164,18 +165,19 @@ def filter_spectrogram(args: Namespace, spg: RcSpectrogram) -> None:
     if args.sample_filter:
         spg.samples = spg.samples[args.sample_filter[0] : args.sample_filter[1] + 1]
     if args.time_filter:
-        spg.samples = [x for x in spg.samples if (args.time_filter.t_start <= x.datetime <= args.time_filter.t_end)]
+        spg.samples = [x for x in spg.samples if (args.time_filter.dt_start <= x.dt <= args.time_filter.dt_end)]
     if args.duration_filter:
-        t0 = spg.samples[0].datetime
+        t0 = spg.samples[0].dt
         spg.samples = [
             x
             for x in spg.samples
-            if (args.duration_filter[0] <= (x.datetime - t0).total_seconds() <= args.duration_filter[1])
+            if (args.duration_filter[0] <= (x.dt - t0).total_seconds() <= args.duration_filter[1])
         ]
 
 
 def main() -> None:
     args = get_args()
+    print(args)
     if args.input_file.endswith(".rcspg"):
         spg = RcSpectrogram()
         spg.load_file(args.input_file)
@@ -183,7 +185,7 @@ def main() -> None:
         spg = load_spectrogram_from_ndjson(args)
     else:
         print(f"Not sure how to handle {args.input_file}")
-        return
+        exit()
 
     filter_spectrogram(args, spg)
 

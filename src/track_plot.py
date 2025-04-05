@@ -73,10 +73,15 @@ def mean(l: List[Number]) -> float:
     return sum(l) / len(l)
 
 
+def _dcf(dc) -> List[str]:
+    "dataclass fields. There's gotta be a better way..."
+    return list(dc.__dict__.keys())
+
+
 def tracklist_range_probe(l: List[TrackPoint]):
     "Find the range of all the fields in a list of TrackPoints"
     ranges = {"len": len(l)}
-    for f in l[0]._fields:
+    for f in _dcf(l[0]):
         try:
             ranges[f] = rangefinder(l, f)
         except Exception:
@@ -94,7 +99,7 @@ def downsample_trackpoints(l: List[TrackPoint], factor=4) -> List[TrackPoint]:
 
     def _sl2tp(samples):
         "Sample List to TrackPoint"
-        dt = [x.datetime.timestamp() for x in samples]
+        dt = [x.dt.timestamp() for x in samples]
         lat = [x.latitude for x in samples]
         lon = [x.longitude for x in samples]
         countrate = [x.countrate for x in samples]
@@ -108,7 +113,7 @@ def downsample_trackpoints(l: List[TrackPoint], factor=4) -> List[TrackPoint]:
         countrate = mean(countrate)
         accuracy = mean(accuracy)
 
-        return TrackPoint(dt, lat, lon, accuracy, doserate, countrate)
+        return TrackPoint(dt=dt, latitude=lat, longitude=lon, accuracy=accuracy, doserate=doserate, countrate=countrate)
 
     for i in range(0, len(l) + 1, factor):
         samples = l[i : i + factor]
@@ -157,7 +162,7 @@ def render_plotly(tk: RcTrack, args: Namespace, bbx: Dict[str, Any]):
         tk.points,
         lat="latitude",
         lon="longitude",
-        hover_name="datetime",
+        hover_name="dt",
         zoom=zoom,
         center=map_ctr(bbx),
         color="doserate",
@@ -193,9 +198,7 @@ def main() -> None:
 
     # FIXME would a pandas dataframe or parquet be better? would their filters be faster?
     for i in range(len(tk.points)):
-        x = list(tk.points[i])
-        x[0] = x[0].astimezone(localtz)
-        tk.points[i] = TrackPoint(*x)
+        tk.points[1].dt = tk.points[i].dt.replace(tzinfo=localtz)
 
     if args.min_count_rate or args.max_count_rate:
         for i in range(len(tk.points) - 1, -1, -1):

@@ -28,7 +28,8 @@ class MockRadiaCode:
 
     sp = RcSpectrum(pathjoin(testdir, "data_th232_plus_background.xml"))
     sn = sp.fg_spectrum.serial_number
-    a0, a1, a2 = sp.fg_spectrum.calibration
+    c = sp.fg_spectrum.calibration
+    a0, a1, a2 = c.a0, c.a1, c.a2
     real_time = 0
 
     th232_duration = sp.fg_spectrum.duration.total_seconds()
@@ -60,7 +61,11 @@ class MockRadiaCode:
         m = self.real_time / self.th232_duration
         self.counts = [int(c * m) for c in self.th232]
         return Spectrum(
-            duration=datetime.timedelta(seconds=self.real_time), a0=self.a0, a1=self.a1, a2=self.a2, counts=self.counts
+            duration=datetime.timedelta(seconds=self.real_time),
+            a0=self.a0,
+            a1=self.a1,
+            a2=self.a2,
+            counts=self.counts,
         )
 
     def spectrum_reset(self):

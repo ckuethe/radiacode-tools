@@ -5,13 +5,13 @@
 
 from datetime import datetime
 from io import StringIO
-from json import dumps as jdumps
 from os.path import dirname
 from os.path import join as pathjoin
 
 import pytest
 
 from radiacode_tools.rc_files import _RCTRK_DEFAULT_NO_SERIAL_NUMBER, RcTrack
+from radiacode_tools.rc_types import RcJSONEncoder
 from radiacode_tools.rc_utils import _BEGINNING_OF_TIME, _BEGINNING_OF_TIME_STR, UTC
 
 testdir = pathjoin(dirname(__file__), "data")
@@ -35,7 +35,8 @@ def test_rctrk(monkeypatch):
 
 def test_rctrk_dict_jsonify():
     tk1 = RcTrack(pathjoin(testdir, "walk.rctrk"))
-    assert jdumps(tk1.as_dict())
+    jt = RcJSONEncoder().encode(tk1)
+    assert jt
 
 
 def test_rctrk_dict_roundtrip():
@@ -44,7 +45,7 @@ def test_rctrk_dict_roundtrip():
 
     tk2.from_dict(tk1.as_dict())
     assert len(tk1.points) == len(tk2.points)
-    assert tk1.points[0].datetime.timestamp() == tk2.points[0].datetime.timestamp()
+    assert tk1.points[0].dt == tk2.points[0].dt
 
 
 def test_rctrk_file_roundtrip(monkeypatch):

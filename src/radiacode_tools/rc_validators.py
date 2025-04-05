@@ -60,7 +60,7 @@ def _timerange(s: str = "~") -> TimeRange:
         a = _isotime(w[0]).replace(tzinfo=UTC if w[0].endswith("Z") else localtz)
     if w[1]:
         b = _isotime(w[1]).replace(tzinfo=UTC if w[1].endswith("Z") else localtz)
-    return TimeRange(a, b)
+    return TimeRange(dt_start=a, dt_end=b)
 
 
 def _geobox(s: str) -> GeoBox:
@@ -86,7 +86,7 @@ def _geobox(s: str) -> GeoBox:
         and _LON_MIN <= p0[1] <= _LON_MAX
         and _LON_MIN <= p1[1] <= _LON_MAX
     ):
-        return GeoBox(GeoPoint(*p0), GeoPoint(*p1))
+        return GeoBox(p1=GeoPoint(latitude=p0[0], longitude=p0[1]), p2=GeoPoint(latitude=p1[0], longitude=p1[1]))
     raise ValueError
 
 
@@ -107,7 +107,7 @@ def _geocircle(s: str) -> GeoCircle:
         and (_LAT_MIN <= rv[1] <= _LAT_MAX)
         and (0 < rv[2] <= _DIST_MAX)
     ):
-        return GeoCircle(GeoPoint(rv[0], rv[1]), rv[2])
+        return GeoCircle(point=GeoPoint(latitude=rv[0], longitude=rv[1]), radius=rv[2])
     raise ValueError
 
 

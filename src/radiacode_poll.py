@@ -135,7 +135,7 @@ def wait_for_time(args: Namespace) -> None:
 
 
 def wait_for_dose(args: Namespace, m0: radiacode.Spectrum, dev: radiacode.RadiaCode) -> float:
-    initial_energy = get_dose_from_spectrum(m0.counts, m0.a0, m0.a1, m0.a2)
+    initial_energy = get_dose_from_spectrum(m0.counts, EnergyCalibration(a0=m0.a0, a1=m0.a1, a2=m0.a2))
     recv_dose = 0.0
     with tqdm(
         desc=f"Target Dose ({args.accumulate_dose:.3f}uSv)",
@@ -147,7 +147,9 @@ def wait_for_dose(args: Namespace, m0: radiacode.Spectrum, dev: radiacode.RadiaC
             while waiting:
                 sleep(1)
                 s = dev.spectrum()
-                recv_dose = get_dose_from_spectrum(s.counts, s.a0, s.a1, s.a2) - initial_energy
+                recv_dose = (
+                    get_dose_from_spectrum(s.counts, EnergyCalibration(a0=s.a0, a1=s.a1, a2=s.a2)) - initial_energy
+                )
                 t.n = round(recv_dose, 3)
                 t.display()
                 if recv_dose >= args.accumulate_dose:
@@ -226,9 +228,9 @@ def main() -> None:
 
     else:  # instantaneous capture
         sp.fg_spectrum = SpectrumLayer(
-            device_model=dev_id["model"],
-            serial_number=dev_id["sernum"],
-            calibration=EnergyCalibration(measurement.a0, measurement.a1, measurement.a2),
+            device_model=dev_id.model,
+            serial_number=dev_id.serial_number,
+            calibration=EnergyCalibration(a0=measurement.a0, a1=measurement.a1, a2=measurement.a2),
             timestamp=obs_start,
             duration=measurement.duration,
             channels=len(measurement.counts),
@@ -238,8 +240,10 @@ def main() -> None:
         n42_writer.from_rcspectrum(sp)
         data = n42_writer.generate_xml()
 
-    dose = get_dose_from_spectrum(measurement.counts, measurement.a0, measurement.a1, measurement.a2)
-    print(f"Total dose: {dose:.2f}uSv ({dev_id['sernum']})", file=sys.stderr)
+    dose = get_dose_from_spectrum(
+        measurement.counts, EnergyCalibration(a0=measurement.a0, a1=measurement.a1, a2=measurement.a2)
+    )
+    print(f"Total dose: {dose:.2f}uSv ({dev_id.serial_number})", file=sys.stderr)
     ofd = None
     if args.outfile:
         tfd, tfn = mkstemp(dir=".")
@@ -254,7 +258,7 @@ def main() -> None:
             lr_times=[measurement.duration.total_seconds()] * 2,
             spectrum=measurement.counts,
             calibration=[measurement.a0, measurement.a1, measurement.a2],
-            detector_model=f"{dev_id['product']} {dev_id['sernum']}",
+            detector_model=f"{dev_id.model} {dev_id.serial_number}",
             mclass="F",
             timestamp=obs_start,
             options=enc_opts,

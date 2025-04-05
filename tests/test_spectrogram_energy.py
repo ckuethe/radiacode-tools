@@ -80,7 +80,7 @@ def test_load_spectrogram_fail():
 @pytest.mark.slow
 def test_load_spectrogram():
     sp = spectrogram_energy.load_spectrogram(pathjoin(test_dir, "K40.rcspg"))
-    assert sp.duration == 43510
+    assert sp.duration.total_seconds() == 43510
     assert pytest.approx(sp.dose, abs=0.01) == 2.12
     assert pytest.approx(sp.peak_dose, abs=1e-3) == 6.55e-5
 

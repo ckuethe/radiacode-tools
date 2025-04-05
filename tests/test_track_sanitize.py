@@ -37,7 +37,7 @@ def test_default_sanitize(monkeypatch):
     rf_time = RangeFinder()
     rf_lon.add([x.longitude for x in track.points])
     rf_lat.add([x.latitude for x in track.points])
-    rf_time.add([x.datetime for x in track.points])
+    rf_time.add([x.dt for x in track.points])
 
     # Check that metadata was scrubbed
     assert track.comment == a.comment
@@ -104,7 +104,7 @@ def test_reverse_sanitize(monkeypatch):
 
     # extract times and locations from the RcTrack object
     locations_track_orig = [(p.latitude, p.longitude) for p in track.points]
-    times_track_orig = [p.datetime for p in track.points]
+    times_track_orig = [p.dt for p in track.points]
 
     # Verify that our position and time recorded in the track is as expected
     assert locations_track_orig == locations_source
@@ -114,7 +114,7 @@ def test_reverse_sanitize(monkeypatch):
     sanitize(a, track)
 
     # extract times and locations from the RcTrack object
-    times_track_edited = [p.datetime for p in track.points]
+    times_track_edited = [p.dt for p in track.points]
     locations_track_edited = [(p.latitude, p.longitude) for p in track.points]
 
     # Verify that our position and time recorded in the track have been edited correctly

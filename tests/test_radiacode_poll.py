@@ -15,6 +15,7 @@ import pytest
 from radiacode.types import Spectrum
 
 import radiacode_poll
+from radiacode_tools.rc_types import EnergyCalibration
 from radiacode_tools.rc_utils import get_dose_from_spectrum
 
 # Approximately when I started writing this; used to give a stable start time
@@ -57,7 +58,9 @@ def test_accumulated_dose():
         a2=dev.a2,
         counts=dev.th232,
     )
-    assert pytest.approx(303.20, abs=1e-2) == get_dose_from_spectrum(s.counts, s.a0, s.a1, s.a2)
+    assert pytest.approx(303.20, abs=1e-2) == get_dose_from_spectrum(
+        s.counts, EnergyCalibration(a0=s.a0, a1=s.a1, a2=s.a2)
+    )
 
 
 @pytest.mark.slow

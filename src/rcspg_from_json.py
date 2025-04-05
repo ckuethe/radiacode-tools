@@ -97,7 +97,8 @@ def main() -> None:
                 spg.serial_number = args.serial_number = rec["serial_number"]  # cache the first serial number found
                 spg.name = args.name or f"Spectrogram {spg.timestamp}"
                 spg.comment = args.comment or ""
-                spg.calibration = EnergyCalibration(*rec["calibration"])
+                c = rec["calibration"]
+                spg.calibration = EnergyCalibration(a0=c[0], a1=c[1], a2=c[2])
                 spg.add_point(
                     timestamp=rec["timestamp"],
                     counts=rec["counts"],

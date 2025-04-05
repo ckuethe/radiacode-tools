@@ -17,6 +17,7 @@ from rcspectroplot import (
     filter_spectrogram,
     get_args,
     load_spectrogram_from_ndjson,
+    main,
     plot_spectrogram,
 )
 
@@ -109,15 +110,26 @@ def test_rcspg_duration_short(monkeypatch):
 
 @pytest.mark.slow
 def test_plot_linear(monkeypatch):
-    monkeypatch.setattr("sys.argv", [__file__, "--plot-nonblocking", "-l", "-o", "/dev/null", testndjson])
+    monkeypatch.setattr("sys.argv", [__file__, "--plot-nonblocking", "-l", "-o", "/dev/null", testfile])
     args = get_args()
-    spg = load_spectrogram_from_ndjson(args)
-    assert plot_spectrogram(spg, args) is None
+    # spg = load_spectrogram_from_ndjson(args)
+    # assert plot_spectrogram(spg, args) is None
+    assert main() is None
 
 
 @pytest.mark.slow
 def test_plot_log(monkeypatch):
     monkeypatch.setattr("sys.argv", [__file__, "--plot-nonblocking", "-o", "/dev/null", testndjson])
     args = get_args()
-    spg = load_spectrogram_from_ndjson(args)
-    assert plot_spectrogram(spg, args) is None
+    # spg = load_spectrogram_from_ndjson(args)
+    # assert plot_spectrogram(spg, args) is None
+    assert main() is None
+
+
+def test_plot_bogus(monkeypatch):
+    monkeypatch.setattr("sys.argv", [__file__, "--plot-nonblocking", "-o", "/dev/null", __file__])
+    args = get_args()
+    # spg = load_spectrogram_from_ndjson(args)
+    # assert plot_spectrogram(spg, args) is None
+    with pytest.raises(SystemExit):
+        main()

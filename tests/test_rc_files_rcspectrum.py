@@ -3,13 +3,13 @@
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syn=python
 # SPDX-License-Identifier: MIT
 
-from json import dumps as jdumps
 from os.path import dirname
 from os.path import join as pathjoin
 
 import pytest
 
 from radiacode_tools.rc_files import RcSpectrum
+from radiacode_tools.rc_types import RcJSONEncoder
 
 testdir = pathjoin(dirname(__file__), "data")
 
@@ -41,7 +41,7 @@ def test_rcspectrum_no_bg():
 def test_rcspectrum_dict_can_jsonify():
     "check that all elements of the RcSpectrum can be encoded as basic JSON types"
     sp = RcSpectrum(pathjoin(testdir, "data_th232_plus_background.xml"))
-    jd = jdumps(sp.as_dict())
+    jd = RcJSONEncoder().encode(sp.as_dict())
     assert sp.fg_spectrum.spectrum_name in jd
 
 

@@ -127,11 +127,10 @@ def get_args() -> Namespace:
 
 
 def reverse_route(track: RcTrack) -> None:
-    timestamps = [x.datetime for x in track.points]  # type: ignore
+    timestamps = [x.dt for x in track.points]  # type: ignore
     track.points.reverse()  # reverse items in place
-    for i, p in enumerate(track.points):
-        # I wish I could do this in-place.
-        track.points[i] = p._replace(datetime=timestamps[i])  # type: ignore
+    for i in range(len(track.points)):
+        track.points[i].dt = timestamps[i]  # type: ignore
 
 
 def sanitize(args: Namespace, track: RcTrack) -> None:
@@ -145,7 +144,7 @@ def sanitize(args: Namespace, track: RcTrack) -> None:
     lat_range = RangeFinder("Lat")
     lon_range = RangeFinder("Lon")
 
-    header_text = f"{track.name} {track.serialnumber} {track.comment} {track.points[0].datetime}"
+    header_text = f"{track.name} {track.serialnumber} {track.comment} {track.points[0].dt}"
     header_hash = hf(header_text.encode(), usedforsecurity=False)
 
     for point in track.points:
@@ -159,7 +158,7 @@ def sanitize(args: Namespace, track: RcTrack) -> None:
     if args.allow_unsanitized_serial is False:
         track.serialnumber = args.serial_number
 
-    start_timestamp = track.points[0].datetime
+    start_timestamp = track.points[0].dt
     if args.allow_unsanitized_time:
         args.start_time = start_timestamp
 
@@ -171,11 +170,9 @@ def sanitize(args: Namespace, track: RcTrack) -> None:
         args.base_longitude = lon_range.min_val
 
     for i, tp in enumerate(track.points):
-        track.points[i] = tp._replace(
-            datetime=tp.datetime - start_timestamp + args.start_time,
-            latitude=round(tp.latitude - lat_range.min_val + args.base_latitude, 7),
-            longitude=round(tp.longitude - lon_range.min_val + args.base_longitude, 7),
-        )
+        track.points[i].dt = tp.dt - start_timestamp + args.start_time
+        track.points[i].latitude = round(tp.latitude - lat_range.min_val + args.base_latitude, 7)
+        track.points[i].longitude = round(tp.longitude - lon_range.min_val + args.base_longitude, 7)
 
     if args.reverse_route:
         reverse_route(track)

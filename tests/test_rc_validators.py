@@ -6,7 +6,7 @@
 import pytest
 
 from radiacode_tools import rc_validators
-from radiacode_tools.rc_types import GeoCircle, GeoPoint
+from radiacode_tools.rc_types import GeoCircle, GeoPoint, TimeRange
 from radiacode_tools.rc_utils import _BEGINNING_OF_TIME, _BEGINNING_OF_TIME_STR
 
 
@@ -143,7 +143,7 @@ def test_samp_range():
 
 def test_time_range():
     rv = rc_validators._timerange()
-    assert (rc_validators._BEGINNING_OF_TIME, rc_validators._THE_END_OF_DAYS) == rv
+    assert TimeRange(dt_start=rc_validators._BEGINNING_OF_TIME, dt_end=rc_validators._THE_END_OF_DAYS) == rv
 
     with pytest.raises(ValueError):
         rc_validators._timerange("1~2~4")

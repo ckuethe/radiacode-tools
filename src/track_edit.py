@@ -159,7 +159,7 @@ def earthdistance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
 
 def check_timerange(member: TrackPoint, container: TimeRange) -> bool:
     "start <= t < end"
-    return container.t_start <= member.datetime < container.t_end
+    return container.dt_start <= member.dt < container.dt_end
 
 
 def check_geobox(member: TrackPoint, container: GeoBox) -> bool:
@@ -297,8 +297,8 @@ def main() -> None:
     l = edit_track(args, track)
 
     print(f"edit results: {l[0]} -> {l[1]} points")
-    T_start = track.points[0].datetime.astimezone(localtz)
-    T_end = track.points[-1].datetime.astimezone(localtz)
+    T_start = track.points[0].dt.astimezone(localtz)
+    T_end = track.points[-1].dt.astimezone(localtz)
     duration = T_end - T_start
     print(f"track times: {T_start} -> {T_end}, duration={duration}")
 

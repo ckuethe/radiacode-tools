@@ -11,6 +11,7 @@ import struct
 import sys
 from argparse import ArgumentParser, Namespace
 from binascii import unhexlify
+from datetime import timedelta
 
 from radiacode_tools.rc_types import EnergyCalibration, SGHeader, SpecEnergy
 from radiacode_tools.rc_utils import FileTime2DateTime, get_dose_from_spectrum
@@ -33,13 +34,13 @@ def parse_header(s: str) -> SGHeader:
     # 64 is 256 downsampled by 4, and 1024 is the max channels we know about in a radiacode right now
     if 64 <= int(rv["Channels"]) <= 1024:
         return SGHeader(
-            rv["Spectrogram"],
-            rv["Time"],
-            FileTime2DateTime(rv["Timestamp"]),
-            int(rv["Channels"]),
-            int(rv["Accumulation time"]),
-            int(rv["Flags"]),
-            rv["Comment"],
+            name=rv["Spectrogram"],
+            time=rv["Time"],  # %Y-%m-%d %H:%M:%S
+            timestamp=FileTime2DateTime(int(rv["Timestamp"])),
+            channels=int(rv["Channels"]),
+            comment=rv["Comment"],
+            duration=timedelta(seconds=int(rv["Accumulation time"])),
+            flags=int(rv["Flags"]),
         )
     else:
         raise ValueError("Inapproprate number of channels")
@@ -51,12 +52,12 @@ def extract_calibration_from_spectrum(s: str) -> EnergyCalibration:
     raw_data = unhexlify(spectrum_data)[:16]
     fmt = f"<I3f"
     tmp = struct.unpack(fmt, raw_data)
-    return EnergyCalibration(*tmp[1:])
+    return EnergyCalibration(a0=tmp[1], a1=tmp[2], a2=tmp[3])
 
 
 def load_spectrogram(fn: str) -> SpecEnergy:
     """Open a spectrogram"""
-    cal: EnergyCalibration = None
+    cal: EnergyCalibration = EnergyCalibration()
     header: SGHeader = SGHeader()
     total_energy: float = 0.0
     peak_dose_rate: float = 0.0
@@ -65,19 +66,19 @@ def load_spectrogram(fn: str) -> SpecEnergy:
         for line in ifd:
             if line.startswith("Spectrogram:") and not header.name:
                 header = parse_header(line)
-            elif line.startswith("Spectrum:") and cal is None:
+            elif line.startswith("Spectrum:") and cal.a0 == 0.0:
                 cal = extract_calibration_from_spectrum(line)
             else:
-                _, t, *counts = line.strip().split("\t")
+                _, t, *raw_counts = line.strip().split("\t")
                 acc_time = int(t)
-                counts = [int(c) for c in counts]
+                counts = [int(c) for c in raw_counts]
                 if len(counts) < header.channels:  # pad to the right number of channels
                     counts.extend([0] * (header.channels - len(counts)))
-                dose = get_dose_from_spectrum(counts, *cal)
+                dose = get_dose_from_spectrum(counts, cal)
                 peak_dose_rate = max(peak_dose_rate, dose / acc_time)
                 total_energy += dose
 
-        return SpecEnergy(total_energy, header.duration, peak_dose_rate)
+        return SpecEnergy(dose=total_energy, duration=header.duration, peak_dose=peak_dose_rate)
 
 
 def main() -> None:
@@ -96,9 +97,9 @@ def main() -> None:
     for fn in args.files:
         try:
             sp = load_spectrogram(fn)
-            rate = s_per_hr * sp.dose / sp.duration
+            rate = s_per_hr * sp.dose / sp.duration.total_seconds()
             print(
-                f"{fn}: {sp.dose:.2f}uSv in {sp.duration}s | {rate:.2f}uSv/hr | peak: {sp.peak_dose*s_per_hr:.2f}uSv/hr"
+                f"{fn}: {sp.dose:.2f}uSv in {int(sp.duration.total_seconds())}s | {rate:.2f}uSv/hr | peak: {sp.peak_dose*s_per_hr:.2f}uSv/hr"
             )
         except KeyboardInterrupt:
             return  # make ^C work

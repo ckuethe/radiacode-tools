@@ -7,14 +7,13 @@ import datetime
 
 import pytest
 
-from radiacode_tools.rc_types import SpecData, Spectrum
+from radiacode_tools.rc_types import EnergyCalibration, SpecData, Spectrum
 from radiacode_tools.rc_utils import (
     UTC,
     DateTime2FileTime,
     FileTime2DateTime,
     get_device_id,
     get_dose_from_spectrum,
-    specdata_to_dict,
     stringify,
 )
 
@@ -38,9 +37,9 @@ def test_filetime_to_datetime():
 
 
 def test_spectrum_dose():
-    a = [-10, 3.0, 0]
+    a = EnergyCalibration(a0=-10, a1=3.0, a2=0)
     c = [100] * 1024
-    usv = get_dose_from_spectrum(c, *a)
+    usv = get_dose_from_spectrum(c, a)
     assert pytest.approx(usv, abs=1e-3) == 5.5458
 
 
@@ -56,8 +55,8 @@ def test_get_device_info():
     dev = MockRadiaCode()
     devinfo = get_device_id(dev=dev)
     model = "RC-102"
-    assert model in devinfo["sernum"]
-    assert model == devinfo["model"]
+    assert model in devinfo.serial_number
+    assert model == devinfo.model
 
 
 def test_specdata_to_dict():
@@ -69,8 +68,8 @@ def test_specdata_to_dict():
         spectrum=Spectrum(datetime.timedelta(seconds=test_duration), *a, t_counts),
     )
 
-    sd_out = specdata_to_dict(sd_in)
+    sd_out = sd_in.as_dict()
     assert test_serial_number == sd_out["serial_number"]
-    assert unix_time.timestamp() == sd_out["timestamp"]
-    assert sd_out["counts"][channels - 1] == channels - 1
-    assert sd_out["duration"] == test_duration
+    assert unix_time.timestamp() == sd_out["time"]
+    assert sd_out["spectrum"].counts[channels - 1] == channels - 1
+    assert sd_out["spectrum"].duration == datetime.timedelta(seconds=test_duration)

@@ -16,7 +16,6 @@ sensor altitude, attitude, ambient temperature, humidity...
 import os
 import socket
 from argparse import ArgumentParser, Namespace
-from datetime import datetime
 from json import JSONDecodeError
 from json import dumps as jdumps
 from json import loads as jloads
@@ -26,7 +25,7 @@ from sys import exit, stderr, stdout
 from tempfile import mkstemp
 from threading import Barrier, BrokenBarrierError, Lock, Thread, active_count
 from threading import enumerate as list_threads
-from time import gmtime, sleep, strftime, time
+from time import gmtime, monotonic, sleep, strftime, time
 from typing import Dict, TextIO
 
 import usb.core  # type: ignore
@@ -35,7 +34,7 @@ from radiacode.transports.usb import DeviceNotFound  # type: ignore
 
 from radiacode_tools.appmetrics import AppMetrics  # type: ignore
 from radiacode_tools.rc_types import GpsData, RtData, SpecData
-from radiacode_tools.rc_utils import find_radiacode_devices, specdata_to_dict
+from radiacode_tools.rc_utils import find_radiacode_devices
 from radiacode_tools.rc_validators import _gpsd
 
 ams = AppMetrics(stub=True)
@@ -178,28 +177,29 @@ def rtdata_worker(rc: RadiaCode, serial_number: str) -> None:
                 else:
                     raise
 
-        for x in db:
-            rtd_type = x.__class__.__name__  # ick.
+        for rec in db:
+            rtd_type = rec.__class__.__name__  # ick.
             if rtd_type == "Event":
                 continue
-            d = {
-                "time": x.dt.timestamp(),
+            rtdata_msg = {
+                "monotime": monotonic(),
+                "time": rec.dt.timestamp(),
                 "serial_number": serial_number,
                 "type": rtd_type,
             }
 
-            xd = x.__dict__
-            d.update(
+            rec_dict = rec.__dict__
+            rtdata_msg.update(
                 {
-                    f: xd.get(f, None)
-                    for f in ["temperature", "charge_level", "count_rate", "dose_rate", "count", "dose", "duration"]
+                    field: rec_dict.get(field, None)
+                    for field in ["temperature", "charge_level", "count_rate", "dose_rate", "count", "dose", "duration"]
                 }
             )
-            for f in ["dose", "count", "dose_rate", "count_rate"]:
-                if f in d and d[f] is not None:
-                    ams.gauge_update(f"{f}_{serial_number}", d[f])
+            for field in ["dose", "count", "dose_rate", "count_rate"]:
+                if field in rtdata_msg and rtdata_msg[field] is not None:
+                    ams.gauge_update(f"{field}_{serial_number}", rtdata_msg[field])
 
-            DATA_QUEUE.put(RtData(**d))
+            DATA_QUEUE.put(RtData(**rtdata_msg))
     with STDIO_LOCK:
         print(f"Exiting rtdata_worker {serial_number}", file=stderr)
     return
@@ -241,8 +241,11 @@ def rc_worker(args: Namespace, serial_number: str) -> None:
                 file=stderr,
             )
 
-    with RC_LOCKS[serial_number], STDIO_LOCK:
-        DATA_QUEUE.put(SpecData(time(), serial_number, rc.spectrum_accum()))
+    with RC_LOCKS[serial_number]:
+        DATA_QUEUE.put(
+            SpecData(monotime=monotonic(), time=time(), serial_number=serial_number, spectrum=rc.spectrum_accum())
+        )
+    with STDIO_LOCK:
         print(f"{serial_number} Connected ", file=stderr)
 
     # wait for all threads to connect to their devices
@@ -274,11 +277,10 @@ def rc_worker(args: Namespace, serial_number: str) -> None:
         try:
             # Grab the spectrum...
             with RC_LOCKS[serial_number]:
-                # FIXME figure out a way to augment with monotonic time
-                sd = SpecData(time(), serial_number, rc.spectrum())
-                DATA_QUEUE.put(sd)
-                ams.counter_increment(f"num_reports_{serial_number}")
-                ams.gauge_update(f"count_{serial_number}", sum(sd.spectrum.counts))
+                sd = SpecData(monotime=monotonic(), time=time(), serial_number=serial_number, spectrum=rc.spectrum())
+            DATA_QUEUE.put(sd)
+            ams.counter_increment(f"num_reports_{serial_number}")
+            ams.gauge_update(f"count_{serial_number}", sum(sd.spectrum.counts))
             with STDIO_LOCK:
                 print(f"\rn:{samples}", end="", flush=True, file=stderr)
                 samples += 1
@@ -332,11 +334,11 @@ def log_worker(args: Namespace) -> None:
 
             elif isinstance(msg, SpecData):
                 fd = log_fds[msg.serial_number]
-                print(jdumps(specdata_to_dict(msg)), file=fd, flush=True)
+                print(jdumps(msg.as_dict()), file=fd, flush=True)
 
             elif isinstance(msg, RtData):
                 fd = log_fds[msg.serial_number]
-                print(jdumps(msg._asdict()), file=fd, flush=True)
+                print(jdumps(msg.as_dict()), file=fd, flush=True)
 
             elif isinstance(msg, GpsData):
                 gps_msg = jdumps(msg.payload)
@@ -380,6 +382,7 @@ def gps_worker(args: Namespace) -> None:
     ams.gauge_create("gps_mode")
     ams.gauge_create("sats_seen")
     ams.gauge_create("sats_used")
+    # time in the GPS field is as reported by the GNSS receiver, and may (will) differ from host time
     gps_fields = ["time", "gnss", "mode", "lat", "lon", "alt", "epc", "sep", "speed", "track", "climb"]
     srv = (args.gpsd["host"], DFLT_GPSD_PORT if args.gpsd["port"] is None else args.gpsd["port"])
     watch_args = {"enable": True, "json": True}
@@ -413,10 +416,11 @@ def gps_worker(args: Namespace) -> None:
                             continue
 
                         x["gnss"] = True
-                        tpv = GpsData({f: x.get(f, None) for f in gps_fields})
+                        tpv = GpsData(monotime=monotonic, payload={f: x.get(f, None) for f in gps_fields})
                         ams.gauge_update("latitude", tpv.payload["lat"])
                         ams.gauge_update("longitude", tpv.payload["lon"])
                         ams.gauge_update("altitude", tpv.payload.get("alt", BAD_GPS_ALT))
+                        tpv.payload["hosttime"] = time()
                         DATA_QUEUE.put(tpv)
                     except KeyError as e:  # skip no fix, etc.
                         pass
@@ -431,7 +435,8 @@ def gps_worker(args: Namespace) -> None:
             IOError,
             JSONDecodeError,
         ) as e:  # network error, complete garbage... give up and reconnect
-            DATA_QUEUE.put(GpsData(payload={"gnss": False, "mode": 0}))
+            DATA_QUEUE.put(GpsData(monotime=monotonic(), payload={"gnss": False, "mode": 0, "error": str(e)}))
+            with STDIO_LOCK:
                 # if e.errno != 111:  # FIXME is ECONNREFUSED always 111? Is there a macro?
                 print(f"caught exception {e} in gps thread, reconnecting", file=stderr)
             sleep(1)

@@ -9,13 +9,14 @@ Some stuff found to be useful in various scripts, and should thus be hoisted int
 utility library, rather than being imported from and between scripts.
 """
 
+from dataclasses import is_dataclass
 from datetime import datetime, timedelta, timezone
 from re import search as re_search
-from typing import Any, Dict, List
+from typing import Any, List
 
 from radiacode import RadiaCode
 
-from .rc_types import DATEFMT, DATEFMT_TZ, Number, SpecData
+from .rc_types import DATEFMT, DATEFMT_TZ, EnergyCalibration, Number, RcHwInfo
 
 # The spectrogram format uses FileTime, the number of 100ns intervals since the
 # beginning of 1600 CE. On a linux/unix/bsd host, we get the number of (fractional)
@@ -70,9 +71,7 @@ def stringify(a: List[Any], c: str = " ") -> str:
 
 def get_dose_from_spectrum(
     counts: List[int],
-    a0: float = 0,
-    a1: float = 3000 / 1024,
-    a2: float = 0,
+    cal: EnergyCalibration,
     d: float = 4.51,
     v: float = 1.0,
 ) -> float:
@@ -88,10 +87,10 @@ def get_dose_from_spectrum(
     joules_per_keV = 1.60218e-16
     mass = d * v * 1e-3  # kg
 
-    def _chan2kev(c):
-        return a0 + a1 * c + a2 * c**2
+    def _chan2kev(cal: EnergyCalibration, c: int):
+        return cal.a0 + cal.a1 * c + cal.a2 * c**2
 
-    total_keV = sum([_chan2kev(ch) * n for ch, n in enumerate(counts)])
+    total_keV = sum([_chan2kev(cal, ch) * n for ch, n in enumerate(counts)])
     gray = total_keV * joules_per_keV / mass
     uSv = gray * 1e6
     return uSv
@@ -109,35 +108,33 @@ def find_radiacode_devices() -> List[str]:
     ]
 
 
-def get_device_id(dev: RadiaCode) -> Dict[str, str]:
-    """ "
-    Poll the device for all its identifiers. Returns a dict with keys:
+def get_device_id(dev: RadiaCode) -> RcHwInfo:
+    "Poll the device for all its identifiers"
 
-    fw, fv, hw_num, sernum, model, boot_ver, boot_date, fw_ver, fw_date
-    """
-    rv = {
-        "fw": dev.fw_signature(),
-        "fv": dev.fw_version(),
-        "hw_num": dev.hw_serial_number(),
-        "sernum": dev.serial_number(),
-    }
-    rv["model"] = "-".join(rv["sernum"].split("-")[:2])
-    f = re_search(
+    sig_match = re_search(
         r'Signature: (?P<fw_signature>[0-9A-F]{8}), FileName="(?P<fw_file>.+?)", IdString="(?P<product>.+?)"',
-        rv["fw"],
+        dev.fw_signature(),
     )
-    if f is None:
+    if sig_match is None:
         raise ValueError("Couldn't parse device signature")
 
-    rv.update(f.groupdict())
-    rv.pop("fw")
+    tfmt = "%b %d %Y %H:%M:%S"
 
-    bv, fv = rv.pop("fv")
-    rv["boot_ver"] = f"{bv[0]}.{bv[1]}"
-    rv["boot_date"] = bv[2]
-    rv["fw_ver"] = f"{fv[0]}.{fv[1]}"
-    rv["fw_date"] = fv[2].strip("\x00")
-    return rv
+    sig_fields = sig_match.groupdict()
+    bv, fv = dev.fw_version()
+    product, model = sig_fields["product"].split(" ")
+    return RcHwInfo(
+        fw_file=sig_fields["fw_file"],
+        fw_signature=sig_fields["fw_signature"],
+        product=product,
+        model=model,
+        serial_number=dev.serial_number(),
+        hw_num=dev.hw_serial_number(),
+        boot_ver=f"{bv[0]}.{bv[1]}",
+        boot_date=datetime.strptime(bv[2], tfmt),
+        fw_ver=f"{fv[0]}.{fv[1]}",
+        fw_date=datetime.strptime(fv[2], tfmt),
+    )
 
 
 def probe_radiacode_devices() -> None:
@@ -146,22 +143,10 @@ def probe_radiacode_devices() -> None:
         rc = RadiaCode(serial_number=dev_id)
         d = get_device_id(dev=rc)
         print(
-            "Found {product}\n"
-            "Serial Number: {sernum}\n"
-            "Boot {boot_ver} ({boot_date})\n"
-            "Firmware {fw_ver} {fw_signature} ({fw_date}) \n"
-            "HW ID {hw_num}".format_map(d),
+            f"Found {d.product}\n"
+            f"Serial Number: {d.serial_number}\n"
+            f"Boot {d.boot_ver} ({d.boot_date})\n"
+            f"Firmware {d.fw_ver} {d.fw_signature} ({d.fw_date}) \n"
+            f"HW ID {d.hw_num}",
             end="\n\n",
         )
-
-
-def specdata_to_dict(data: SpecData) -> Dict[str, Any]:
-    "Turn a SpecData into an easily jsonified dict"
-    rec = {
-        "timestamp": data.time,
-        "serial_number": data.serial_number,
-        "duration": data.spectrum.duration.total_seconds(),
-        "calibration": [data.spectrum.a0, data.spectrum.a1, data.spectrum.a2],
-        "counts": data.spectrum.counts,
-    }
-    return rec

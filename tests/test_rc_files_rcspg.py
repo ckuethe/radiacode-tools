@@ -23,5 +23,5 @@ def test_rcspg():
     spg2 = RcSpectrogram()
     spg2.add_calibration(spg.calibration)
     # spg2.historical_spectrum = spg.historical_spectrum
-    _ = [spg2.add_point(timestamp=s.datetime, counts=s.counts) for s in spg.samples if len(s.counts) == spg.channels]
+    _ = [spg2.add_point(timestamp=s.dt, counts=s.counts) for s in spg.samples if len(s.counts) == spg.channels]
     assert len(spg2.samples) > len(spg.samples) // 2

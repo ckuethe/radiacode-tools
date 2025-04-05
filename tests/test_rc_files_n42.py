@@ -58,18 +58,22 @@ def test_n42_creation_errors():
         n42._populate_rad_instrument_information("")
 
     ### no calibration ###
-    sp.fg_spectrum = SpectrumLayer(serial_number=thx.fg_spectrum.serial_number)
+    sp.fg_spectrum = SpectrumLayer(
+        serial_number=thx.fg_spectrum.serial_number, timestamp=thx.fg_spectrum.timestamp, calibration=None
+    )
     n42.from_rcspectrum(sp)
-    with pytest.raises(TypeError):
+    with pytest.raises(ValueError, match="foreground calibration"):
         n42.write_file("/dev/null")
 
     ### no duration ###
     sp.fg_spectrum = SpectrumLayer(
         serial_number=thx.fg_spectrum.serial_number,
+        timestamp=thx.fg_spectrum.timestamp,
         calibration=thx.fg_spectrum.calibration,
+        duration=None,
     )
     n42.from_rcspectrum(sp)
-    with pytest.raises(AttributeError):
+    with pytest.raises(AttributeError, match="total_seconds"):
         n42.write_file("/dev/null")
 
     ### no timestamp ###
@@ -77,9 +81,10 @@ def test_n42_creation_errors():
         serial_number=thx.fg_spectrum.serial_number,
         calibration=thx.fg_spectrum.calibration,
         duration=thx.fg_spectrum.duration,
+        counts=[1],
     )
     n42.from_rcspectrum(sp)
-    with pytest.raises(AttributeError):
+    with pytest.raises(ValueError, match="spectrum layer has no timestamp"):
         n42.write_file("/dev/null")
 
     ### no counts ###
@@ -90,7 +95,7 @@ def test_n42_creation_errors():
         timestamp=thx.fg_spectrum.timestamp,
     )
     n42.from_rcspectrum(sp)
-    with pytest.raises(TypeError):
+    with pytest.raises(ValueError, match="spectrum layer has no counts"):
         n42.write_file("/dev/null")
 
     ### Success! ###
