@@ -27,7 +27,7 @@ from tempfile import mkstemp
 from threading import Barrier, BrokenBarrierError, Lock, Thread, active_count
 from threading import enumerate as list_threads
 from time import gmtime, monotonic, sleep, strftime, time
-from typing import Dict, TextIO
+from typing import Dict, List, TextIO, Tuple
 
 import usb.core  # type: ignore
 from radiacode import RadiaCode  # type: ignore
@@ -206,7 +206,7 @@ def rtdata_worker(rc: RadiaCode, serial_number: str) -> None:
     return
 
 
-def rc_worker(args: Namespace, serial_number: str) -> None:
+def rc_worker(args: Namespace, serial_number: str) -> bool:
     """
     Thread responsible for data acquisition. Connects to devices, polls spectra,
     accumulates data, and generates the output file
@@ -226,7 +226,7 @@ def rc_worker(args: Namespace, serial_number: str) -> None:
                 file=stderr,
             )
             CTRL_QUEUE.put(SHUTDOWN_OBJECT)  # if we can't start all threads, shut everything down
-        return
+        return False
 
     try:
         # radiacode will enumerate and give some information like serial number
@@ -260,7 +260,7 @@ def rc_worker(args: Namespace, serial_number: str) -> None:
     except BrokenBarrierError:
         with STDIO_LOCK:
             print(f"timeout waiting for all devices to connect", file=stderr)
-        return
+        return False
 
     rtdata_thread = Thread(
         target=rtdata_worker,
@@ -304,7 +304,7 @@ def rc_worker(args: Namespace, serial_number: str) -> None:
     with STDIO_LOCK:
         print(f"{serial_number} data collection stop - {samples} records, {samples*args.interval:.1f}s", file=stderr)
 
-    return
+    return True
 
 
 def log_worker(args: Namespace) -> None:
@@ -384,6 +384,7 @@ def gps_worker(args: Namespace) -> None:
     """
     BAD_GPS_ALT: float = -6378  # center of earth
     DFLT_GPSD_PORT: int = 2947
+    ams.flag_create("gps_connected")
     ams.gauge_create("latitude")
     ams.gauge_create("longitude")
     ams.gauge_create("altitude")
@@ -456,6 +457,33 @@ def gps_worker(args: Namespace) -> None:
     return  # clean exit
 
 
+def create_threads(args: Namespace) -> Tuple[int, List[Thread]]:
+    thread_list: List[Thread] = []
+    thread_count = 0
+
+    # file deepcode ignore MissingAPI: all threads will be cleaned at the bottom of main()
+    log_thread = Thread(target=log_worker, args=(args,), name="log-worker")
+    thread_list.append(log_thread)
+    log_thread.start()
+    thread_count += 1
+
+    if args.gpsd:
+        gps_thread = Thread(target=gps_worker, args=(args,), name="gps-worker")
+        thread_list.append(gps_thread)
+        gps_thread.start()
+        thread_count += 1
+
+    for serial_number in args.devs:
+        rc_thread = Thread(
+            target=rc_worker,
+            name=f"poller-worker-{serial_number}",
+            args=(args, serial_number),
+        )
+        thread_count += 2  # two device threads: spectrum and realtime data
+        thread_list.append(rc_thread)
+    return thread_count, thread_list
+
+
 def main() -> None:
     args = get_args()
     global ams
@@ -484,15 +512,7 @@ def main() -> None:
     if not args.devs:  # no devs specified, use all detected
         args.devs = dev_names
 
-    expected_thread_count = 2 * len(args.devs)  # two device threads: spectrum and realtime data
-
-    # file deepcode ignore MissingAPI: all threads will be cleaned at the bottom of main()
-    Thread(target=log_worker, args=(args,), name="log-worker").start()
-    expected_thread_count += 1
-
-    if args.gpsd:
-        Thread(target=gps_worker, args=(args,), name="gps-worker").start()
-        expected_thread_count += 1
+    expected_thread_count, thread_list = create_threads(args)
 
     THREAD_BARRIER = Barrier(len(args.devs))
     signal(SIGINT, handle_shutdown_signal)
@@ -502,15 +522,7 @@ def main() -> None:
     # save batteries.
     signal(SIGHUP, handle_shutdown_signal)
     # create the threads and store in a list so they can be checked later
-    threads = [
-        Thread(
-            target=rc_worker,
-            name=f"poller-worker-{serial_number}",
-            args=(args, serial_number),
-        )
-        for serial_number in args.devs
-    ]
-    [t.start() for t in threads]  # type: ignore[func-returns-value]
+    [t.start() for t in thread_list if t.name.startswith("poller-worker")]  # type: ignore[func-returns-value]
     while active_count() < expected_thread_count:
         sleep(1)
 

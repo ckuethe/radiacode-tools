@@ -141,42 +141,30 @@ def test_log_worker(capfd):
             assert msg["temperature"] == 23.45
 
 
-# def test_save_data():
-#     data = [
-#         # Total Dose
-#         SpecData(0, self.devs[0], Spectrum(datetime.timedelta(0), *self.a, [0] * self.channels)),
-#         # Baseline at the start of the spectrogram
-#         SpecData(0, self.devs[0], Spectrum(datetime.timedelta(0), *self.a, [0] * self.channels)),
-#     ]
-#     for i in range(5):
-#         tmp = [2**i] * 2**i
-#         tmp.extend([0] * self.channels)
-#         data.append(
-#             SpecData(i + 1, self.devs[0], Spectrum(datetime.timedelta(seconds=i), *self.a, tmp[: self.channels]))
-#         )
+@pytest.mark.slow
+def test_create_threads():
+    args = Namespace(devs=devs, stdout=True, gpsd={"host": "localhost", "port": 1, "device": None})
+    nthreads, threadz = rcmultispg.create_threads(args)
+    # log worker should always exist
+    assert nthreads == 2 + 2 * len(devs)
+    assert threadz[0].name == "log-worker"
 
-#     m = mock_open()
-#     with patch("builtins.open", m):
-#         # rcspg_save_spectrogram_file(data=data, serial_number=self.devs[0])
-#         pass
-#     payload = "\t".join(
-#         [
-#             "Spectrogram: rcmulti-19700101000000-RC-101-111111",
-#             "Time: 1970-01-01 00:00:00",
-#             "Timestamp: 116444736000000000",
-#             "Accumulation time: 4",
-#             "Channels: 1024",
-#             "Device serial: RC-101-111111",
-#             "Flags: 1",
-#             "Comment: ",
-#         ]
-#     )
+    # it's not important for this test that the gps thread actually connects to gpsd.
+    assert threadz[0].is_alive() == True
+    assert threadz[1].name == "gps-worker"
 
-#     # There's probably a better way to do this
-#     wr_calls = m.mock_calls
-#     self.assertFalse(wr_calls)  # so I can throw an error to see the payloads
-#     #self.assertIsNone(wr_calls)  # so I can throw an error to see the payloads
-#     # wr_calls[2].assert_called_with(payload)
+    # and we're not even going to start the poller threads
+    for i, d in enumerate(devs):
+        assert threadz[i + 2].name == f"poller-worker-{d}"
+        assert threadz[i + 2].is_alive() == False
+
+    # Nicely shut down the two running threads
+    rcmultispg.CTRL_QUEUE.put(rcmultispg.SHUTDOWN_OBJECT)
+    rcmultispg.DATA_QUEUE.put(rcmultispg.SHUTDOWN_OBJECT)
+    [threadz[t].join(1) for _ in range(4) for t in range(2)]
+
+    assert threadz[0].is_alive() is False
+    assert threadz[1].is_alive() is False
 
 
 def test_main_fails(monkeypatch):
@@ -193,6 +181,7 @@ def test_main_fails(monkeypatch):
         rcmultispg.main()
 
 
+@pytest.mark.slow
 def test_rc_worker():
     args = Namespace(interval=1, prefix="foobar")
-    rcmultispg.rc_worker(args, serial_number=devs[0])
+    assert rcmultispg.rc_worker(args, serial_number=devs[0]) is False
