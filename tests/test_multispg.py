@@ -123,18 +123,21 @@ def test_log_worker(capfd):
     t.join(1)
 
     captured = capfd.readouterr()
-
+    assert "ignored None" in captured.err
+    assert "shutting down" in captured.err
+    assert "SHUTDOWN_OBJECT" in captured.out
     lines = captured.out.splitlines()
-    assert "SHUTDOWN_OBJECT" in lines[0]
-    for line in lines[1:]:
+    for line in lines:
+        if not line.startswith("{"):
+            continue
         msg = jloads(line.replace("NaN", "-1"))
         assert msg["monotime"] == monotime
-        assert msg["dataclass"] is True
+        assert msg["_dataclass"] is True
         if msg["_type"] == "GpsData":
             assert msg["payload"]["gnss"] is False
         elif msg["_type"] == "SpecData":
             assert msg["serial_number"] == devs[0]
-            assert len(msg["counts"]) == 1024
+            assert len(msg["spectrum"]["counts"]) == 1024
         elif msg["_type"] == "RtData":
             assert msg["serial_number"] == devs[0]
             assert msg["charge_level"] == 42
@@ -182,6 +185,7 @@ def test_main_fails(monkeypatch):
 
 
 @pytest.mark.slow
-def test_rc_worker():
+def test_rc_worker(capsys):
     args = Namespace(interval=1, prefix="foobar")
     assert rcmultispg.rc_worker(args, serial_number=devs[0]) is False
+    assert f"{devs[0]} failed to connect" in capsys.readouterr().err

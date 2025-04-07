@@ -15,6 +15,7 @@ sensor altitude, attitude, ambient temperature, humidity...
 
 import os
 import socket
+import sys
 from argparse import ArgumentParser, Namespace
 from datetime import datetime
 from json import JSONDecodeError
@@ -22,7 +23,6 @@ from json import dumps as jdumps
 from json import loads as jloads
 from queue import Queue
 from signal import SIGHUP, SIGINT, signal
-from sys import exit, stderr, stdout
 from tempfile import mkstemp
 from threading import Barrier, BrokenBarrierError, Lock, Thread, active_count
 from threading import enumerate as list_threads
@@ -65,7 +65,7 @@ def tbar(wait_time=None) -> None:
 def handle_shutdown_signal(_signum=None, _stackframe=None) -> None:
     "Signal handler to trigger clean shutdown"
     with STDIO_LOCK:
-        print("\ngot shutdown signal", file=stderr)
+        print("\ngot shutdown signal", file=sys.stderr)
     CTRL_QUEUE.put(SHUTDOWN_OBJECT)
     DATA_QUEUE.put(SHUTDOWN_OBJECT)
 
@@ -146,7 +146,7 @@ def get_args() -> Namespace:
     )
     rv = ap.parse_args()
     if rv.interval < MIN_POLL_INTERVAL:
-        print(f"increasing poll interval to {MIN_POLL_INTERVAL}s", file=stderr)
+        print(f"increasing poll interval to {MIN_POLL_INTERVAL}s", file=sys.stderr)
         rv.interval = MIN_POLL_INTERVAL
 
     # post-processing stages.
@@ -161,7 +161,7 @@ def rtdata_worker(rc: RadiaCode, serial_number: str) -> None:
     tracks.
     """
     with STDIO_LOCK:
-        print(f"Starting rtdata_worker for {serial_number}", file=stderr)
+        print(f"Starting rtdata_worker for {serial_number}", file=sys.stderr)
     db = []
     while CTRL_QUEUE.qsize() == 0:  # don't even need to read the item
         sleep(1)
@@ -171,7 +171,7 @@ def rtdata_worker(rc: RadiaCode, serial_number: str) -> None:
             except Exception as e:
                 z = str(e.args[0])
                 with STDIO_LOCK:
-                    print(f"rtdata_worker caught exception {z}", file=stderr)
+                    print(f"rtdata_worker caught exception {z}", file=sys.stderr)
                 if "seq jump" in z or "but have only" in z:
                     sleep(0.1)
                     continue
@@ -202,7 +202,7 @@ def rtdata_worker(rc: RadiaCode, serial_number: str) -> None:
 
             DATA_QUEUE.put(RtData(**rtdata_msg))
     with STDIO_LOCK:
-        print(f"Exiting rtdata_worker {serial_number}", file=stderr)
+        print(f"Exiting rtdata_worker {serial_number}", file=sys.stderr)
     return
 
 
@@ -223,7 +223,7 @@ def rc_worker(args: Namespace, serial_number: str) -> bool:
         with STDIO_LOCK:
             print(
                 f"{serial_number} failed to connect - cable error, device disconnect, bt connected? {e}",
-                file=stderr,
+                file=sys.stderr,
             )
             CTRL_QUEUE.put(SHUTDOWN_OBJECT)  # if we can't start all threads, shut everything down
         return False
@@ -239,7 +239,7 @@ def rc_worker(args: Namespace, serial_number: str) -> bool:
         with STDIO_LOCK:
             print(
                 f"WARNING: unable to turn device {serial_number} on. Upgrade to radiacode>=0.3.4 or data may be lost.",
-                file=stderr,
+                file=sys.stderr,
             )
 
     with RC_LOCKS[serial_number]:
@@ -252,14 +252,14 @@ def rc_worker(args: Namespace, serial_number: str) -> bool:
             )
         )
     with STDIO_LOCK:
-        print(f"{serial_number} Connected ", file=stderr)
+        print(f"{serial_number} Connected ", file=sys.stderr)
 
     # wait for all threads to connect to their devices
     try:
         tbar(10)
     except BrokenBarrierError:
         with STDIO_LOCK:
-            print(f"timeout waiting for all devices to connect", file=stderr)
+            print(f"timeout waiting for all devices to connect", file=sys.stderr)
         return False
 
     rtdata_thread = Thread(
@@ -276,7 +276,7 @@ def rc_worker(args: Namespace, serial_number: str) -> bool:
             rc.dose_reset()
 
     with STDIO_LOCK:
-        print(f"{serial_number} sampling", file=stderr)
+        print(f"{serial_number} sampling", file=sys.stderr)
 
     samples = 0
     while CTRL_QUEUE.qsize() == 0:  # don't even need to read the item
@@ -290,7 +290,7 @@ def rc_worker(args: Namespace, serial_number: str) -> bool:
             ams.counter_increment(f"num_reports_{serial_number}")
             ams.gauge_update(f"count_{serial_number}", sum(sd.spectrum.counts))
             with STDIO_LOCK:
-                print(f"\rn:{samples}", end="", flush=True, file=stderr)
+                print(f"\rn:{samples}", end="", flush=True, file=sys.stderr)
                 samples += 1
             sleep(args.interval)
             tbar()
@@ -302,7 +302,9 @@ def rc_worker(args: Namespace, serial_number: str) -> bool:
         rc.set_device_on(False)
 
     with STDIO_LOCK:
-        print(f"{serial_number} data collection stop - {samples} records, {samples*args.interval:.1f}s", file=stderr)
+        print(
+            f"{serial_number} data collection stop - {samples} records, {samples*args.interval:.1f}s", file=sys.stderr
+        )
 
     return True
 
@@ -313,7 +315,7 @@ def log_worker(args: Namespace) -> None:
     file to be written, and the reader threads don't have to wait on disk.
     """
     with STDIO_LOCK:
-        print(f"starting log_worker for: {' '.join(args.devs)}", file=stderr)
+        print(f"starting log_worker for: {' '.join(args.devs)}", file=sys.stderr)
 
     log_fds: Dict[str, TextIO] = {}  # {d: None for d in args.devs}
     start_time = time()
@@ -321,7 +323,7 @@ def log_worker(args: Namespace) -> None:
 
     for sn in args.devs:
         if args.stdout:
-            log_fds[sn] = stdout
+            log_fds[sn] = sys.stdout
         else:
             tmpfd, tmpfn = mkstemp(dir=".")
             os.close(tmpfd)
@@ -355,7 +357,7 @@ def log_worker(args: Namespace) -> None:
 
             else:
                 with STDIO_LOCK:
-                    print(f"ignored {msg}", file=stderr)
+                    print(f"ignored {msg}", file=sys.stderr)
                 pass  # who put this junk here?
 
         sleep(MIN_POLL_INTERVAL)
@@ -363,10 +365,10 @@ def log_worker(args: Namespace) -> None:
     # No longer `running`
     for sn in args.devs:
         if sn in log_fds:
-            if log_fds[sn] != stdout:
+            if log_fds[sn] != sys.stdout:
                 log_fds[sn].close()
     with STDIO_LOCK:
-        print("log worker shutting down", file=stderr)
+        print("log worker shutting down", file=sys.stderr)
     return
 
 
@@ -447,12 +449,12 @@ def gps_worker(args: Namespace) -> None:
             DATA_QUEUE.put(GpsData(monotime=monotonic(), payload={"gnss": False, "mode": 0, "error": str(e)}))
             with STDIO_LOCK:
                 # if e.errno != 111:  # FIXME is ECONNREFUSED always 111? Is there a macro?
-                print(f"caught exception {e} in gps thread, reconnecting", file=stderr)
+                print(f"caught exception {e} in gps thread, reconnecting", file=sys.stderr)
             sleep(1)
     # end reconnect loop
 
     with STDIO_LOCK:
-        print("gps worker shutting down", file=stderr)
+        print("gps worker shutting down", file=sys.stderr)
     ams.flag_clear("gps_connected")
     return  # clean exit
 
@@ -495,16 +497,16 @@ def main() -> None:
         dev_names = None
     finally:
         if not dev_names:
-            print("No devices Found", file=stderr)
-            exit(1)
+            print("No devices Found", file=sys.stderr)
+            sys.exit(1)
 
     ams = AppMetrics(port=6853, local_only=False, appname="rcmultispg")
     ams.flag_create("gps_connected")
     missing = set(args.devs).difference(set(dev_names))
     if missing:
         if args.require_all:
-            print(f"Some devices are missing: {' '.join(list(missing))}", file=stderr)
-            exit(1)
+            print(f"Some devices are missing: {' '.join(list(missing))}", file=sys.stderr)
+            sys.exit(1)
         else:
             # Well then, some devices were present, some were requested
             args.devs = list(set(args.devs).intersection(set(dev_names)))
@@ -537,7 +539,7 @@ def main() -> None:
         CTRL_QUEUE.put(SHUTDOWN_OBJECT)
         DATA_QUEUE.put(SHUTDOWN_OBJECT)
         with STDIO_LOCK:
-            print("Stopping threads", file=stderr)
+            print("Stopping threads", file=sys.stderr)
 
     # Clean up
     ams.close()
@@ -553,7 +555,7 @@ def main() -> None:
             pass
 
         with STDIO_LOCK:
-            print(f"{[t.name for t in list_threads()]}", file=stderr)
+            print(f"{[t.name for t in list_threads()]}", file=sys.stderr)
         sleep(0.5)
 
 
