@@ -200,6 +200,7 @@ def rtdata_worker(rc: RadiaCode, serial_number: str) -> None:
                 if field in rtdata_msg and rtdata_msg[field] is not None:
                     ams.gauge_update(f"{field}_{serial_number}", rtdata_msg[field])
 
+            print(rec, file=sys.stderr)
             DATA_QUEUE.put(RtData(**rtdata_msg))
     with STDIO_LOCK:
         print(f"Exiting rtdata_worker {serial_number}", file=sys.stderr)
@@ -228,19 +229,11 @@ def rc_worker(args: Namespace, serial_number: str) -> bool:
             CTRL_QUEUE.put(SHUTDOWN_OBJECT)  # if we can't start all threads, shut everything down
         return False
 
-    try:
-        # radiacode will enumerate and give some information like serial number
-        # and calibration if it's turned off, but won't return a useful spectrum.
-        # Ask me how much data I've lost because of this. :(
-        rc.set_device_on(True)
-    except AssertionError as e:
-        # versions of cdump/radiacode <= 0.3.3 throw an assertion error if you try
-        # to turn the device on. I've sent a PR to allow this to work.
-        with STDIO_LOCK:
-            print(
-                f"WARNING: unable to turn device {serial_number} on. Upgrade to radiacode>=0.3.4 or data may be lost.",
-                file=sys.stderr,
-            )
+    # radiacode will enumerate and give some information like serial number
+    # and calibration if it's turned off, but won't return a useful spectrum.
+    # Ask me how much data I've lost because of this. :( Turning the device
+    # on requires radiacode>=0.3.4
+    rc.set_device_on(True)
 
     with RC_LOCKS[serial_number]:
         DATA_QUEUE.put(

@@ -23,6 +23,26 @@ a = [-10, 2.5, 4.5e-4]
 channels = 1024
 
 
+def _thread_shutdown_after(n=1):
+    "shut down the threads by dropping the SHUTDOWN_OBJECt into CTRL_QUEUE after a delay"
+    signal.signal(signal.SIGALRM, rcmultispg.handle_shutdown_signal)
+    signal.alarm(n)
+
+
+def _reset_queues():
+    "Empty out the control and data queues"
+    while rcmultispg.CTRL_QUEUE.empty() is False:
+        rcmultispg.CTRL_QUEUE.get_nowait()
+    while rcmultispg.DATA_QUEUE.empty() is False:
+        rcmultispg.DATA_QUEUE.get_nowait()
+
+
+def _create_metrics(sn):
+    for gn in [f"dose_{sn}", f"dose_rate_{sn}", f"count_{sn}", f"count_rate_{sn}"]:
+        if gn not in rcmultispg.ams._stats["gauge"]:
+            rcmultispg.ams.gauge_create(gn)
+
+
 def test_get_args(monkeypatch):
     # arbitrary
     monkeypatch.setattr(
@@ -56,10 +76,10 @@ def test_handle_shutdown():
     # so use SIGALRM. Then I don't have to figure out which thread or process
     # this test runner is - alarm will deliver it to the right place. The only
     # drawback is that it'll take up to one second to deliver.
-    signal.signal(signal.SIGALRM, rcmultispg.handle_shutdown_signal)
+    _reset_queues()
     assert rcmultispg.CTRL_QUEUE.qsize() == 0
     assert rcmultispg.DATA_QUEUE.qsize() == 0
-    signal.alarm(1)
+    _thread_shutdown_after()
 
     # ,get() is blocking so these will just wait until the signal handler
     # runs to put SHUTDOWN_OBJECT in the queues. It's an object that can
@@ -67,6 +87,7 @@ def test_handle_shutdown():
     # busy-wait or sleep
     assert rcmultispg.DATA_QUEUE.get() is rcmultispg.SHUTDOWN_OBJECT
     assert rcmultispg.CTRL_QUEUE.get() is rcmultispg.SHUTDOWN_OBJECT
+    _reset_queues()
 
 
 @pytest.mark.slow
@@ -93,8 +114,8 @@ def test_get_radiacode_devices(monkeypatch):
 
 @pytest.mark.slow
 def test_log_worker(capfd):
-    devs = ["RC-100-123456"]
-    args = Namespace(stdout=True, devs=devs)
+    args = Namespace(stdout=True, devs=[devs[0]])
+    _reset_queues()
     t = threading.Thread(target=rcmultispg.log_worker, args=(args,))
     t.start()
     monotime = 1.7e9
@@ -147,7 +168,12 @@ def test_log_worker(capfd):
 @pytest.mark.slow
 def test_create_threads():
     args = Namespace(devs=devs, stdout=True, gpsd={"host": "localhost", "port": 1, "device": None})
+    _reset_queues()
+    rcmultispg.ams = rcmultispg.AppMetrics(stub=True)
+
+    # do it!
     nthreads, threadz = rcmultispg.create_threads(args)
+
     # log worker should always exist
     assert nthreads == 2 + 2 * len(devs)
     assert threadz[0].name == "log-worker"
@@ -185,10 +211,26 @@ def test_main_fails(monkeypatch):
 
 
 @pytest.mark.slow
-def test_rc_worker(capsys):
+def test_rc_worker_failed(capsys):
     args = Namespace(interval=1, prefix="foobar")
-    assert rcmultispg.rc_worker(args, serial_number=devs[0]) is False
+    rcmultispg.ams = rcmultispg.AppMetrics(stub=True)
+    sn = devs[0]
+    assert rcmultispg.rc_worker(args, serial_number=sn) is False
     assert f"{devs[0]} failed to connect" in capsys.readouterr().err
+
+
+@pytest.mark.slow
+def test_rc_worker(capsys, monkeypatch):
+    sn = devs[0]
+    args = Namespace(interval=1, prefix="foobar", devs=[sn], reset_spectrum=False, reset_dose=False, poweroff=False)
+    monkeypatch.setattr(rcmultispg, "RadiaCode", MockRadiaCode)
+    rcmultispg.THREAD_BARRIER = rcmultispg.Barrier(1)
+    rcmultispg.ams = rcmultispg.AppMetrics(stub=True)
+
+    _reset_queues()
+    _thread_shutdown_after()
+    assert rcmultispg.rc_worker(args, serial_number=sn) is True
+    assert f"{devs[0]} Connect" in capsys.readouterr().err
 
 
 @pytest.mark.slow
@@ -197,11 +239,12 @@ def test_rc_rtdata_worker(capsys):
     sn = devs[0]
     dev.serial_number = sn
     rcmultispg.RC_LOCKS[sn] = threading.Lock()
+    rcmultispg.ams = rcmultispg.AppMetrics(stub=True)
 
-    signal.signal(signal.SIGALRM, rcmultispg.handle_shutdown_signal)
-    signal.alarm(1)
+    _reset_queues()
+    _create_metrics(sn)
+    _thread_shutdown_after()
 
     assert rcmultispg.rtdata_worker(dev, serial_number=sn) is None
     o, e = capsys.readouterr()
-    assert "Fake RadiaCode" in o
     assert f"rtdata_worker for {sn}" in e

@@ -7,11 +7,9 @@ import datetime
 from os.path import dirname
 from os.path import join as pathjoin
 
-from radiacode.types import Spectrum
+from radiacode.types import DoseRateDB, Event, RareData, RawData, RealTimeData, Spectrum
 
 from radiacode_tools.rc_files import RcSpectrum
-
-# from rc_utils import get_device_id, get_dose_from_spectrum
 
 # Approximately when I started writing this; used to give a stable start time
 test_epoch = datetime.datetime(2023, 10, 13, 13, 13, 13)
@@ -21,25 +19,22 @@ testdir = pathjoin(dirname(__file__), "data")
 
 
 class MockRadiaCode:
-    fw_sig = 'Signature: 57353F42, FileName="rc-102.bin", IdString="RadiaCode RC-102"'
-    fw_ver = ((4, 0, "Feb  6 2023 15:49:14"), (4, 9, "Jan 25 2024 14:49:00"))
-    hsn = "0035001C-464B5009-20393153"
-    conn_time = test_epoch
+    def __init__(self, serial_number=None, mac=None):
+        self.fw_sig = 'Signature: 57353F42, FileName="rc-102.bin", IdString="RadiaCode RC-102"'
+        self.fw_ver = ((4, 0, "Feb  6 2023 15:49:14"), (4, 9, "Jan 25 2024 14:49:00"))
+        self.hsn = "0035001C-464B5009-20393153"
+        self.conn_time = test_epoch
 
-    sp = RcSpectrum(pathjoin(testdir, "data_th232_plus_background.xml"))
-    sn = sp.fg_spectrum.serial_number
-    c = sp.fg_spectrum.calibration
-    a0, a1, a2 = c.a0, c.a1, c.a2
-    real_time = 0
+        sp = RcSpectrum(pathjoin(testdir, "data_th232_plus_background.xml"))
+        self.sn = serial_number if serial_number else sp.fg_spectrum.serial_number
+        c = sp.fg_spectrum.calibration
+        self.a0, self.a1, self.a2 = c.a0, c.a1, c.a2
+        self.real_time = 0
 
-    th232_duration = sp.fg_spectrum.duration.total_seconds()
-    th232 = sp.fg_spectrum.counts
-    th232_cps = sum(th232) / th232_duration
-    counts = [0] * len(th232)
-
-    def __init__(self, mac=None):
-        print("Fake RadiaCode")
-        pass
+        self.th232_duration = sp.fg_spectrum.duration.total_seconds()
+        self.th232 = sp.fg_spectrum.counts
+        self.th232_cps = sum(self.th232) / self.th232_duration
+        self.counts = [0] * len(self.th232)
 
     def fw_signature(self):
         return self.fw_sig
@@ -68,6 +63,9 @@ class MockRadiaCode:
             counts=self.counts,
         )
 
+    def spectrum_accum(self):
+        return Spectrum(duration=datetime.timedelta(0), a0=self.a0, a1=self.a1, a2=self.a2, counts=[0] * 1024)
+
     def spectrum_reset(self):
         self.real_time = 0
         self.counts = [0] * len(self.th232)
@@ -81,5 +79,44 @@ class MockRadiaCode:
     def set_local_time(self, dt: datetime.datetime):
         pass
 
-    def data_buf(self) -> list:
-        return list()
+    def data_buf(self):
+        now = test_epoch + datetime.timedelta(seconds=self.real_time)
+        records = [
+            Event(
+                dt=now,
+                event=0,
+                event_param1=0,
+                flags=0,
+            ),
+            RareData(
+                dt=now,
+                duration=2969738,
+                dose=9.5740e0 - 3,
+                temperature=33.0,
+                charge_level=75.47,
+                flags=0x5040,
+            ),
+            DoseRateDB(
+                dt=now,
+                count=1502,
+                count_rate=15.646,
+                dose_rate=9.1911e-5,
+                dose_rate_err=12.7,
+                flags=0x5001,
+            ),
+            RealTimeData(
+                dt=test_epoch,
+                count_rate=15.764,
+                count_rate_err=6.2,
+                dose_rate=9.8098e-5,
+                dose_rate_err=15.0,
+                flags=0x4041,
+                real_time_flags=0,
+            ),
+            RawData(
+                dt=now,
+                count_rate=18.0,
+                dose_rate=1.0049e-4,
+            ),
+        ]
+        return records
