@@ -5,17 +5,17 @@
 
 import datetime
 import signal
-import sys
 import threading
 from argparse import Namespace
 from collections import namedtuple
-from io import StringIO
 from json import loads as jloads
 
 import pytest
 
 import rcmultispg
 from radiacode_tools.rc_types import GpsData, RtData, SpecData, Spectrum
+
+from .mock_radiacode import MockRadiaCode
 
 unix_time = datetime.datetime(2023, 12, 1, 0, 16, 11)
 devs = ["RC-101-111111", "RC-102-222222", "RC-103-333333"]
@@ -124,7 +124,7 @@ def test_log_worker(capfd):
 
     captured = capfd.readouterr()
     assert "ignored None" in captured.err
-    assert "shutting down" in captured.err
+    assert "log_worker" in captured.err
     assert "SHUTDOWN_OBJECT" in captured.out
     lines = captured.out.splitlines()
     for line in lines:
@@ -189,3 +189,19 @@ def test_rc_worker(capsys):
     args = Namespace(interval=1, prefix="foobar")
     assert rcmultispg.rc_worker(args, serial_number=devs[0]) is False
     assert f"{devs[0]} failed to connect" in capsys.readouterr().err
+
+
+@pytest.mark.slow
+def test_rc_rtdata_worker(capsys):
+    dev = MockRadiaCode()
+    sn = devs[0]
+    dev.serial_number = sn
+    rcmultispg.RC_LOCKS[sn] = threading.Lock()
+
+    signal.signal(signal.SIGALRM, rcmultispg.handle_shutdown_signal)
+    signal.alarm(1)
+
+    assert rcmultispg.rtdata_worker(dev, serial_number=sn) is None
+    o, e = capsys.readouterr()
+    assert "Fake RadiaCode" in o
+    assert f"rtdata_worker for {sn}" in e

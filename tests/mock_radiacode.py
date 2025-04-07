@@ -80,3 +80,6 @@ class MockRadiaCode:
 
     def set_local_time(self, dt: datetime.datetime):
         pass
+
+    def data_buf(self) -> list:
+        return list()
