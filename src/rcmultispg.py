@@ -494,7 +494,6 @@ def main() -> None:
             sys.exit(1)
 
     ams = AppMetrics(port=6853, local_only=False, appname="rcmultispg")
-    ams.flag_create("gps_connected")
     missing = set(args.devs).difference(set(dev_names))
     if missing:
         if args.require_all:
