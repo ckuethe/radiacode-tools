@@ -89,4 +89,5 @@ dev = [
     "pytest-cov>=6.0.0",
     "pytest-mock>=3.14.0",
     "pytest-remotedata>=0.4.1",
+    "pytest-xdist>=3.6.1",
 ]
