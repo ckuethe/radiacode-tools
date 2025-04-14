@@ -14,13 +14,10 @@ from argparse import ArgumentParser, Namespace
 from os.path import basename, dirname
 from os.path import join as pathjoin
 from os.path import realpath
-from time import sleep
-from typing import Any, Dict, Iterable, List
-
-from tqdm.auto import tqdm
+from typing import Any, Dict, Iterable
 
 from radiacode_tools.rc_files import RcTrack
-from radiacode_tools.rc_utils import DATEFMT_TZ, UTC, datetime, parse_datetime
+from radiacode_tools.rc_utils import DATEFMT_TZ, parse_datetime
 
 
 def get_args() -> Namespace:
