@@ -11,7 +11,7 @@ from datetime import datetime
 from math import log10, sqrt
 from typing import Any, Dict, List
 
-import plotly.express as px
+import plotly.express
 
 # Load the RadiaCode tools
 from radiacode_tools.rc_files import RcTrack
@@ -158,7 +158,7 @@ def _infer_plot_format_from_fn(fn: str) -> str | None:
 
 def render_plotly(tk: RcTrack, args: Namespace, bbx: Dict[str, Any]):
     zoom = osm_zoom(bbx)
-    fig = px.scatter_map(
+    fig = plotly.express.scatter_map(
         tk.points,
         lat="latitude",
         lon="longitude",

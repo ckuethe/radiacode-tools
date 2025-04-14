@@ -6,6 +6,7 @@
 from os.path import dirname
 from os.path import join as pathjoin
 
+import plotly.express
 import pytest
 
 testdir = pathjoin(dirname(__file__), "data")
@@ -47,12 +48,12 @@ def test_infer_plot_format():
     assert _infer_plot_format_from_fn("five.PDf") == "pdf"
 
 
-@pytest.mark.slow
 @pytest.mark.filterwarnings("ignore::DeprecationWarning")  # kaleido uses deprecated setDaemon()
-# @pytest.mark.remote_data  # renders maps, so it needs network to fetch tile :(
-def test_main_default(monkeypatch):
+def test_main_default(monkeypatch, mocker):
+    mocker.patch("plotly.express")
     monkeypatch.setattr("sys.argv", [__file__, "-o", "/dev/null", testfile])
     assert main() is None
+    plotly.express.scatter_map.assert_called_once()
 
 
 def test_main_bad_renderer(monkeypatch):
