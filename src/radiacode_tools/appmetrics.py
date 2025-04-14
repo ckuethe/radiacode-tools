@@ -214,7 +214,7 @@ class AppMetricsBaseReqHandler(BaseHTTPRequestHandler):
                         }
                     }
                 });
-                httpRequest.open("GET", "/", true);
+                httpRequest.open("GET", "/data", true);
                 httpRequest.send();
             }
             var metricsUpdateInterval = 2500; // millseconds
@@ -229,39 +229,49 @@ class AppMetricsBaseReqHandler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         shutdown: bool = False
-        rcode = HTTPStatus.OK
+        rcode = HTTPStatus.BAD_REQUEST  # assume something is amiss unless we prove otherwise
+        content: str = '{"error": "bad request"}'
         content_type: str = "application/json"
         qqq: str = "/quitquitquit"
-        if self.path.startswith(qqq):  # Exit handling logic
-            if self.metrics.safe is False:
-                if self.path == qqq:
-                    shutdown = True
-                else:  # only "/quitquitquit" is allowd
-                    rcode = HTTPStatus.BAD_REQUEST
-            else:
-                if self.path == f"{qqq}?{self.metrics._stats[P]['pid']}":
-                    shutdown = True
-                else:
-                    rcode = HTTPStatus.BAD_REQUEST
-        if rcode != HTTPStatus.OK:
-            errmsg = self.metrics._stats[P].copy()
-            errmsg["httpstatus"] = rcode
-            errmsg["error"] = f"invalid shutdown command; safe mode {self.metrics.safe}"
-            content = jdumps(errmsg, indent=1).encode() + b"\r\n"
-        elif self.path.startswith("/web"):
+        # Each of the conditions is responsible for setting rcode, and filling `content`
+        if False:  # just for the formatting
+            pass
+        elif self.path == "/":  # root page
+            rcode = HTTPStatus.OK
             content_type = "text/html"
-            content = self.index_html().encode()
-        else:
-            if shutdown:
+            content = self.index_html()
+        elif self.path == "/data":  # data endpoint
+            rcode = HTTPStatus.OK
+            content = jdumps(self.metrics.get_stats(), indent=1)
+        elif self.path.startswith(qqq):  # Exit handling logic
+            pid = self.metrics._stats[P]["pid"]
+            # in unsafe mode: only "/quitquitquit" is allowed
+            # in safe mode: "/quitquitquit?<pid>" is required
+            if (self.metrics.safe is False and self.path == qqq) or (
+                (self.metrics.safe is True and self.path == f"{qqq}?{pid}")
+            ):
+                shutdown = True
+                rcode = HTTPStatus.OK
+
                 self.metrics._stats[P]["shutdown"] = True
-            content = jdumps(self.metrics.get_stats(), indent=1).encode() + b"\r\n"
+                content = jdumps(self.metrics.get_stats(), indent=1)
+            else:
+                # copy the statistics so as not to mess with the storage structure
+                errmsg = self.metrics._stats[P].copy()
+                errmsg["httpstatus"] = rcode
+                errmsg["error"] = f"invalid shutdown command; missing or extra PID arg"
+                content = jdumps(errmsg, indent=1)
+        else:  # anything else, use the default error message
+            pass
 
         self.send_response(rcode)
+        resp = content.encode() + b"\r\n"
         self.send_header("Content-Type", content_type)
-        self.send_header("Content-Length", str(len(content)))
+        self.send_header("Content-Length", str(len(resp)))
         self.end_headers()
-        self.wfile.write(content)
-        self.wfile.flush()
+        self.wfile.write(resp)
+        if self.wfile.closed is False:
+            self.wfile.flush()
 
         if shutdown:
             killpg(getpgrp(), SIGHUP)

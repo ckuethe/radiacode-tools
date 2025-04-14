@@ -90,13 +90,13 @@ def test_server():
     srv = f"http://127.0.0.1:{amx._server.port}"
 
     # HTML index page
-    resp = requests.get(f"{srv}/web")
+    resp = requests.get(f"{srv}/")
     assert resp.ok
     assert resp.headers["Content-Type"] == "text/html"
     assert "Application Metrics" in resp.text
 
     # data
-    resp = requests.get(f"{srv}/")
+    resp = requests.get(f"{srv}/data")
     assert resp.ok
     d = resp.json()
     assert resp.headers["Content-Type"] == "application/json"
@@ -105,9 +105,9 @@ def test_server():
     assert d["process"]["real"]
     assert d["process"]["wall"]
 
-    # anything else should also return valid json
+    # anything else should also return valid json, though it's not a valid request
     resp = requests.get(f"{srv}/fail")
-    assert resp.ok
+    assert resp.ok is False
     assert resp.json()
 
     # shutdown command in safe mode requires the PID
