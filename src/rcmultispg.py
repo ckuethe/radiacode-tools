@@ -200,7 +200,6 @@ def rtdata_worker(rc: RadiaCode, serial_number: str) -> None:
                 if field in rtdata_msg and rtdata_msg[field] is not None:
                     ams.gauge_update(f"{field}_{serial_number}", rtdata_msg[field])
 
-            # print(rec, file=sys.stderr)
             DATA_QUEUE.put(RtData(**rtdata_msg))
     with STDIO_LOCK:
         print(f"Exiting rtdata_worker {serial_number}", file=sys.stderr)
