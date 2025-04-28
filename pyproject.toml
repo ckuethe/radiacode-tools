@@ -29,7 +29,7 @@ dependencies = [
   "flask>=3.1.0",
   "kaleido==0.2.0", # something is busted between uv and pypi...
   "qrcode>=8.0",
-  "radiacode>=0.3.4",
+  "radiacode>=0.3.5",
   "requests>=2.32.3",
   "tqdm>=4.67.1",
   "xmlschema>=3.4.5",

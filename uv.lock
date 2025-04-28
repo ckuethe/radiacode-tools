@@ -1242,15 +1242,15 @@ wheels = [
 
 [[package]]
 name = "radiacode"
-version = "0.3.4"
+version = "0.3.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "bluepy", marker = "sys_platform != 'darwin'" },
+    { name = "bluepy", marker = "sys_platform == 'linux'" },
     { name = "pyusb" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/b2/9d/a045a512bd6d91f6e22d87ffe43142e43c9f21de15727fd5ac0247abeaf9/radiacode-0.3.4.tar.gz", hash = "sha256:4717ce7d4ff4477f5d718f41eb02b6c7203f5b6f5e308bd8e0a266096ce37c14", size = 21976 }
+sdist = { url = "https://files.pythonhosted.org/packages/25/4c/cf2d7059ee17b4c2f43b5e89601a2c1e46d13ff4022bf17d945b408bb475/radiacode-0.3.5.tar.gz", hash = "sha256:4a2165b282656517a13ef82a207621d57d7729065758ddcb4c5dd368bb045fb6", size = 22925 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/4f/15/f342b79ce227935c0a40422a849ba3acc51966c7182dab75040cda9c08bf/radiacode-0.3.4-py3-none-any.whl", hash = "sha256:0a65c253a5786980a9bbe760a8922c4040660dd0ee810bfa8a68b00de770f839", size = 14461 },
+    { url = "https://files.pythonhosted.org/packages/2e/66/5053b48f9f195a823bb809bf6c2e615d385879e8e4a038c13d5b4dc03b8f/radiacode-0.3.5-py3-none-any.whl", hash = "sha256:fc237a9dfd3ebe0c7df03e2fe62866fee2e5a0c9e59a6414a7d52f8bd3a93425", size = 15265 },
 ]
 
 [[package]]
@@ -1299,7 +1299,7 @@ requires-dist = [
     { name = "matplotlib", marker = "extra == 'graphical'", specifier = ">=3.10.1" },
     { name = "plotly-express", marker = "extra == 'graphical'", specifier = ">=0.4.1" },
     { name = "qrcode", specifier = ">=8.0" },
-    { name = "radiacode", specifier = ">=0.3.4" },
+    { name = "radiacode", specifier = ">=0.3.5" },
     { name = "requests", specifier = ">=2.32.3" },
     { name = "tqdm", specifier = ">=4.67.1" },
     { name = "xmlschema", specifier = ">=3.4.5" },
