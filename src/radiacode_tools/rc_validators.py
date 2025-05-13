@@ -103,8 +103,8 @@ def _geocircle(s: str) -> GeoCircle:
     if (
         True
         and (3 == len(rv))
-        and (_LON_MIN <= rv[0] <= _LON_MAX)
-        and (_LAT_MIN <= rv[1] <= _LAT_MAX)
+        and (_LAT_MIN <= rv[0] <= _LAT_MAX)
+        and (_LON_MIN <= rv[1] <= _LON_MAX)
         and (0 < rv[2] <= _DIST_MAX)
     ):
         return GeoCircle(point=GeoPoint(latitude=rv[0], longitude=rv[1]), radius=rv[2])

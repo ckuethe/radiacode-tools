@@ -95,6 +95,8 @@ def test_geometry():
 def test_geocircle():
     gc = rc_validators._geocircle("1,2,3")
     assert GeoCircle(point=GeoPoint(latitude=1, longitude=2), radius=3) == gc
+    gc = rc_validators._geocircle("33.95,-118.41,3")
+    assert GeoCircle(point=GeoPoint(latitude=33.95, longitude=-118.41), radius=3) == gc
     with pytest.raises(ValueError):
         _ = rc_validators._geocircle("0,0,0")  # invalid radius
     with pytest.raises(ValueError):
