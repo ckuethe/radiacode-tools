@@ -13,6 +13,7 @@ from datetime import MINYEAR, datetime, timedelta
 from json import JSONEncoder
 from typing import Any, Dict, Iterable, List, Tuple, Union
 
+from radiacode.types import Enum as RadiacodeEnum
 from radiacode.types import Spectrum as RadiacodeSpectrum
 
 Number = Union[int, float]
@@ -26,8 +27,10 @@ DATEFMT_Z: str = DATEFMT + "%z"
 DATEFMT_T: str = DATEFMT.replace(" ", "T")
 DATEFMT_TZ: str = DATEFMT_T + "Z"
 
-_nan = float("nan")
-_outtatime = datetime(MINYEAR, 1, 1, 0, 0, 0)  # this will throw a ValueError if you .timestamp() it :)
+_nan = float("nan")  # didn't want to import math.nan
+# this will throw a ValueError if you .timestamp() it and is therefore a good
+# sentinel value. "outtatime" is, of course, a "Back to the Future" reference.
+_outtatime = datetime(MINYEAR, 1, 1, 0, 0, 0)
 
 
 class RcJSONEncoder(JSONEncoder):
@@ -41,6 +44,8 @@ class RcJSONEncoder(JSONEncoder):
             return o.isoformat()
         elif isinstance(o, timedelta):
             return o.total_seconds()
+        elif isinstance(o, RadiacodeEnum):
+            return o.name
         elif hasattr(o, "as_dict"):
             return o.as_dict()
         elif is_dataclass(o):
