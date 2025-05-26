@@ -223,7 +223,7 @@ class SGHeader(DataclassEncoderMixin):
 @dataclass(kw_only=True)
 class SpectrogramPoint(DataclassEncoderMixin):
     counts: List[int]
-    td: float
+    td: timedelta
     dt: datetime = _outtatime
 
 

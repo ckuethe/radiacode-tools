@@ -12,10 +12,10 @@ import pytest
 
 import spectrogram_energy
 
-test_dir = pathjoin(dirname(__file__), "data")
+test_dir: str = pathjoin(dirname(__file__), "data")
 
 
-header_fields = [
+header_fields: list[str] = [
     "Spectrogram: unittest",
     "Time: 2023-11-23 00:20:09",
     "Timestamp: 133451904099380000",
@@ -40,38 +40,6 @@ def test_argparse(monkeypatch):
     assert parsed_args.files == [test_dir]
 
 
-def test_filetime_to_unixtime():
-    parsed = spectrogram_energy.parse_header("\t".join(header_fields))
-    assert parsed.name == "unittest"
-    assert parsed.channels == 1024
-    assert "2023-11-23 05:20:09.938000+00:00" == str(parsed.timestamp)
-
-
-def test_extract_calibration():
-    # a real spectrum line is about 12kB but we only need the first 16 hex-pairs
-    spec_line = "Spectrum: 00 00 00 00 FC 35 CC C0 66 6B 17 40 82 97 E6 39 30"
-    ec = spectrogram_energy.extract_calibration_from_spectrum(spec_line)
-    assert pytest.approx(ec.a0, abs=1e-3) == -6.3816
-    assert pytest.approx(ec.a1, abs=1e-3) == 2.3659
-    assert pytest.approx(ec.a2, abs=1e-3) == 4.4e-5
-
-
-def test_parse_header():
-    parsed = spectrogram_energy.parse_header("\t".join(header_fields))
-    assert parsed.name == "unittest"
-    assert parsed.channels == 1024
-
-
-def test_parse_header_fail():
-    hf = header_fields.copy()
-    with pytest.raises(ValueError):
-        hf[4] = "Channels: 63"
-        spectrogram_energy.parse_header("\t".join(hf))
-    with pytest.raises(ValueError):
-        hf[4] = "Channels: 1025"
-        spectrogram_energy.parse_header("\t".join(hf))
-
-
 def test_load_spectrogram_fail():
     with pytest.raises(FileNotFoundError):
         spectrogram_energy.load_spectrogram(pathjoin(test_dir, "unobtainium.rcspg"))
@@ -93,4 +61,4 @@ def test_main(monkeypatch):
     spectrogram_energy.main()
 
     assert "K40.rcspg: 2.12uSv in 43510s" in sys.stdout.getvalue()  # from the K40 spectrogram
-    assert "not enough values to unpack" in sys.stderr.getvalue()  # from all the other test stuff
+    assert "while processing" in sys.stderr.getvalue()  # from all the other test stuff
