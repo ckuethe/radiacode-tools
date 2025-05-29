@@ -57,6 +57,9 @@ rcspectrogram = "rcspectroplot:main"
 gpsled = "gpsled:main"
 recursivedeadtime = "recursive_deadtime:main"
 
+[tool.ruff]
+line-length = 120
+
 [tool.black]
 line-length = 120
 
