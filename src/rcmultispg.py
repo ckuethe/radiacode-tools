@@ -27,7 +27,7 @@ from tempfile import mkstemp
 from threading import Barrier, BrokenBarrierError, Lock, Thread, active_count
 from threading import enumerate as list_threads
 from time import gmtime, monotonic, sleep, strftime, time
-from typing import Dict, List, TextIO, Tuple
+from typing import Any, Dict, List, TextIO, Tuple
 
 import usb.core  # type: ignore
 from radiacode import RadiaCode  # type: ignore
@@ -38,7 +38,7 @@ from radiacode_tools.rc_types import GpsData, RcJSONEncoder, RtData, SpecData
 from radiacode_tools.rc_utils import UTC, find_radiacode_devices
 from radiacode_tools.rc_validators import _gpsd
 
-ams = AppMetrics(stub=True)
+ams: AppMetrics = AppMetrics(stub=True)
 
 # According to radiacode.configuration(), DeviceParams.MinFrmPeriod_ms is 500.
 # I assume that means 2Hz internal data update rate, which also tracks with
@@ -49,9 +49,9 @@ STDIO_LOCK: Lock = Lock()  # Prevent stdio corruption
 THREAD_BARRIER: Barrier = Barrier(0)
 
 # Queues and stuff
-DATA_QUEUE: Queue = Queue()  # Global so I can use them in signal handlers
-CTRL_QUEUE: Queue = Queue()
-SHUTDOWN_OBJECT = object()
+DATA_QUEUE: Queue[Any] = Queue()  # Global so I can use them in signal handlers
+CTRL_QUEUE: Queue[Any] = Queue()
+SHUTDOWN_OBJECT: object = object()
 
 
 def tbar(wait_time=None) -> None:
@@ -192,7 +192,7 @@ def rtdata_worker(rc: RadiaCode, serial_number: str) -> None:
                 "type": rtd_type,
             }
 
-            rec_dict = rec.__dict__
+            rec_dict: dict[str, Any] = rec.__dict__
             rtdata_msg.update(
                 {
                     field: rec_dict.get(field, None)
@@ -254,7 +254,7 @@ def rc_worker(args: Namespace, serial_number: str) -> bool:
         tbar(10)
     except BrokenBarrierError:
         with STDIO_LOCK:
-            print(f"timeout waiting for all devices to connect", file=sys.stderr)
+            print("timeout waiting for all devices to connect", file=sys.stderr)
         return False
 
     rtdata_thread = Thread(
@@ -374,10 +374,6 @@ def gps_worker(args: Namespace) -> None:
     GPS data enrichment is ... a polite request. If GPSD goes down, navigation
     solutions are unavailable or invalid, etc. we don't want to take quit the
     whole process.
-
-    FIXME this does not tolerate gps disconnect/reconnect very well. I should
-    FIXME reuse the logic from webcgps or refactor this function to handle that
-    FIXME more robustly
     """
     BAD_GPS_ALT: float = -6378  # center of earth
     DFLT_GPSD_PORT: int = 2947
@@ -389,62 +385,67 @@ def gps_worker(args: Namespace) -> None:
     ams.gauge_create("sats_seen")
     ams.gauge_create("sats_used")
     # time in the GPS field is as reported by the GNSS receiver, and may (will) differ from host time
-    gps_fields = ["time", "gnss", "mode", "lat", "lon", "alt", "epc", "sep", "speed", "track", "climb"]
-    srv = (args.gpsd["host"], DFLT_GPSD_PORT if args.gpsd["port"] is None else args.gpsd["port"])
-    watch_args = {"enable": True, "json": True}
+    gps_fields: list[str] = ["time", "gnss", "mode", "lat", "lon", "alt", "epc", "sep", "speed", "track", "climb"]
+    srv: tuple[str, int] = (args.gpsd["host"], DFLT_GPSD_PORT if args.gpsd["port"] is None else args.gpsd["port"])
+    watch_args: dict[str, bool | str] = {"enable": True, "json": True}
     if args.gpsd["device"]:
         watch_args["device"] = args.gpsd["device"]
-    watch = "?WATCH=" + jdumps(watch_args)
+    watch: str = "?WATCH=" + jdumps(watch_args)
+    exstr = ""
     while CTRL_QUEUE.qsize() == 0:  # reconnect loop
         try:
-            with socket.create_connection(srv, timeout=3) as s:
-                gpsfd = s.makefile("rw")
-                print(watch, file=gpsfd, flush=True)
-                ams.flag_set("gps_connected")
-                dedup = None
-                while True:
-                    line = gpsfd.readline().strip()
-                    try:
-                        x = jloads(line)
-                        if x["class"] == "SKY":
-                            try:
-                                ams.gauge_update("sats_seen", int(x["nSat"]))
-                                ams.gauge_update("sats_used", int(x["uSat"]))
-                            except KeyError:
-                                pass
-                        if x["class"] != "TPV":
-                            continue
-                        if x["time"] == dedup:
-                            continue
-                        dedup = x["time"]
-                        ams.gauge_update("gps_mode", x["mode"])
-                        if x["mode"] < 2:
-                            continue
+            with socket.create_connection(srv, timeout=3) as s: 
+                s.setblocking(False)
+                with s.makefile("rw") as gpsfd:
+                    print(watch, file=gpsfd, flush=True)
+                    ams.flag_set("gps_connected")
+                    dedup = None
+                    while True:
+                        line: str = gpsfd.readline().strip()
+                        try:
+                            if "No such device" in line:
+                                raise IOError("GPSD is confused")
+                            x = jloads(line)
+                            if x["class"] == "SKY":
+                                try:
+                                    ams.gauge_update("sats_seen", int(x["nSat"]))
+                                    ams.gauge_update("sats_used", int(x["uSat"]))
+                                except KeyError:
+                                    pass
+                            if x["class"] != "TPV":
+                                continue
+                            if x["time"] == dedup:
+                                continue
+                            dedup = x["time"]
+                            ams.gauge_update("gps_mode", x["mode"])
+                            if x["mode"] < 2:
+                                continue
 
-                        x["gnss"] = True
-                        tpv = GpsData(monotime=monotonic(), payload={f: x.get(f, None) for f in gps_fields})
-                        ams.gauge_update("latitude", tpv.payload["lat"])
-                        ams.gauge_update("longitude", tpv.payload["lon"])
-                        ams.gauge_update("altitude", tpv.payload.get("alt", BAD_GPS_ALT))
-                        tpv.payload["hosttime"] = time()
-                        DATA_QUEUE.put(tpv)
-                    except KeyError as e:  # skip no fix, etc.
-                        pass
+                            x["gnss"] = True
+                            tpv: GpsData = GpsData(monotime=monotonic(), payload={f: x.get(f, None) for f in gps_fields})
+                            ams.gauge_update("latitude", tpv.payload["lat"])
+                            ams.gauge_update("longitude", tpv.payload["lon"])
+                            ams.gauge_update("altitude", tpv.payload.get("alt", BAD_GPS_ALT))
+                            tpv.payload["hosttime"] = time()
+                            DATA_QUEUE.put(tpv)
+                        except (ValueError,KeyError):  # skip no fix, etc.
+                            pass
 
-                    # Control Queue is non-empty, shutting down
-                    if CTRL_QUEUE.qsize():  # Check the control queue every line
-                        ams.flag_clear("gps_connected")
-                        return  # clean exit
-        except (
-            socket.error,
-            TimeoutError,
-            IOError,
-            JSONDecodeError,
-        ) as e:  # network error, complete garbage... give up and reconnect
-            DATA_QUEUE.put(GpsData(monotime=monotonic(), payload={"gnss": False, "mode": 0, "error": str(e)}))
+                        # Control Queue is non-empty, shutting down
+                        if CTRL_QUEUE.qsize():  # Check the control queue every line
+                            ams.flag_clear("gps_connected")
+                            return  # clean exit
+        except KeyboardInterrupt:
+            CTRL_QUEUE.put(SHUTDOWN_OBJECT)
+            ams.flag_clear("gps_connected")
+            return
+        except Exception as e:  # network error, complete garbage... give up and reconnect
+            exstr = str(e)
+        finally:
+            DATA_QUEUE.put(GpsData(monotime=monotonic(), payload={"gnss": False, "mode": 0, "error": exstr}))
             with STDIO_LOCK:
                 # if e.errno != 111:  # FIXME is ECONNREFUSED always 111? Is there a macro?
-                print(f"caught exception {e} in gps thread, reconnecting", file=sys.stderr)
+                print(f"caught exception {exstr} in gps thread, reconnecting", file=sys.stderr)
             sleep(1)
     # end reconnect loop
 
