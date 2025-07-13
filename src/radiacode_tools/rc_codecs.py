@@ -5,17 +5,18 @@
 # SPDX-License-Identifier: MIT
 
 import struct
-from typing import List, Union
+from typing import Union
 
 _B45C = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ $%*+-./:"  # defined in RFC9285
 
 
 def b45_encode(s: Union[str, bytearray]) -> str:
     "Encode a string or bytearray into a base45 ASCII *string*"
-    rv = []
+    rv: list[str] = []
     if isinstance(s, str):
         s = bytearray(s, "utf-8")
     padded = False
+    intval: int = 0
     for i in range(0, len(s), 2):
         try:
             intval = s[i] * 256 + s[i + 1]
@@ -38,14 +39,14 @@ def b45_decode(s: str) -> bytes:
     Decode a base45 ASCII string into bytes; original content may have been bytes.
     This will raise if an input character is not found in the _B45C character set.
     """
-    rv = []
+    rv: list[int] = []
     padded = False
     for i in range(0, len(s), 3):
-        v = [_B45C.index(c) for c in s[i : i + 3]]
+        v: list[int] = [_B45C.index(c) for c in s[i : i + 3]]
         if len(v) < 3:
             v.extend([0] * (3 - len(v)))
             padded = True
-        n = v[0] + v[1] * 45 + v[2] * 45**2
+        n: int = v[0] + v[1] * 45 + v[2] * 45**2
         a, b = divmod(n, 256)
         if padded:
             rv.append(b)
@@ -54,11 +55,11 @@ def b45_decode(s: str) -> bytes:
     return bytes(rv)
 
 
-def rle0_encode(l: List[int]) -> List[int]:
+def rle0_encode(L: list[int]) -> list[int]:
     "N42 CountedZeros. It's run length encoding, but only for zero value"
-    rv: List[int] = []
+    rv: list[int] = []
     nz = 0
-    for i, v in enumerate(l):
+    for v in L:
         if v:
             if nz:
                 rv.extend((0, nz))
@@ -71,23 +72,23 @@ def rle0_encode(l: List[int]) -> List[int]:
     return rv
 
 
-def rle0_decode(l: List[int]) -> List[int]:
+def rle0_decode(L: list[int]) -> list[int]:
     "Expand N42 CountedZeros into the uncompressed form"
     i = 0
-    n = len(l)
-    rv = []
+    n: int = len(L)
+    rv: list[int] = []
     while i < n:
-        if l[i] == 0:
-            rv.extend([0] * l[i + 1])
+        if L[i] == 0:
+            rv.extend([0] * L[i + 1])
             i += 2
         else:
-            rv.append(l[i])
+            rv.append(L[i])
             i += 1
 
     return rv
 
 
-def vbyte_encode(numbers: List[int]) -> bytes:
+def vbyte_encode(numbers: list[int]) -> bytes:
     """
     Compress a list of uint32 using variable length encoding. Much smaller than encoding everything as
     four byte ints or strings (up to 9 characters each). To be clear: every value must fit into uint32.
@@ -95,18 +96,18 @@ def vbyte_encode(numbers: List[int]) -> bytes:
     if all([0 <= i <= 0xFFFFFFFF for i in numbers]) is False:
         raise ValueError("All values must fit into unsigned 32-bit integer")
 
-    payload_len = len(numbers)
-    npad = payload_len % 4
+    payload_len: int = len(numbers)
+    npad: int = payload_len % 4
     if npad:
         numbers = numbers + [0] * (4 - npad)
 
-    control_bytes = []
-    data_bytes = []
+    control_bytes: list[bytes] = []
+    data_bytes: list[bytes] = []
 
     for i in range(0, len(numbers), 4):
         cb = 0
         for k in range(4):
-            n = numbers[i + k]
+            n: int = numbers[i + k]
             if n <= 0xFF:
                 cb |= 0 << (2 * k)
                 data_bytes.append(struct.pack("<B", n))
@@ -130,20 +131,20 @@ def vbyte_encode(numbers: List[int]) -> bytes:
     return b"".join([struct.pack("<H", payload_len), b"".join(control_bytes), b"".join(data_bytes)])
 
 
-def vbyte_decode(vbz: bytes) -> List[int]:
+def vbyte_decode(vbz: bytes) -> list[int]:
     "decompress vbyte encoded data into a regular list of ints"
-    rv: List[int] = []
+    rv: list[int] = []
     hl = 2
     nn = 0
 
-    payload_len = struct.unpack("<H", vbz[:hl])[0]
-    nctl = (payload_len + 3) // 4
+    payload_len: int = struct.unpack("<H", vbz[:hl])[0]
+    nctl: int = (payload_len + 3) // 4
 
-    ctl_bytes = vbz[hl : hl + nctl]
-    data_bytes = vbz[hl + nctl :] + b"\0\0\0\0"
+    ctl_bytes: bytes = vbz[hl : hl + nctl]
+    data_bytes: bytes = vbz[hl + nctl :] + b"\0\0\0\0"
 
     for cb in ctl_bytes:
-        nb = [((cb >> (2 * k)) & 0x03) + 1 for k in range(4)]
+        nb: list[int] = [((cb >> (2 * k)) & 0x03) + 1 for k in range(4)]
         for bl in nb:
             if bl == 1:
                 rv.append(data_bytes[nn])
