@@ -8,31 +8,32 @@ import os
 from argparse import ArgumentParser, Namespace
 
 import deadtime
+from radiacode_tools.rc_types import DTstats
 
-_UNSET_ = "n0"  # a bare neutron, just as a string whose contents may be searched
+_UNSET_: str = "n0"  # a bare neutron, just as a string whose contents may be searched
 
 
 def get_args() -> Namespace:
-    ap = ArgumentParser(
+    ap: ArgumentParser = ArgumentParser(
         description="Walk a file hierarchy looking for datasets which might be used to compute deadtime"
     )
     ap.add_argument("-b", "--bgfile", type=str)
     ap.add_argument(nargs=1, dest="datadir", type=str)
     ap.epilog = "A target directory must have three files: (<source>)_a.xml, (<source>)_b.xml, and $1+$2.xml, eg. cs137_a.xml, eu152_b.xml, cs137_a+eu152_b.xml"
-    args = ap.parse_args()
+    args: Namespace = ap.parse_args()
     args.datadir = args.datadir[0]
     return args
 
 
-def process_dir(dirname, files, rate_bg=0) -> bool:
+def process_dir(dirname: str, files: list[str], rate_bg: float = 0.0) -> bool:
     print(f"\nProcessing {dirname}")
-    n1 = _UNSET_
-    n2 = _UNSET_
-    n12 = _UNSET_
+    n1: str = _UNSET_
+    n2: str = _UNSET_
+    n12: str = _UNSET_
     files.sort()
     while files:
-        fn = files.pop()
-        nuc = fn.rstrip(".xml")
+        fn: str = files.pop()
+        nuc: str = fn.rstrip(".xml")
         if n2 == _UNSET_ and fn.endswith("_b.xml"):
             n2 = nuc
         if fn.endswith("_a.xml"):
@@ -40,14 +41,14 @@ def process_dir(dirname, files, rate_bg=0) -> bool:
         if n1 in fn and n2 in fn:
             n12 = nuc
 
-    rates = {
+    rates: dict[str, float] = {
         "bg": rate_bg,
         "a": deadtime.get_rate_from_spectrum(os.path.join(dirname, f"{n1}.xml")),
         "b": deadtime.get_rate_from_spectrum(os.path.join(dirname, f"{n2}.xml")),
         "ab": deadtime.get_rate_from_spectrum(os.path.join(dirname, f"{n12}.xml")),
     }
 
-    dt = deadtime.print_deadtime(rates)
+    dt: DTstats = deadtime.print_deadtime(rates)
     if dt.dt_us < 0:
         print("WARNING: bogus deadtime!")
         return False
@@ -55,14 +56,13 @@ def process_dir(dirname, files, rate_bg=0) -> bool:
 
 
 def main() -> None:
-    args = get_args()
+    args: Namespace = get_args()
+    rate_bg: float = 0.0
     if args.bgfile:
         rate_bg = deadtime.get_rate_from_spectrum(args.bgfile)
-    else:
-        rate_bg = 0
 
     # file deepcode ignore PT: CLI tool intentionally opening the files the user asked for
-    for rootdir, dirs, files in os.walk(args.datadir):
+    for rootdir, _dirs, files in os.walk(args.datadir):
         if 3 == len(files):
             process_dir(rootdir, files, rate_bg=rate_bg)
 
