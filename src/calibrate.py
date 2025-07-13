@@ -9,7 +9,7 @@ import os
 from argparse import ArgumentParser, Namespace
 from sys import exit
 from tempfile import mkstemp
-from typing import Iterable, List, NoReturn, Tuple
+from typing import Iterable, NoReturn
 
 from numpy import corrcoef
 from numpy.polynomial import Polynomial
@@ -79,7 +79,7 @@ def template_calibration(args: Namespace) -> NoReturn:
     exit(0)
 
 
-def load_calibration(args: Namespace) -> List[Tuple[Number, Number]]:
+def load_calibration(args: Namespace) -> list[tuple[int,float]]:
     """
     Calibration file is a json file which contains a dict like this:
 
@@ -98,7 +98,7 @@ def load_calibration(args: Namespace) -> List[Tuple[Number, Number]]:
     }
 
     """
-    rv = []
+    rv: list[tuple[int, float]] = []
     # file deepcode ignore PT: CLI too, intentionally opening the file the user asked for
     with open(args.cal_file) as ifd:
         data = json.load(ifd)
@@ -114,7 +114,7 @@ def load_calibration(args: Namespace) -> List[Tuple[Number, Number]]:
 
 
 def get_args() -> Namespace:
-    ap = ArgumentParser()
+    ap: ArgumentParser = ArgumentParser()
     ap.add_argument(
         "-z",
         "--zero-start",
@@ -164,8 +164,8 @@ def rsquared(xlist: Iterable[Number], ylist: Iterable[Number], coeffs: Iterable[
     ylist: an array of y-value measurements of the same dimension as xlist
     coeffs: an iterable of polynomial coefficients, least significant first (x^0, x^1, .. , x^n)
     """
-    chan2kev = Polynomial(coeffs)
-    computed: List[Number] = [chan2kev(i) for i in xlist]
+    chan2kev: Polynomial = Polynomial(coeffs)
+    computed: list[Number] = [chan2kev(i) for i in xlist]
     corr_matrix = corrcoef(ylist, computed)  # type:ignore
     r_squared = corr_matrix[0, 1] ** 2
 
@@ -173,31 +173,31 @@ def rsquared(xlist: Iterable[Number], ylist: Iterable[Number], coeffs: Iterable[
     return r_squared
 
 
-def make_fit(chan, energy, args) -> List[float]:
-    pf = Polynomial.fit(chan, energy, deg=args.order, window=[min(chan), max(chan)]).coef
+def make_fit(chan, energy, args) -> list[float]:
+    pf:list[float] = Polynomial.fit(chan, energy, deg=args.order, window=[min(chan), max(chan)]).coef
     pf = [round(f, args.precision) for f in pf]
     print(f"x^0 .. x^{args.order}: {pf}")
     return pf
 
 
 def main() -> None:
-    args = get_args()
+    args: Namespace = get_args()
 
     if args.write_template:
         template_calibration(args)
 
     try:
-        data = load_calibration(args)
+        data: list[tuple[int, float]] = load_calibration(args)
     except FileNotFoundError:
         print(f"Calibration file '{args.cal_file}' does not exist")
         exit(1)
     except (TypeError, json.JSONDecodeError):
-        print(f"Data format error loading calibration file")
+        print("Data format error loading calibration file")
         exit(1)
     chan, energy = zip(*data)
 
     print(f"data range: {data[0]} - {data[-1]}")
-    pf = make_fit(chan, energy, args)
+    pf: list[float] = make_fit(chan, energy, args)
     rsquared(chan, energy, pf)
 
 
