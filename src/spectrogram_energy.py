@@ -55,14 +55,14 @@ def main() -> None:
             # file deepcode ignore PT: CLI tool intentionally opening the files the user asked for
             for root, _, files in os.walk(d):
                 found_files.extend([os.path.join(root, f) for f in files])
-        args.files = found_files  # pyrefly: ignore missing-attribute
+        args.files = found_files
 
     for fn in args.files:
         try:
             sp: SpecEnergy = load_spectrogram(fn)
             rate: float = s_per_hr * sp.dose / sp.duration.total_seconds()
             print(
-                f"{fn}: {sp.dose:.2f}uSv in {int(sp.duration.total_seconds())}s | {rate:.2f}uSv/hr | peak: {sp.peak_dose*s_per_hr:.2f}uSv/hr"
+                f"{fn}: {sp.dose:.2f}uSv in {int(sp.duration.total_seconds())}s | {rate:.2f}uSv/hr | peak: {sp.peak_dose * s_per_hr:.2f}uSv/hr"
             )
         except KeyboardInterrupt:
             return  # make ^C work
