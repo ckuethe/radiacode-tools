@@ -79,7 +79,7 @@ def get_args() -> Namespace:
     return rv
 
 
-def load_file_lines(args) -> Dict[str, Dict[str, Any]]:
+def load_file_lines(args: Namespace) -> Dict[str, Dict[str, Any]]:
     with open(args.input) as ifd:
         db: Dict[str, Dict[str, Any]] = {}
         timekey = ""
@@ -120,14 +120,14 @@ def load_file_lines(args) -> Dict[str, Dict[str, Any]]:
         return db
 
 
-def keys_missing(required: Iterable, have: Iterable) -> bool:
-    missing = set(required).difference(set(have))
+def keys_missing(required: Iterable[str], have: Iterable[str]) -> bool:
+    missing: set[str] = set(required).difference(set(have))
     return True if missing else False
 
 
 def convert_lines_to_track(args: Namespace, lines: Dict[str, Dict[str, Any]]) -> RcTrack:
-    trk = RcTrack()
-    req_keys = {"datetime", "lat", "lon", "dose_rate", "epc", "count_rate"}
+    trk: RcTrack = RcTrack()
+    req_keys: set[str] = {"datetime", "lat", "lon", "dose_rate", "epc", "count_rate"}
 
     for ts in sorted(lines.keys()):
         d = lines[ts]
@@ -152,9 +152,9 @@ def convert_lines_to_track(args: Namespace, lines: Dict[str, Dict[str, Any]]) ->
 
 
 def main() -> None:
-    args = get_args()
+    args: Namespace = get_args()
     db = load_file_lines(args)
-    trk = convert_lines_to_track(args, db)
+    trk: RcTrack = convert_lines_to_track(args, db)
     print(f"Created track with {len(trk.points)} points")
     trk.write_file(args.output)
 
