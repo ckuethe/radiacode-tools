@@ -15,6 +15,7 @@ from datetime import datetime, timedelta
 from os.path import basename, dirname
 from os.path import join as pathjoin
 from os.path import realpath
+from typing import Any
 
 from radiacode_tools.rc_files import RcSpectrogram
 from radiacode_tools.rc_types import EnergyCalibration
@@ -23,7 +24,7 @@ from radiacode_tools.rc_types import EnergyCalibration
 def get_args() -> Namespace:
     "The usual argparse stuff"
 
-    ap = ArgumentParser(description="Convert json log format into radiacode formats")
+    ap: ArgumentParser = ArgumentParser(description="Convert json log format into radiacode formats")
     ap.add_argument(
         "-i",
         "--input",
@@ -63,7 +64,7 @@ def get_args() -> Namespace:
 
     _dev_stdin = "/dev/stdin"
     _dev_stdout = "/dev/stdout"
-    rv = ap.parse_args()
+    rv: Namespace = ap.parse_args()
     if rv.input in ["-", "", None]:
         rv.input = _dev_stdin
 
@@ -80,16 +81,16 @@ def get_args() -> Namespace:
 
 
 def main() -> None:
-    args = get_args()
+    args: Namespace = get_args()
     with open(args.input) as ifd:
-        spg = RcSpectrogram()
+        spg: RcSpectrogram = RcSpectrogram()
         for line in ifd:
             if "counts" not in line:
                 continue  # not a spectrum; might be GNSS, battery, etc. Skip it.
             if args.serial_number and args.serial_number not in line:
                 continue  # not the serial number we want. Skip it
 
-            rec = json.loads(line)
+            rec: dict[str, Any] = json.loads(line)
             if spg.serial_number:  # set by the first valid record
                 spg.add_point(timestamp=rec["timestamp"], counts=rec["counts"])  # also updates accumulation time
             else:
@@ -97,7 +98,7 @@ def main() -> None:
                 spg.serial_number = args.serial_number = rec["serial_number"]  # cache the first serial number found
                 spg.name = args.name or f"Spectrogram {spg.timestamp}"
                 spg.comment = args.comment or ""
-                c = rec["calibration"]
+                c: list[float] = rec["calibration"]
                 spg.calibration = EnergyCalibration(a0=c[0], a1=c[1], a2=c[2])
                 spg.add_point(
                     timestamp=rec["timestamp"],
