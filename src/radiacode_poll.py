@@ -7,7 +7,7 @@
 import os
 import sys
 import warnings
-from argparse import ArgumentParser, Namespace
+from argparse import ArgumentParser, Namespace, _MutuallyExclusiveGroup
 from datetime import datetime, timedelta
 from tempfile import mkstemp
 from time import sleep
@@ -19,7 +19,7 @@ from dateutil.parser import parse as dp  # type: ignore
 from tqdm.auto import tqdm  # type: ignore
 
 from radiacode_tools.rc_files import RcN42, RcSpectrum
-from radiacode_tools.rc_types import EnergyCalibration, SpectrumLayer
+from radiacode_tools.rc_types import EnergyCalibration, RcHwInfo, SpectrumLayer
 from radiacode_tools.rc_utils import (
     get_device_id,
     get_dose_from_spectrum,
@@ -29,13 +29,21 @@ from radiacode_tools.rc_validators import _positive_float
 
 
 def get_args() -> Namespace:
-    ap = ArgumentParser(description="Poll a RadiaCode PSRD and produce an N42 file")
-    ap.add_argument(
+    ap: ArgumentParser = ArgumentParser(description="Poll a RadiaCode PSRD and produce an N42 file")
+    dmx: _MutuallyExclusiveGroup = ap.add_mutually_exclusive_group()
+    dmx.add_argument(
         "-b",
         "--btaddr",
         type=str,
         metavar="MAC",
         help="Bluetooth address of device; leave blank to use USB",
+    )
+    dmx.add_argument(
+        "-s",
+        "--serial-number",
+        type=str,
+        metavar="STR",
+        help="Serial number of USB connected device",
     )
     ap.add_argument(
         "-l",
@@ -44,7 +52,7 @@ def get_args() -> Namespace:
         action="store_true",
         help="List connected devices and exit",
     )
-    mx = ap.add_mutually_exclusive_group()  # only one way of accumulation may be selected
+    mx: _MutuallyExclusiveGroup = ap.add_mutually_exclusive_group()  # only one way of accumulation may be selected
     mx.add_argument(
         "--accumulate",
         default=False,
@@ -73,7 +81,7 @@ def get_args() -> Namespace:
         + "time the intial spectrum was captured. If not specified, the output file will "
         + "contain the intial and final spectra, which can be subtracted in other tools.",
     )
-    ux = ap.add_mutually_exclusive_group()
+    ux: _MutuallyExclusiveGroup = ap.add_mutually_exclusive_group()
     ux.add_argument(
         "-u",
         "--url",
@@ -101,7 +109,7 @@ def get_args() -> Namespace:
         help="Reset accumulated dose. Very Dangerous.",
     )
     ap.add_argument(dest="outfile", nargs="?", default="", help="default: stdout")
-    rv = ap.parse_args()
+    rv: Namespace = ap.parse_args()
 
     # post-processing stages.
     rv.want_accumulation = any([rv.accumulate, rv.accumulate_time, rv.accumulate_dose])
@@ -135,7 +143,7 @@ def wait_for_time(args: Namespace) -> None:
 
 
 def wait_for_dose(args: Namespace, m0: radiacode.Spectrum, dev: radiacode.RadiaCode) -> float:
-    initial_energy = get_dose_from_spectrum(m0.counts, EnergyCalibration(a0=m0.a0, a1=m0.a1, a2=m0.a2))
+    initial_energy: float = get_dose_from_spectrum(m0.counts, EnergyCalibration(a0=m0.a0, a1=m0.a1, a2=m0.a2))
     recv_dose = 0.0
     with tqdm(
         desc=f"Target Dose ({args.accumulate_dose:.3f}uSv)",
@@ -146,7 +154,7 @@ def wait_for_dose(args: Namespace, m0: radiacode.Spectrum, dev: radiacode.RadiaC
             waiting = True
             while waiting:
                 sleep(1)
-                s = dev.spectrum()
+                s: radiacode.Spectrum = dev.spectrum()
                 recv_dose = (
                     get_dose_from_spectrum(s.counts, EnergyCalibration(a0=s.a0, a1=s.a1, a2=s.a2)) - initial_energy
                 )
@@ -160,23 +168,27 @@ def wait_for_dose(args: Namespace, m0: radiacode.Spectrum, dev: radiacode.RadiaC
 
 
 def main() -> None:
-    args = get_args()
+    args: Namespace = get_args()
 
     if args.list_devices:
         probe_radiacode_devices()
         return
 
-    dev = radiacode.RadiaCode(args.btaddr)
+    if args.btaddr:
+        dev: radiacode.RadiaCode = radiacode.RadiaCode(bluetooth_mac=args.btaddr)
+    else:
+        dev = radiacode.RadiaCode(serial_number=args.serial_number)
+
     if args.reset_spectrum:
         dev.spectrum_reset()
     if args.reset_dose:
         dev.dose_reset()
 
-    dev_id = get_device_id(dev)
-    measurement = dev.spectrum()  # Always grab a spectrum to start
-    obs_start = datetime.utcnow()
-    n42_writer = RcN42()
-    sp = RcSpectrum()
+    dev_id: RcHwInfo = get_device_id(dev)
+    measurement: radiacode.Spectrum = dev.spectrum()  # Always grab a spectrum to start
+    obs_start: datetime = datetime.utcnow()
+    n42_writer: RcN42 = RcN42()
+    sp: RcSpectrum = RcSpectrum()
     if args.want_accumulation:  # are we accumulating measurements over time?
         # suppress tqdm warnings when we exceed the expected maximum
         warnings.filterwarnings("ignore", module="tqdm")
@@ -187,15 +199,15 @@ def main() -> None:
         elif args.accumulate_dose:  # yep, until a set dose is reached
             wait_for_dose(args, measurement, dev)
         # Cool, we've waited long enough, grab the end spectrum
-        measurement1 = dev.spectrum()
+        measurement1: radiacode.Spectrum = dev.spectrum()
 
         if args.bgsub:  # Subtract initial measurement to get just the accumulated data
-            dt = measurement1.duration - measurement.duration
-            diff_counts = [x[1] - x[0] for x in zip(measurement.counts, measurement1.counts)]
+            dt: timedelta = measurement1.duration - measurement.duration
+            diff_counts: list[int] = [x[1] - x[0] for x in zip(measurement.counts, measurement1.counts)]
             sp.fg_spectrum = SpectrumLayer(
-                device_model=dev_id["model"],
-                serial_number=dev_id["sernum"],
-                calibration=EnergyCalibration(measurement.a0, measurement.a1, measurement.a2),
+                device_model=dev_id.model,
+                serial_number=dev_id.serial_number,
+                calibration=EnergyCalibration(a0=measurement.a0, a1=measurement.a1, a2=measurement.a2),
                 timestamp=obs_start,
                 duration=dt,
                 channels=len(diff_counts),
@@ -204,9 +216,9 @@ def main() -> None:
             )
         else:  # don't subtract the background, just include it.
             sp.bg_spectrum = SpectrumLayer(
-                device_model=dev_id["model"],
-                serial_number=dev_id["sernum"],
-                calibration=EnergyCalibration(measurement.a0, measurement.a1, measurement.a2),
+                device_model=dev_id.model,
+                serial_number=dev_id.serial_number,
+                calibration=EnergyCalibration(a0=measurement.a0, a1=measurement.a1, a2=measurement.a2),
                 timestamp=obs_start,
                 duration=measurement.duration,
                 channels=len(measurement.counts),
@@ -214,9 +226,9 @@ def main() -> None:
                 spectrum_name="untitled background",
             )
             sp.fg_spectrum = SpectrumLayer(
-                device_model=dev_id["model"],
-                serial_number=dev_id["sernum"],
-                calibration=EnergyCalibration(measurement1.a0, measurement1.a1, measurement1.a2),
+                device_model=dev_id.model,
+                serial_number=dev_id.serial_number,
+                calibration=EnergyCalibration(a0=measurement1.a0, a1=measurement1.a1, a2=measurement1.a2),
                 timestamp=obs_start,
                 duration=measurement1.duration,
                 channels=len(measurement1.counts),
@@ -224,7 +236,7 @@ def main() -> None:
                 spectrum_name="untitled foreground",
             )
         n42_writer.from_rcspectrum(sp)
-        data = n42_writer.generate_xml()
+        data: str = n42_writer.generate_xml()
 
     else:  # instantaneous capture
         sp.fg_spectrum = SpectrumLayer(
@@ -240,7 +252,7 @@ def main() -> None:
         n42_writer.from_rcspectrum(sp)
         data = n42_writer.generate_xml()
 
-    dose = get_dose_from_spectrum(
+    dose: float = get_dose_from_spectrum(
         measurement.counts, EnergyCalibration(a0=measurement.a0, a1=measurement.a1, a2=measurement.a2)
     )
     print(f"Total dose: {dose:.2f}uSv ({dev_id.serial_number})", file=sys.stderr)
@@ -263,13 +275,13 @@ def main() -> None:
             timestamp=obs_start,
             options=enc_opts,
         )
-        qbody = quote_plus(rc_radqr.b45_encode(deflate(msg)))
-        url = f"RADDATA://G0/{enc_opts:02X}00/{qbody}"
+        qbody: str = quote_plus(rc_radqr.b45_encode(deflate(msg)))
+        url: str = f"RADDATA://G0/{enc_opts:02X}00/{qbody}"
         if args.qrcode:
             # defer import until it's needed
-            import qrcode  # type: ignore
+            from qrcode import QRCode
 
-            qc = qrcode.QRCode()
+            qc: QRCode = QRCode()
             qc.add_data(url)
             if args.outfile:
                 ofd = open(tfn, "wb")
