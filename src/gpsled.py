@@ -33,7 +33,7 @@ WantedBy=multi-user.target
 """
 
 
-def configure_led(args: Namespace, enable: bool = True):
+def configure_led(args: Namespace, enable: bool = True) -> None:
     subprocess.run(["/usr/sbin/modprobe", "ledtrig-pattern"], check=True)
     with open(args.led_path, "w") as ofd:
         print("pattern" if enable else "none", file=ofd)
@@ -47,7 +47,7 @@ def configure_led(args: Namespace, enable: bool = True):
 
 
 def get_args() -> Namespace:
-    def _led(s):
+    def _led(s: str) -> str:
         "check for /trigger because it's available in all modes"
         if isinstance(s, list):
             s = s[0]
@@ -58,7 +58,7 @@ def get_args() -> Namespace:
         else:
             return _led(f"/sys/class/leds/{s}/trigger")
 
-    ap = ArgumentParser()
+    ap: ArgumentParser = ArgumentParser()
     ap.add_argument(
         "-g",
         "--gpsd",
@@ -81,7 +81,7 @@ def get_args() -> Namespace:
         help="/sys/class/leds/<led>/trigger",
     )
 
-    args = ap.parse_args()
+    args: Namespace = ap.parse_args()
     args.led_path = args.led_path[0]
 
     if args.gpsd is None:
@@ -96,29 +96,33 @@ def gps_worker(args: Namespace) -> None:
     if not os.path.exists(args.led_path):
         raise FileNotFoundError(args.led_path)
 
-    watch_args = {"enable": True, "json": True}
+    watch_args: dict[str, str | bool] = {"enable": True, "json": True}
     if args.gpsd.get("dev", ""):
         watch_args["device"] = args.gpsd["dev"]
-    watchstr = "?WATCH=" + jdumps(watch_args)
+    watchstr: str = "?WATCH=" + jdumps(watch_args)
 
-    last_state = None
+    last_state: int = -1
     with open(args.led_path.replace("/trigger", "/pattern"), "wt") as ofd:
         while True:
             try:
+                # FIXME use the same logic from webcgps to detect loss of device and reconnection
                 with socket.create_connection(srv, 3) as s:
                     gpsfd = s.makefile("rw")
 
                     print(watchstr, file=gpsfd, flush=True)
-                    dedup = None
+                    dedup = ""
                     while True:
-                        line = gpsfd.readline().strip()
+                        line: str = gpsfd.readline().strip()
                         try:
-                            x = jloads(line)
+                            x: dict[str, str | int | float] = jloads(line)
                             if x["class"] != "TPV":
                                 continue
                             if x["time"] == dedup:
                                 continue
-                            tpv = {f: x.get(f, None) for f in ["time", "mode", "lat", "lon", "alt", "speed", "track"]}
+                            dedup = x["time"]
+                            tpv: dict[str, str | int | float] = {
+                                f: x.get(f, "") for f in ["time", "mode", "lat", "lon", "alt", "speed", "track"]
+                            }
 
                             if tpv["mode"] != last_state:
                                 if tpv["mode"] == 3:
@@ -130,6 +134,7 @@ def gps_worker(args: Namespace) -> None:
                                 else:
                                     print("0 495 1 5", flush=True, file=ofd)
                                     tpv["led"] = "blip"
+                                last_state = tpv["mode"]
 
                             if args.verbose:
                                 print(tpv)
@@ -145,7 +150,7 @@ def gps_worker(args: Namespace) -> None:
 
 
 def main() -> None:
-    args = get_args()
+    args: Namespace = get_args()
     configure_led(args)
     gps_worker(args)
 
