@@ -8,7 +8,7 @@ import base64
 import datetime
 import re
 import zlib
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional, Tuple
 from urllib.parse import unquote_plus
 
 from dateutil.parser import parse as dateparse
@@ -30,13 +30,17 @@ OPT_CSV_SPECTRUM = 0x04
 OPT_NO_SPEC_RLE0 = 0x08
 
 
-def extract_metadata(uri: str, debug=False) -> Dict[str, Any]:
+def extract_metadata(uri: str, debug=False) -> dict[str, Any]:
     "Given a RADDATA URL, produce a dict of metadata and the payload"
-    rv = re.match(
+    m = re.match(
         r"^(RADDATA|INTERSPEC)://G(?P<specver>\d)/(?P<options>[0-9a-f]{1,2})(?P<n_uris>[0-9a-f])(?P<n_spectra>[0-9a-f])/(?P<data>.+)",
         uri,
         re.I | re.S | re.M,
-    ).groupdict()
+    )
+    if m is None:
+        raise ValueError("Unable to parse URL")
+
+    rv: dict[str, Any] = m.groupdict()
     for f in ["specver", "n_uris", "n_spectra", "options"]:
         rv[f] = int(rv[f], 16)
 
@@ -61,7 +65,7 @@ def extract_metadata(uri: str, debug=False) -> Dict[str, Any]:
     return rv
 
 
-def parse_payload_fields(msg: bytes, debug=False) -> Dict[str, Any]:
+def parse_payload_fields(msg: bytes, debug=False) -> dict[str, Any]:
     """
     The payload can have a variable number of fields - k:v pairs - only two of which are
     required: live/real times (T) and the actual spectrum (S) data. The spectrum must be
@@ -111,12 +115,12 @@ def parse_payload_fields(msg: bytes, debug=False) -> Dict[str, Any]:
     return rv
 
 
-def decode_qr_data(msg: str, debug: bool = False) -> Dict[str, Any]:
+def decode_qr_data(msg: str, debug: bool = False) -> dict[str, Any]:
     "Main decoder. Given the text embodied in a QR Code, produce a dict of the measurement"
-    rv = extract_metadata(msg, debug)
+    rv: dict[str, Any] = extract_metadata(msg, debug)
 
     # Payload may be some combination of URL encoded, base64 encoded, base45 encoded, and deflated
-    payload = unquote_plus(rv["data"])
+    payload: str | bytes = unquote_plus(rv["data"])
     if rv["base_x_encoded"]:
         if rv["use_base64"]:
             if debug:
@@ -155,10 +159,10 @@ def decode_qr_data(msg: str, debug: bool = False) -> Dict[str, Any]:
 
 def make_qr_payload(
     *,
-    lr_times: Tuple[Number, Number],
-    spectrum: List[int],
-    calibration: List[int] = None,
-    deviations: Optional[List[Tuple[Number, Number]]] = None,
+    lr_times: list[float | int],
+    spectrum: list[int],
+    calibration: list[float] = None,
+    deviations: Optional[list[Tuple[Number, Number]]] = None,
     mclass: Optional[str] = "",
     location: Optional[Tuple[Number, Number]] = None,
     detector_model: Optional[str] = "",
@@ -171,9 +175,9 @@ def make_qr_payload(
     Format the payload of the raddata/interspec qrcode
 
     lr_times [T]: required. live time and real ("wall") time. Live time <= real time. Tuple[Number,Number]
-    spectrum [S]: required. counts in each detector channel. List[int]
-    calibration [C]: calibration coefficients. List[Number]
-    deviations [D]: energy deviation values. List[Tuple[Number,Number]]
+    spectrum [S]: required. counts in each detector channel. list[int]
+    calibration [C]: calibration coefficients. list[Number]
+    deviations [D]: energy deviation values. list[Tuple[Number,Number]]
     mclass [I]: item type, or MeasurementClass in N42 parlance. One of [FBICN]
     location [L]: location where the measurement was taken. Tuple[Number,Number]
     detector_model [M]: Freeform text describing the detector. str
@@ -181,7 +185,7 @@ def make_qr_payload(
     comment [O]: Freeform text. str
     timestamp [P]: when this measurement was taken. [datetime.datetime]
 
-    (Playing fast and loose with the type annotations: Number is a float or int, List and Tuple are more or less equivalent)
+    (Playing fast and loose with the type annotations: Number is a float or int, list and Tuple are more or less equivalent)
     """
     fields = []
 

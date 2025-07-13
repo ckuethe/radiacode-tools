@@ -95,13 +95,13 @@ def test_radqr_decode_alt_scheme():
 
 def test_radqr_decode_fail():
     # Check URI schem
-    with pytest.raises(AttributeError):
+    with pytest.raises(ValueError):
         msg = qr_tests[0][0].replace("RADDATA", "http")
         _ = rc_radqr.decode_qr_data(msg)
-    with pytest.raises(AttributeError):
+    with pytest.raises(ValueError):
         msg = qr_tests[0][0].replace("RADDATA", "Xraddata")
         _ = rc_radqr.decode_qr_data(msg)
-    with pytest.raises(AttributeError):
+    with pytest.raises(ValueError):
         msg = qr_tests[0][0].replace("RADDATA", "interspecX")
         _ = rc_radqr.decode_qr_data(msg)
 
@@ -111,16 +111,16 @@ def test_radqr_decode_fail():
         _ = rc_radqr.decode_qr_data(msg)
 
     # Check Flags - most of these will throw AttributeError when the regex doesn't match
-    with pytest.raises(AttributeError):
+    with pytest.raises(ValueError):
         msg = qr_tests[0][0].replace("/000/", "//")  # can't be empty
         _ = rc_radqr.decode_qr_data(msg)
-    with pytest.raises(AttributeError):
+    with pytest.raises(ValueError):
         msg = qr_tests[0][0].replace("/000/", "/00/")  # less than 3 characters is too short
         _ = rc_radqr.decode_qr_data(msg)
-    with pytest.raises(AttributeError):
+    with pytest.raises(ValueError):
         msg = qr_tests[0][0].replace("/000/", "/00000/")  # more than 4 characters is too long
         _ = rc_radqr.decode_qr_data(msg)
-    with pytest.raises(AttributeError):
+    with pytest.raises(ValueError):
         msg = qr_tests[0][0].replace("/000/", "/X000/")  # Only hexchars [0-9a-f]
         _ = rc_radqr.decode_qr_data(msg)
     with pytest.raises(ValueError, match="Undefined option bits set") as cm:
