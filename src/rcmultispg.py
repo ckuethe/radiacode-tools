@@ -18,7 +18,6 @@ import socket
 import sys
 from argparse import ArgumentParser, Namespace
 from datetime import datetime
-from json import JSONDecodeError
 from json import dumps as jdumps
 from json import loads as jloads
 from queue import Queue
@@ -174,7 +173,7 @@ def rtdata_worker(rc: RadiaCode, serial_number: str) -> None:
             except Exception as e:
                 z = str(e.args[0])
                 with STDIO_LOCK:
-                    print(f"rtdata_worker caught exception {z}", file=sys.stderr)
+                    print(f"rtdata_worker {serial_number} caught exception {z}", file=sys.stderr)
                 if "seq jump" in z or "but have only" in z:
                     sleep(0.1)
                     continue
@@ -221,7 +220,7 @@ def rc_worker(args: Namespace, serial_number: str) -> bool:
     ams.gauge_create(f"count_rate_{serial_number}")
     RC_LOCKS[serial_number] = Lock()
     try:
-        rc = RadiaCode(serial_number=serial_number)
+        rc: RadiaCode = RadiaCode(serial_number=serial_number)
     except (usb.core.USBTimeoutError, usb.core.USBError, DeviceNotFound) as e:
         with STDIO_LOCK:
             print(
@@ -298,7 +297,7 @@ def rc_worker(args: Namespace, serial_number: str) -> bool:
 
     with STDIO_LOCK:
         print(
-            f"{serial_number} data collection stop - {samples} records, {samples*args.interval:.1f}s", file=sys.stderr
+            f"{serial_number} data collection stop - {samples} records, {samples * args.interval:.1f}s", file=sys.stderr
         )
 
     return True
@@ -394,7 +393,7 @@ def gps_worker(args: Namespace) -> None:
     exstr = ""
     while CTRL_QUEUE.qsize() == 0:  # reconnect loop
         try:
-            with socket.create_connection(srv, timeout=3) as s: 
+            with socket.create_connection(srv, timeout=3) as s:
                 s.setblocking(False)
                 with s.makefile("rw") as gpsfd:
                     print(watch, file=gpsfd, flush=True)
@@ -422,13 +421,15 @@ def gps_worker(args: Namespace) -> None:
                                 continue
 
                             x["gnss"] = True
-                            tpv: GpsData = GpsData(monotime=monotonic(), payload={f: x.get(f, None) for f in gps_fields})
+                            tpv: GpsData = GpsData(
+                                monotime=monotonic(), payload={f: x.get(f, None) for f in gps_fields}
+                            )
                             ams.gauge_update("latitude", tpv.payload["lat"])
                             ams.gauge_update("longitude", tpv.payload["lon"])
                             ams.gauge_update("altitude", tpv.payload.get("alt", BAD_GPS_ALT))
                             tpv.payload["hosttime"] = time()
                             DATA_QUEUE.put(tpv)
-                        except (ValueError,KeyError):  # skip no fix, etc.
+                        except (ValueError, KeyError):  # skip no fix, etc.
                             pass
 
                         # Control Queue is non-empty, shutting down
@@ -445,7 +446,8 @@ def gps_worker(args: Namespace) -> None:
             DATA_QUEUE.put(GpsData(monotime=monotonic(), payload={"gnss": False, "mode": 0, "error": exstr}))
             with STDIO_LOCK:
                 # if e.errno != 111:  # FIXME is ECONNREFUSED always 111? Is there a macro?
-                print(f"caught exception {exstr} in gps thread, reconnecting", file=sys.stderr)
+                if "Connection refused" not in exstr:
+                    print(f"caught exception {exstr} in gps thread, reconnecting", file=sys.stderr)
             sleep(1)
     # end reconnect loop
 
