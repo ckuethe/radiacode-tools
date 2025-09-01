@@ -472,6 +472,11 @@ def create_threads(args: Namespace) -> Tuple[int, List[Thread]]:
         thread_list.append(gps_thread)
         gps_thread.start()
         thread_count += 1
+    else:
+        ams.flag_create("gps_connected")
+        ams.gauge_create("gps_mode")
+        ams.gauge_create("sats_seen")
+        ams.gauge_create("sats_used")
 
     for serial_number in args.devs:
         rc_thread = Thread(
