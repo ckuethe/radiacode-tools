@@ -18,31 +18,60 @@ import radiacode
 import radiacode.types
 from usb import USBError
 
-
-class RcJsonEncoder(json.JSONEncoder):
-    'Augmented JSON encoder that supports datatime and radiacode types'
-    def default(self, o:Any):
-        if isinstance(o, datetime.datetime):
-            return o.isoformat()
-        if isinstance(o, datetime.timedelta):
-            return str(o)
-        if isinstance(o, radiacode.types.Enum):
-            return o.name
-        if hasattr(o, "__dict__"):
-            return o.__dict__
-        return super().default(o)
+from radiacode_tools.rc_types import RcJSONEncoder
 
 
 def get_args() -> Namespace:
-    ap = ArgumentParser()
+    ap = ArgumentParser(
+        description="Download and stream the contents of the device Data Buffer",
+        epilog="CAUTION: downloading will clear the data buffer, meaning that the "
+        "data will no longer be available to any other client such as the official "
+        "radiacode apps.",
+    )
     mx = ap.add_mutually_exclusive_group()
-    mx.add_argument("-d", "--device", metavar="STR", type=str, default=None, help="USB serial-number")
-    mx.add_argument("-b", "--btaddr", metavar="STR", type=str, default=None, help="BlueTooth MAC")
-    ap.add_argument("-j", "--jsonlog", default=False, action="store_true")
-    ap.add_argument("-s", "--stdout", default=False, action="store_true")
-    ap.add_argument("-r", "--no-rtdata", default=False, action="store_true", help="Don't display RealTimeData")
+    mx.add_argument(
+        "-d",
+        "--device",
+        metavar="STR",
+        type=str,
+        default=None,
+        help="Connect to device identified by USB serial-number",
+    )
+    mx.add_argument(
+        "-b",
+        "--btaddr",
+        metavar="STR",
+        type=str,
+        default=None,
+        help="Connect to device identified by BlueTooth MAC",
+    )
     ap.add_argument(
-        "-x", "--raise-exceptions", default=False, action="store_true", help="Don't suppress low level decoder errors"
+        "-j",
+        "--jsonlog",
+        default=False,
+        action="store_true",
+        help="Store downloaded data in a json file [%(default)s]",
+    )
+    ap.add_argument(
+        "-s",
+        "--stdout",
+        default=False,
+        action="store_true",
+        help="Also print results to stdout when logging to a json file [%(default)s]",
+    )
+    ap.add_argument(
+        "-r",
+        "--no-rtdata",
+        default=False,
+        action="store_true",
+        help="Don't display RealTimeData [%(default)s]",
+    )
+    ap.add_argument(
+        "-x",
+        "--raise-exceptions",
+        default=False,
+        action="store_true",
+        help="Don't suppress low level decoder errors, for developers [%(default)s]",
     )
     return ap.parse_args()
 
@@ -67,7 +96,7 @@ def main() -> None:
     # if you don't turn the device on, you don't get any spectrum data.
     # If you try poll you just get all zeroes.
     rc.set_device_on(True)
-    
+
     # Figure out a good way to poll the radiacode to see if it's actually
     # turned on
     assert sum(rc.spectrum_accum().counts)
@@ -122,7 +151,7 @@ def main() -> None:
 
                     if isinstance(msg, radiacode.types.Event) and msg.event == radiacode.types.EventId.TEXT_MESSAGE:
                         decoded["text"] = rc.text_message().strip()
-                    jdata = json.dumps(decoded, cls=RcJsonEncoder)
+                    jdata = json.dumps(decoded, cls=RcJSONEncoder)
                     print(jdata, file=ofd, flush=True)
                     if copy_to_stdout:
                         print(jdata, flush=True)
@@ -140,5 +169,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
     main()
