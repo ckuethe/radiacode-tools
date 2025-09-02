@@ -4,10 +4,9 @@
 # Author: Chris Kuethe <chris.kuethe@gmail.com> , https://github.com/ckuethe/radiacode-tools
 # SPDX-License-Identifier: MIT
 
-import os
 from argparse import ArgumentParser, Namespace, RawDescriptionHelpFormatter
+from datetime import datetime, timedelta
 from math import atan2, cos, pow, radians, sin, sqrt
-from tempfile import mkstemp
 from textwrap import dedent
 from typing import List, Tuple
 
@@ -55,7 +54,7 @@ def get_args() -> Namespace:
     If both include and exclude filters are given
     """
 
-    ap = ArgumentParser(
+    ap: ArgumentParser = ArgumentParser(
         description="Edit a Radiacode track by clipping to (or out) time ranges and geometries.",
         epilog=dedent(longhelp),
         formatter_class=RawDescriptionHelpFormatter,
@@ -130,7 +129,7 @@ def get_args() -> Namespace:
     )
     ap.add_argument(nargs=1, dest="filename", metavar="FILE")
 
-    rv = ap.parse_args()
+    rv: Namespace = ap.parse_args()
     rv.filename = rv.filename[0]
     if rv.output is None:
         rv.output = rv.filename
@@ -142,17 +141,17 @@ def earthdistance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     See https://en.wikipedia.org/wiki/Haversine_formula for the underlying math.
     """
 
-    y1 = radians(lat1)
-    y2 = radians(lat2)
-    x1 = radians(lon1)
-    x2 = radians(lon2)
+    y1: float = radians(lat1)
+    y2: float = radians(lat2)
+    x1: float = radians(lon1)
+    x2: float = radians(lon2)
 
-    d_y = y2 - y1
-    d_x = x2 - x1
+    d_y: float = y2 - y1
+    d_x: float = x2 - x1
 
     # I could've used `**` instead of `pow` but I had to import from math anyway...
-    a = pow(sin(d_y / 2), 2) + cos(y1) * cos(y2) * pow(sin(d_x / 2), 2)
-    c = 2 * atan2(sqrt(a), sqrt(1 - a))
+    a: float = pow(sin(d_y / 2), 2) + cos(y1) * cos(y2) * pow(sin(d_x / 2), 2)
+    c: float = 2 * atan2(sqrt(a), sqrt(1 - a))
 
     return c * 6371e3  # Wikipedia says we approximate earth radius as 6371km in Haversine
 
@@ -175,12 +174,12 @@ def check_geobox(member: TrackPoint, container: GeoBox) -> bool:
                         (x2,y2)       (x2,y2)
 
     """
-    x = (
+    x: bool = (
         min(container.p1.longitude, container.p2.longitude)
         <= member.longitude
         <= max(container.p1.longitude, container.p2.longitude)
     )
-    y = (
+    y: bool = (
         min(container.p1.latitude, container.p2.latitude)
         <= member.longitude
         <= max(container.p1.latitude, container.p2.latitude)
@@ -208,19 +207,19 @@ def check_geocircle(member: TrackPoint, container: GeoCircle) -> bool:
 
 
 def check_timeranges(member: TrackPoint, container: List[TimeRange]) -> List[bool]:
-    if not isinstance(container, list):
+    if not isinstance(container, list):  # pyright: ignore reportUnnecessaryIsInstance
         raise ValueError("container must be a list")
     return [check_timerange(member, tr) for tr in container]
 
 
 def check_geoboxes(member: TrackPoint, container: List[GeoBox]) -> List[bool]:
-    if not isinstance(container, list):
+    if not isinstance(container, list):  # pyright: ignore reportUnnecessaryIsInstance
         raise ValueError("container must be a list")
     return [check_geobox(member, gb) for gb in container]
 
 
 def check_geocircles(member: TrackPoint, container: List[GeoCircle]) -> List[bool]:
-    if not isinstance(container, list):
+    if not isinstance(container, list):  # pyright: ignore reportUnnecessaryIsInstance
         raise ValueError("container must be a list")
     return [check_geocircle(member, gc) for gc in container]
 
@@ -243,45 +242,45 @@ def edit_track(args: Namespace, track: RcTrack) -> Tuple[int, int]:
         args.track_name = f"{track.name} (edit)"
     track.name = args.track_name
 
-    before_len = len(track.points)
+    before_len: int = len(track.points)
     for i in range(before_len - 1, -1, -1):
         if args.include_time_range:
-            is_included_time = check_timeranges(track.points[i], args.include_time_range)
+            is_included_time: list[bool] = check_timeranges(track.points[i], args.include_time_range)
             if not any(is_included_time):
                 track.points.pop(i)
                 continue
         if args.exclude_time_range:
-            is_excluded_time = check_timeranges(track.points[i], args.exclude_time_range)
+            is_excluded_time: list[bool] = check_timeranges(track.points[i], args.exclude_time_range)
             if any(is_excluded_time):
                 track.points.pop(i)
                 continue
         if args.include_geo:
-            is_included_geo = check_geoboxes(track.points[i], args.include_geo)
+            is_included_geo: list[bool] = check_geoboxes(track.points[i], args.include_geo)
             if not any(is_included_geo):
                 track.points.pop(i)
                 continue
         if args.exclude_geo:
-            is_excluded_geo = check_geoboxes(track.points[i], args.exclude_geo)
+            is_excluded_geo: list[bool] = check_geoboxes(track.points[i], args.exclude_geo)
             if any(is_excluded_geo):
                 track.points.pop(i)
                 continue
         if args.include_radius:
-            is_included_radius = check_geocircles(track.points[i], args.include_radius)
+            is_included_radius: list[bool] = check_geocircles(track.points[i], args.include_radius)
             if not any(is_included_radius):
                 track.points.pop(i)
                 continue
         if args.exclude_radius:
-            is_excluded_radius = check_geocircles(track.points[i], args.exclude_radius)
+            is_excluded_radius: list[bool] = check_geocircles(track.points[i], args.exclude_radius)
             if any(is_excluded_radius):
                 track.points.pop(i)
                 continue
 
-    after_len = len(track.points)
+    after_len: int = len(track.points)
     return (before_len, after_len)
 
 
 def main() -> None:
-    args = get_args()
+    args: Namespace = get_args()
 
     if True:
         print("parsed args:")
@@ -292,14 +291,14 @@ def main() -> None:
         print()
 
     # file deepcode ignore PT: Shut up snyk, this is a CLI utility intended to walk files...
-    track = RcTrack()
+    track: RcTrack = RcTrack()
     track.load_file(args.filename)
-    l = edit_track(args, track)
+    edit_len: tuple[int, int] = edit_track(args, track)
 
-    print(f"edit results: {l[0]} -> {l[1]} points")
-    T_start = track.points[0].dt.astimezone(localtz)
-    T_end = track.points[-1].dt.astimezone(localtz)
-    duration = T_end - T_start
+    print(f"edit results: {edit_len[0]} -> {edit_len[1]} points")
+    T_start: datetime = track.points[0].dt.astimezone(localtz)
+    T_end: datetime = track.points[-1].dt.astimezone(localtz)
+    duration: timedelta = T_end - T_start
     print(f"track times: {T_start} -> {T_end}, duration={duration}")
 
     track.write_file(args.output)
