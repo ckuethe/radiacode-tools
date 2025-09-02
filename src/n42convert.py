@@ -14,10 +14,10 @@ from radiacode_tools.rc_files import RcN42, RcSpectrum
 def get_args() -> Namespace:
     ap = ArgumentParser()
 
-    def _uuid(s) -> UUID | None:
+    def _uuid(s: str) -> UUID | str:
         if s.strip():
             return UUID(s)
-        return None
+        return ""
 
     ap.add_argument(
         "-i",
@@ -65,7 +65,9 @@ def get_args() -> Namespace:
     return ap.parse_args()
 
 
-def process_single_file(fg_file=None, bg_file=None, out_file=None, uuid=None, overwrite=False) -> bool:
+def process_single_file(
+    fg_file: str = "", bg_file: str = "", out_file: str = "", uuid: str = "", overwrite: bool = False
+) -> bool:
     "Read a data file and convert it"
     if out_file and os.path.exists(out_file) and overwrite is False:
         print(f"Not overwriting {out_file}")
@@ -88,8 +90,11 @@ def process_single_file(fg_file=None, bg_file=None, out_file=None, uuid=None, ov
         # use the one provided by the foreground data file.
         n42.spectrum_data.bg_spectrum = fg_spec.bg_spectrum
 
-    if out_file is None:
+    if not out_file:
         out_file = f"{fg_file}.n42"
+
+    if uuid:
+        n42.uuid = uuid
 
     # file deepcode ignore PT: CLI tool intentionally opening the files the user asked for
     n42.write_file(out_file)
@@ -103,7 +108,7 @@ def main() -> None:
         for cur_dir, _, files in os.walk(args.input):
             for fn in files:
                 if fn.endswith(".xml"):
-                    src_file = os.path.join(cur_dir, fn)
+                    src_file: str = os.path.join(cur_dir, fn)
                     process_single_file(fg_file=src_file, out_file=f"{src_file}.n42")
     else:
         process_single_file(
