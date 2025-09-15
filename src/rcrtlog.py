@@ -60,6 +60,13 @@ def get_args() -> Namespace:
         help="Also print results to stdout when logging to a json file [%(default)s]",
     )
     ap.add_argument(
+        "-q",
+        "--exit-after-sync",
+        default=False,
+        action="store_true",
+        help="Exit after downloading all historical data [%(default)s]",
+    )
+    ap.add_argument(
         "-r",
         "--no-rtdata",
         default=False,
@@ -113,6 +120,7 @@ def main() -> None:
         print(f"Logging to {fn}", file=stderr)
         copy_to_stdout = args.stdout
 
+    sync_timer: int = 0
     with open(fn, "w") as ofd:
         while True:
             now = datetime.datetime.now().replace(microsecond=0)
@@ -136,6 +144,11 @@ def main() -> None:
                     # I hate the name "dt", so change it so something more descriptive
                     decoded["message_time"] = decoded.pop("dt", None)
 
+                    mtd: datetime.timedelta = decoded["host_time"] - decoded["message_time"]
+                    if mtd.total_seconds() < 5:
+                        sync_timer += 1
+                    else:
+                        sync_timer = 0
                     # Don't need all the very insignificant digits
                     if "count_rate" in decoded:
                         decoded["count_rate"] = round(decoded["count_rate"], 3)
@@ -164,6 +177,8 @@ def main() -> None:
                 else:
                     print(f"Ignoring Radiacode exception {e}")
 
+            if args.exit_after_sync and sync_timer > 10:
+                break
             time.sleep(0.5)
     return
 
