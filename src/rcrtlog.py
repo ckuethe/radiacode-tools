@@ -97,11 +97,11 @@ def main() -> None:
     # If you try poll you just get all zeroes.
     rc.set_device_on(True)
 
-    # Figure out a good way to poll the radiacode to see if it's actually
-    # turned on
-    assert sum(rc.spectrum_accum().counts)
-    # assert len(rc.commands()) > 1024
-    # assert len(rc.configuration()) > 1024
+    while True:
+        s = rc.spectrum_accum()
+        if s.duration.total_seconds() or sum(s.counts):
+            break
+        time.sleep(0.1)
 
     fn = "/dev/stdout"
     copy_to_stdout = False
