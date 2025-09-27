@@ -12,7 +12,9 @@ from argparse import ArgumentParser, Namespace
 
 from radiacode_tools.rc_files import RcSpectrogram
 from radiacode_tools.rc_types import SpecEnergy
-from radiacode_tools.rc_utils import get_dose_from_spectrum
+from radiacode_tools.rc_utils import (
+    get_dose_from_spectrum,  # FIXME - use the right D and V for device model
+)
 
 
 def get_args() -> Namespace:

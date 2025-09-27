@@ -21,10 +21,9 @@ from tqdm.auto import tqdm  # type: ignore
 from radiacode_tools.rc_files import RcN42, RcSpectrum
 from radiacode_tools.rc_types import EnergyCalibration, RcHwInfo, SpectrumLayer
 from radiacode_tools.rc_utils import (
-    get_device_id,
-    get_dose_from_spectrum,
-    probe_radiacode_devices,
+    get_dose_from_spectrum,  # FIXME - use the right D and V for device model
 )
+from radiacode_tools.rc_utils import get_device_id, probe_radiacode_devices
 from radiacode_tools.rc_validators import _positive_float
 
 
