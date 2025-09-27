@@ -21,7 +21,7 @@ from radiacode_tools.rc_validators import _duration_range, _samp_range, _timeran
 
 def get_args() -> Namespace:
     "The usual argument handling stuff"
-    ap = ArgumentParser()
+    ap: ArgumentParser = ArgumentParser()
     ap.add_argument(
         "-l",
         "--linear",
@@ -64,33 +64,12 @@ def get_args() -> Namespace:
     )
     ap.add_argument(nargs=1, dest="input_file", metavar="FILE")
 
-    rv = ap.parse_args()
+    rv: Namespace = ap.parse_args()
 
     rv.input_file = os.path.expanduser(rv.input_file[0])
     if rv.output_file is None:
         rv.output_file = rv.input_file + ".png"
 
-    # if True:
-    #     pass
-    # elif rv.duration_filter:
-    #     try:
-    #         rv.duration_filter = _duration_range(rv.duration_filter)
-    #     except Exception:
-    #         print(f"Unable to parse relative time range: {rv.duration_filter}")
-    #         exit(1)
-    # elif rv.time_filter:
-    #     try:
-    #         tmp = _timerange(rv.time_filter)
-    #         rv.time_filter = tmp[0].timestamp(), tmp[1].timestamp()
-    #     except Exception:
-    #         print(f"Unable to parse timestamp range: {rv.time_filter}")
-    #         exit(1)
-    # elif rv.sample_filter:
-    #     try:
-    #         rv.sample_filter = _samp_range(rv.sample_filter)
-    #     except Exception:
-    #         print(f"Unable to parse sample number range: {rv.sample_filter}")
-    #         exit(1)
     return rv
 
 
@@ -108,8 +87,8 @@ def plot_spectrogram(
     plt.ylabel("Time")
     plt.title(sg.name)
 
-    def array_extend(a, l):
-        return a + [0] * (l - len(a))
+    def array_extend(a: list[int], n: int) -> list[int]:
+        return a + [0] * (n - len(a))
 
     data = np.array([array_extend(s.counts, sg.channels) for s in sg.samples])
     ylabels = np.array([s.dt for s in sg.samples])
@@ -136,15 +115,15 @@ def load_spectrogram_from_ndjson(args: Namespace) -> RcSpectrogram:
     to turn it into an RcSpectrogram, for example filtering for a selected device
     serial number, but after that it's just like the regular radiacode format.
     """
-    spg = RcSpectrogram()
+    spg: RcSpectrogram = RcSpectrogram()
     with open(args.input_file) as ifd:
         sn = None or args.serial_number
         records = [jloads(l) for l in ifd if "counts" in l]
 
     if sn is None:
-        sn = records[0]["serial_number"]
+        sn: str = records[0]["serial_number"]
         print(f"Assuming serial number {sn}")
-    cal = records[0]["calibration"]
+    cal: list[float] = records[0]["calibration"]
     spg.add_calibration(EnergyCalibration(a0=cal[0], a1=cal[1], a2=cal[2]))
     spg.serial_number = sn
 
@@ -176,10 +155,10 @@ def filter_spectrogram(args: Namespace, spg: RcSpectrogram) -> None:
 
 
 def main() -> None:
-    args = get_args()
+    args: Namespace = get_args()
     print(args)
     if args.input_file.endswith(".rcspg"):
-        spg = RcSpectrogram()
+        spg: RcSpectrogram = RcSpectrogram()
         spg.load_file(args.input_file)
     elif args.input_file.endswith(".ndjson"):
         spg = load_spectrogram_from_ndjson(args)
