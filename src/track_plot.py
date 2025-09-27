@@ -18,10 +18,10 @@ from radiacode_tools.rc_files import RcTrack
 from radiacode_tools.rc_types import Number, TrackPoint, palettes
 from radiacode_tools.rc_utils import localtz
 from radiacode_tools.rc_validators import (
-    _geometry,
-    _non_negative_int,
-    _positive_float,
-    _rcsn,
+    geometry,
+    non_negative_int,
+    positive_float,
+    rcsn,
 )
 
 
@@ -33,19 +33,19 @@ def get_args() -> Namespace:
     ap.add_argument(
         "-a",
         "--accuracy",
-        type=_positive_float,
+        type=positive_float,
         default=15.0,
         help="Maximum point error in meters [%(default)s]",
     )
     ap.add_argument(
-        "-d", "--downsample", type=_non_negative_int, default=16, help="0 or 1 means no downsampling, [%(default)s]"
+        "-d", "--downsample", type=non_negative_int, default=16, help="0 or 1 means no downsampling, [%(default)s]"
     )
-    ap.add_argument("-r", "--min-count-rate", type=_positive_float)
-    ap.add_argument("-R", "--max-count-rate", type=_positive_float)
-    ap.add_argument("-g", "--geometry", type=_geometry, default="1600x1024", help="Image size [%(default)s]")
-    ap.add_argument("-s", "--serial-number", dest="sn", type=_rcsn, metavar="STR")
+    ap.add_argument("-r", "--min-count-rate", type=positive_float)
+    ap.add_argument("-R", "--max-count-rate", type=positive_float)
+    ap.add_argument("-g", "--geometry", type=geometry, default="1600x1024", help="Image size [%(default)s]")
+    ap.add_argument("-s", "--serial-number", dest="sn", type=rcsn, metavar="STR")
     ap.add_argument("--interactive", default=False, action="store_true", help="Open an interactive plot in a browser")
-    ap.add_argument("--opacity", type=_positive_float, default=0.25, help="Marker opacity [%(default)s]")
+    ap.add_argument("--opacity", type=positive_float, default=0.25, help="Marker opacity [%(default)s]")
     ap.add_argument(
         "--palette",
         default="turbo",

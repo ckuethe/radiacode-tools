@@ -13,7 +13,7 @@ from typing import List, Tuple
 from radiacode_tools.rc_files import RcTrack
 from radiacode_tools.rc_types import GeoBox, GeoCircle, TimeRange, TrackPoint
 from radiacode_tools.rc_utils import localtz
-from radiacode_tools.rc_validators import _geobox, _geocircle, _timerange
+from radiacode_tools.rc_validators import geobox, geocircle, timerange
 
 
 def get_args() -> Namespace:
@@ -62,7 +62,7 @@ def get_args() -> Namespace:
     ap.add_argument(  # -t include-time-range
         "-t",
         "--include-time-range",
-        type=_timerange,
+        type=timerange,
         metavar="TIMERANGE",
         default=[],
         action="append",
@@ -71,7 +71,7 @@ def get_args() -> Namespace:
     ap.add_argument(  # -T exclude-time-range
         "-T",
         "--exclude-time-range",
-        type=_timerange,
+        type=timerange,
         metavar="TIMERANGE",
         default=[],
         action="append",
@@ -83,7 +83,7 @@ def get_args() -> Namespace:
         default=[],
         action="append",
         metavar="GEOBOX",
-        type=_geobox,
+        type=geobox,
         help="include points within a bounding box lat1,lon1~lat2,lon2 (decimal degrees)",
     )
     ap.add_argument(  # -G exclude-geo
@@ -92,7 +92,7 @@ def get_args() -> Namespace:
         default=[],
         metavar="GEOBOX",
         action="append",
-        type=_geobox,
+        type=geobox,
         help="exclude points within a bounding box",
     )
     ap.add_argument(  # -g include-radius
@@ -101,7 +101,7 @@ def get_args() -> Namespace:
         default=[],
         action="append",
         metavar="RADIUS",
-        type=_geocircle,
+        type=geocircle,
         help="include points within some radius of a point lat,lon,radius (decimal degrees, meters)",
     )
     ap.add_argument(  # -G exclude-radius
@@ -110,7 +110,7 @@ def get_args() -> Namespace:
         default=[],
         action="append",
         metavar="RADIUS",
-        type=_geocircle,
+        type=geocircle,
         help="exclude points within some radius of a point",
     )
     ap.add_argument(  # -n track-name

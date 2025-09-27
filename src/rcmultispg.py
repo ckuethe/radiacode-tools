@@ -35,7 +35,7 @@ from radiacode.transports.usb import DeviceNotFound  # type: ignore
 from radiacode_tools.appmetrics import AppMetrics  # type: ignore
 from radiacode_tools.rc_types import GpsData, RcJSONEncoder, RtData, SpecData
 from radiacode_tools.rc_utils import UTC, find_radiacode_devices
-from radiacode_tools.rc_validators import _gpsd
+from radiacode_tools.rc_validators import gpsd
 
 ams: AppMetrics = AppMetrics(stub=True)
 
@@ -118,7 +118,7 @@ def get_args() -> Namespace:
     ap.add_argument(
         "-g",
         "--gpsd",
-        type=_gpsd,
+        type=gpsd,
         metavar="URL",
         help="Connect to specified device, eg. gpsd://localhost:2947/dev/ttyACM0",
     )

@@ -10,7 +10,7 @@ from hashlib import sha256 as hf
 
 from radiacode_tools.rc_files import RcTrack
 from radiacode_tools.rc_types import RangeFinder
-from radiacode_tools.rc_validators import _isotime, _rcsn
+from radiacode_tools.rc_validators import isotime, rcsn
 
 
 def get_args() -> Namespace:
@@ -31,7 +31,7 @@ def get_args() -> Namespace:
         "--serial-number",
         default="RC-100-314159",
         metavar="STR",
-        type=_rcsn,
+        type=rcsn,
         help="[%(default)s]",
     )
     ap.add_argument(  # -t start-time
@@ -39,7 +39,7 @@ def get_args() -> Namespace:
         "--start-time",
         default="1984-12-05T00:00:00",
         metavar="TIME",
-        type=_isotime,
+        type=isotime,
         help="[%(default)s]",
     )
     ap.add_argument(  # -x base-longitude

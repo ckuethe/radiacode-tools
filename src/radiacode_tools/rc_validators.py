@@ -29,14 +29,14 @@ _DIST_MAX: float = 40030e3  # 3.1416 * 2 * 6371km
 _SAMP_MAX: float = 2.0**32  # where are you getting 4.2 billion radiation measurement from?
 
 
-def _rcsn(s: str) -> str:
+def rcsn(s: str) -> str:
     "helper to check the format of a radiacode serial number"
     if re_match(r"RC-\d{3}[G]?-\d{6}", s.strip()):
         return s
     raise ValueError("Incorrect serial number format")
 
 
-def _isotime(s: str) -> datetime:
+def isotime(s: str) -> datetime:
     """helper to enforce ISO8061 time string format
 
     MUST look like 'YYYY-mm-dd[T ]HH:MM:SSZ?'
@@ -49,7 +49,7 @@ def _isotime(s: str) -> datetime:
         raise ValueError("Invalid time format")
 
 
-def _timerange(s: str = "~") -> TimeRange:
+def timerange(s: str = "~") -> TimeRange:
     """
     argparse helper to validate a timerange (a pair of datetimes)
 
@@ -62,13 +62,13 @@ def _timerange(s: str = "~") -> TimeRange:
     a = _BEGINNING_OF_TIME
     b = _THE_END_OF_DAYS
     if w[0]:
-        a = _isotime(w[0]).replace(tzinfo=UTC if w[0].endswith("Z") else localtz)
+        a = isotime(w[0]).replace(tzinfo=UTC if w[0].endswith("Z") else localtz)
     if w[1]:
-        b = _isotime(w[1]).replace(tzinfo=UTC if w[1].endswith("Z") else localtz)
+        b = isotime(w[1]).replace(tzinfo=UTC if w[1].endswith("Z") else localtz)
     return TimeRange(dt_start=a, dt_end=b)
 
 
-def _geobox(s: str) -> GeoBox:
+def geobox(s: str) -> GeoBox:
     """
     argparse helper to validate a box geometry specified by two diagonal corners
 
@@ -95,7 +95,7 @@ def _geobox(s: str) -> GeoBox:
     raise ValueError
 
 
-def _geocircle(s: str) -> GeoCircle:
+def geocircle(s: str) -> GeoCircle:
     """
     argparse helper to validate a geocircle; a radius around a point formatted
     as latitude,longitude,radius_m where
@@ -116,7 +116,7 @@ def _geocircle(s: str) -> GeoCircle:
     raise ValueError
 
 
-def _duration_range(s: str = "~") -> Tuple[int, int]:
+def duration_range(s: str = "~") -> Tuple[int, int]:
     """
     Argparse helpter to validate some time ranges, returning a pair of floating point seconds
 
@@ -131,19 +131,19 @@ def _duration_range(s: str = "~") -> Tuple[int, int]:
     a = 0.0
     b = _SAMP_MAX
     if w[0]:
-        t = [_non_negative_int(x) for x in w[0].split(":")]
+        t = [non_negative_int(x) for x in w[0].split(":")]
         if 3 != len(t):
             raise ValueError
         a = timedelta(hours=t[0], minutes=t[1], seconds=t[2]).total_seconds()
     if w[1]:
-        t = [_non_negative_int(x) for x in w[1].split(":")]
+        t = [non_negative_int(x) for x in w[1].split(":")]
         if 3 != len(t):
             raise ValueError
         b = timedelta(hours=t[0], minutes=t[1], seconds=t[2]).total_seconds()
     return int(a), int(b)
 
 
-def _samp_range(s: str = "~") -> Tuple[int, int]:
+def samp_range(s: str = "~") -> Tuple[int, int]:
     "Check that a string of the form 'start~end' can be converted into two non-negative integers"
     w = s.split("~")
     if 2 != len(w):
@@ -151,14 +151,14 @@ def _samp_range(s: str = "~") -> Tuple[int, int]:
     a = 0
     b = int(_SAMP_MAX)
     if w[0]:
-        a = _non_negative_int(w[0])
+        a = non_negative_int(w[0])
     if w[1]:
-        b = _non_negative_int(w[1])
+        b = non_negative_int(w[1])
 
     return a, b
 
 
-def _non_negative_int(s: str) -> int:
+def non_negative_int(s: str) -> int:
     "check that a string can be converted into a non-negative base-10 integer"
     fv = float(s)
     iv = int(fv)
@@ -169,15 +169,15 @@ def _non_negative_int(s: str) -> int:
     return iv
 
 
-def _positive_int(s: str) -> int:
+def positive_int(s: str) -> int:
     "check that a string can be converted into a positive base-10 integer"
-    rv = _non_negative_int(s)
+    rv = non_negative_int(s)
     if rv <= 0:
         raise ValueError()
     return int(rv)
 
 
-def _positive_float(s: str) -> float:
+def positive_float(s: str) -> float:
     "check that a string can be converted into a positive float"
     rv = float(s)
     if rv > 0:
@@ -185,15 +185,15 @@ def _positive_float(s: str) -> float:
     raise ValueError()
 
 
-def _geometry(s: str) -> Tuple[int, int]:
+def geometry(s: str) -> Tuple[int, int]:
     "check a geometry string of 'WxH' where W and H are positive integers"
     n = s.strip().split("x")
     if len(n) != 2:
         raise ValueError()
-    return _positive_int(n[0]), _positive_int(n[1])
+    return positive_int(n[0]), positive_int(n[1])
 
 
-def _gpsd(s: str) -> Dict[str, Any] | None:
+def gpsd(s: str) -> Dict[str, Any] | None:
     m = re_match(r"^gpsd://(?P<host>[a-zA-Z0-9_.-]+)(:(?P<port>\d+))?(?P<device>/.+)?", s)
     if m:
         return m.groupdict()

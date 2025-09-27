@@ -15,7 +15,7 @@ from numpy import corrcoef
 from numpy.polynomial import Polynomial
 
 from radiacode_tools.rc_types import Number
-from radiacode_tools.rc_validators import _positive_int
+from radiacode_tools.rc_validators import positive_int
 
 
 def template_calibration(args: Namespace) -> NoReturn:
@@ -79,7 +79,7 @@ def template_calibration(args: Namespace) -> NoReturn:
     exit(0)
 
 
-def load_calibration(args: Namespace) -> list[tuple[int,float]]:
+def load_calibration(args: Namespace) -> list[tuple[int, float]]:
     """
     Calibration file is a json file which contains a dict like this:
 
@@ -133,7 +133,7 @@ def get_args() -> Namespace:
     ap.add_argument(
         "-o",
         "--order",
-        type=_positive_int,
+        type=positive_int,
         default=2,
         metavar="N",
         help="Calibration polynomial order [%(default)d]",
@@ -141,7 +141,7 @@ def get_args() -> Namespace:
     ap.add_argument(
         "-p",
         "--precision",
-        type=_positive_int,
+        type=positive_int,
         default=8,
         metavar="N",
         help="Number of decimal places in calibration factors [%(default)d]",
@@ -174,7 +174,7 @@ def rsquared(xlist: Iterable[Number], ylist: Iterable[Number], coeffs: Iterable[
 
 
 def make_fit(chan, energy, args) -> list[float]:
-    pf:list[float] = Polynomial.fit(chan, energy, deg=args.order, window=[min(chan), max(chan)]).coef
+    pf: list[float] = Polynomial.fit(chan, energy, deg=args.order, window=[min(chan), max(chan)]).coef
     pf = [round(f, args.precision) for f in pf]
     print(f"x^0 .. x^{args.order}: {pf}")
     return pf

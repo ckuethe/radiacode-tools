@@ -24,7 +24,7 @@ from radiacode_tools.rc_utils import (
     get_dose_from_spectrum,  # FIXME - use the right D and V for device model
 )
 from radiacode_tools.rc_utils import get_device_id, probe_radiacode_devices
-from radiacode_tools.rc_validators import _positive_float
+from radiacode_tools.rc_validators import positive_float
 
 
 def get_args() -> Namespace:
@@ -66,7 +66,7 @@ def get_args() -> Namespace:
     )
     mx.add_argument(
         "--accumulate-dose",
-        type=_positive_float,
+        type=positive_float,
         metavar="DOSE",
         help="Measure until a certain dose has been accumulated (uSv)",
     )

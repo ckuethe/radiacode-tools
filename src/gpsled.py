@@ -15,7 +15,7 @@ from json import dumps as jdumps
 from json import loads as jloads
 from time import sleep
 
-from radiacode_tools.rc_validators import _gpsd
+from radiacode_tools.rc_validators import gpsd
 
 _example_systemd_unit = """
 [Unit]
@@ -62,7 +62,7 @@ def get_args() -> Namespace:
     ap.add_argument(
         "-g",
         "--gpsd",
-        type=_gpsd,
+        type=gpsd,
         metavar="URL",
         default="gpsd://localhost",
         help="Connect to specified device, eg. gpsd://localhost:2947/dev/ttyACM0",

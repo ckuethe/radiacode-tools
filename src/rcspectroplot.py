@@ -16,7 +16,7 @@ import numpy as np
 # Load the RadiaCode tools
 from radiacode_tools.rc_files import RcSpectrogram
 from radiacode_tools.rc_types import EnergyCalibration, palettes
-from radiacode_tools.rc_validators import _duration_range, _samp_range, _timerange
+from radiacode_tools.rc_validators import duration_range, samp_range, timerange
 
 
 def get_args() -> Namespace:
@@ -35,21 +35,21 @@ def get_args() -> Namespace:
     mtx = ap.add_mutually_exclusive_group()
     mtx.add_argument(
         "--sample",
-        type=_samp_range,
+        type=samp_range,
         dest="sample_filter",
         metavar="N~N",
         help="select spectrogram samples by sample number",
     )
     mtx.add_argument(
         "--duration",
-        type=_duration_range,
+        type=duration_range,
         dest="duration_filter",
         metavar="H:M:S~H:M:S",
         help="select spectrogram sample by time since recording start",
     )
     mtx.add_argument(
         "--time",
-        type=_timerange,
+        type=timerange,
         dest="time_filter",
         metavar="Y-M-DTh:m:s~Y-M-DTh:m:s",
         help="select spectrogram sample by absolute timestamp",
