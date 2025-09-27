@@ -9,8 +9,8 @@ Some stuff found to be useful in various scripts, and should thus be hoisted int
 utility library, rather than being imported from and between scripts.
 """
 
-from dataclasses import is_dataclass
 from datetime import datetime, timedelta, timezone
+from re import Match
 from re import search as re_search
 from typing import Any, List
 
@@ -25,7 +25,7 @@ from .rc_types import DATEFMT, DATEFMT_TZ, EnergyCalibration, Number, RcHwInfo
 _filetime_quantum = 1e-7
 _filetime_epoch_offset = 116444736000000000
 
-UTC = timezone(timedelta(0))
+UTC: timezone = timezone(timedelta(0))
 localtz = datetime.now(timezone.utc).astimezone().tzinfo
 
 # guess what happened here
@@ -80,19 +80,19 @@ def get_dose_from_spectrum(
 
     counts: a list of counts per channel
     a0-a2 are the calibration coefficients for the instrument
-    d: density in g/cm^3 of the scintillator crystal, approximately 4.51 for CsI:Tl
-    v: volume of the scintillator crystal, radiacode is 1cm^3
+    d: density in g/cm^3 of the scintillator crystal, approximately 4.51 for CsI:Tl and 6.63 for GaGG:Ce
+    v: volume of the scintillator crystal, radiacode is usually 1cm^3 but RC110 is 3cm^3
     """
 
     joules_per_keV = 1.60218e-16
-    mass = d * v * 1e-3  # kg
+    mass: float = d * v * 1e-3  # kg
 
-    def _chan2kev(cal: EnergyCalibration, c: int):
+    def _chan2kev(cal: EnergyCalibration, c: int) -> float:
         return cal.a0 + cal.a1 * c + cal.a2 * c**2
 
-    total_keV = sum([_chan2kev(cal, ch) * n for ch, n in enumerate(counts)])
-    gray = total_keV * joules_per_keV / mass
-    uSv = gray * 1e6
+    total_keV: float = sum([_chan2kev(cal, ch) * n for ch, n in enumerate(counts)])
+    gray: float = total_keV * joules_per_keV / mass
+    uSv: float = gray * 1e6
     return uSv
 
 
@@ -103,7 +103,7 @@ def find_radiacode_devices() -> List[str]:
 
     return [  # No error handling. Caller can deal with any errors.
         d.serial_number
-        for d in usb_find(idVendor=0x0483, idProduct=0xF123, find_all=True)
+        for d in usb_find(idVendor=0x0483, idProduct=0xF123, find_all=True)  # pyrefly: ignore not-iterable
         if d.serial_number.startswith("RC-")
     ]
 
@@ -111,7 +111,7 @@ def find_radiacode_devices() -> List[str]:
 def get_device_id(dev: RadiaCode) -> RcHwInfo:
     "Poll the device for all its identifiers"
 
-    sig_match = re_search(
+    sig_match: Match[str] | None = re_search(
         r'Signature: (?P<fw_signature>[0-9A-F]{8}), FileName="(?P<fw_file>.+?)", IdString="(?P<product>.+?)"',
         dev.fw_signature(),
     )
@@ -120,7 +120,7 @@ def get_device_id(dev: RadiaCode) -> RcHwInfo:
 
     tfmt = "%b %d %Y %H:%M:%S"
 
-    sig_fields = sig_match.groupdict()
+    sig_fields: dict[str, str | Any] = sig_match.groupdict()
     bv, fv = dev.fw_version()
     product, model = sig_fields["product"].split(" ")
     return RcHwInfo(
@@ -140,8 +140,8 @@ def get_device_id(dev: RadiaCode) -> RcHwInfo:
 def probe_radiacode_devices() -> None:
     "'probe' might not be the right name; this finds connected devices and prints their device identifiers"
     for dev_id in find_radiacode_devices():
-        rc = RadiaCode(serial_number=dev_id)
-        d = get_device_id(dev=rc)
+        rc: RadiaCode = RadiaCode(serial_number=dev_id)
+        d: RcHwInfo = get_device_id(dev=rc)
         print(
             f"Found {d.product}\n"
             f"Serial Number: {d.serial_number}\n"
