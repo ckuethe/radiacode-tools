@@ -25,22 +25,20 @@ from hashlib import sha256
 from re import sub as re_sub
 from struct import pack as struct_pack
 from struct import unpack as struct_unpack
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, List, Optional, Union
 from uuid import uuid4
 
 import xmltodict
 
 from .rc_types import (
     DATEFMT_T,
-    DATEFMT_TZ,
-    DATEFMT_Z,
     DataclassEncoderMixin,
     EnergyCalibration,
     Number,
     SpectrogramPoint,
     SpectrumLayer,
     TrackPoint,
-    _outtatime,
+    _outtatime,  # pylance: ignore reportPrivateUsage
 )
 from .rc_utils import (
     UTC,
@@ -61,10 +59,16 @@ _RCTRK_DEFAULT_FLAGS: str = "EC"  # Not sure what this does
 class RcTrack:
     "Radiacode Track (.rctrk) interface"
 
-    def __init__(self, filename: Optional[str] = None) -> None:
+    def __init__(self, filename: str = "") -> None:
         self._clear_data()
         self._columns = ["DateTime", "Latitude", "Longitude", "Accuracy", "DoseRate", "CountRate", "Comment"]
         self.filename = filename
+        self.timestamp: datetime = _outtatime
+        self.name: str = ""
+        self.serialnumber: str = ""
+        self.comment: str = ""
+        self.flags: str = ""
+        self.points: List[TrackPoint] = []
 
         self._clear_data()
         if filename:
@@ -72,16 +76,16 @@ class RcTrack:
 
     def _clear_data(self) -> None:
         "Clear out the header, in preparation for loading"
-        self.timestamp: datetime = datetime.now(UTC)
-        self.name: str = ""
-        self.serialnumber: str = _RCTRK_DEFAULT_NO_SERIAL_NUMBER
-        self.comment: str = ""
-        self.flags: str = _RCTRK_DEFAULT_FLAGS
-        self.points: List[TrackPoint] = []
+        self.timestamp = datetime.now(UTC)
+        self.name = ""
+        self.serialnumber = _RCTRK_DEFAULT_NO_SERIAL_NUMBER
+        self.comment = ""
+        self.flags = _RCTRK_DEFAULT_FLAGS
+        self.points = []
 
-    def as_dict(self) -> Dict[str, Any]:
+    def as_dict(self) -> dict[str, Any]:
         "Convert the internal state into a format that could be easily jsonified"
-        rv = {
+        rv: dict[str, Any] = {
             "name": self.name,
             "serialnumber": self.serialnumber,
             "comment": self.comment,
@@ -90,7 +94,7 @@ class RcTrack:
         }
         return rv
 
-    def from_dict(self, d: Dict[str, Any]) -> bool:
+    def from_dict(self, d: dict[str, Any]) -> bool:
         """
         Populate the in-memory representation from a dict:
 
@@ -137,10 +141,10 @@ class RcTrack:
         ]
         return True
 
-    def _format_trackpoint(self, tp: TrackPoint) -> Dict[str, Any]:
+    def _format_trackpoint(self, tp: TrackPoint) -> dict[str, Any]:
         "render a trackpoint as a simple dict"
         # fz = [None] + list(tp._asdict().values())
-        rv = {"filetime": -1}
+        rv: dict[str, Any] = {"filetime": -1}
         rv.update(tp.__dict__)
         rv["filetime"] = DateTime2FileTime(rv["dt"])
         # rv["datetime"] = format_datetime(rv["dt"], DATEFMT_TZ)
@@ -149,7 +153,7 @@ class RcTrack:
     def write_file(self, filename: str) -> None:
         "Write the in-memory representation to filesystem"
         if not self.name:
-            self.name = f"Track {self.timestamp.replace(tzinfo=None,microsecond=0)}"
+            self.name = f"Track {self.timestamp.replace(tzinfo=None, microsecond=0)}"
         with open(filename, "wt") as ofd:
             print("Track: " + "\t".join([self.name, self.serialnumber, self.comment, self.flags]), file=ofd)
             # Patch column names in output file.
@@ -162,7 +166,7 @@ class RcTrack:
         "Load a track from the filesystem"
         with open(filename, "rt") as ifd:
             self._clear_data()
-            nf = len(self._columns)
+            nf: int = len(self._columns)
             for n, line in enumerate(ifd):
                 if n == 0:
                     if not line.startswith("Track:"):
@@ -177,7 +181,7 @@ class RcTrack:
                     continue
                 fields: List[Any] = line.split("\t")
                 if len(fields) != nf + 1:
-                    raise ValueError(f"Incorrect number of values on line {n+1}")
+                    raise ValueError(f"Incorrect number of values on line {n + 1}")
                 fields[1] = FileTime2DateTime(fields[0]).replace(
                     tzinfo=UTC
                 )  # filetime is higher resolution than YYYY-mm-dd HH:MM:SS
@@ -196,7 +200,7 @@ class RcTrack:
                     )
                 )
 
-    def add_point_dict(self, d) -> None:
+    def add_point_dict(self, d: dict[str, Any]) -> None:
         """
         Add a track point from a dict with the following keys
 
@@ -256,15 +260,15 @@ class RcSpectrum:
             self.load_file(filename)
 
     def __repr__(self) -> str:
-        return "Spectrum(" f"\n\tfg={self.fg_spectrum}" f"\n\tbg={self.bg_spectrum}" f'\n\tnote="{self.note}"\n)'
+        return f'Spectrum(\n\tfg={self.fg_spectrum}\n\tbg={self.bg_spectrum}\n\tnote="{self.note}"\n)'
 
-    def _parse_spectrum(self, spectrum: Dict[str, Any]) -> SpectrumLayer:
+    def _parse_spectrum(self, spectrum: dict[str, Any]) -> SpectrumLayer:
         """Given an spectrum dict, return useful items"""
-        cal = [float(f) for f in spectrum["EnergyCalibration"]["Coefficients"]["Coefficient"]]
-        polynomial_order = int(spectrum["EnergyCalibration"]["PolynomialOrder"])
+        cal: list[float] = [float(f) for f in spectrum["EnergyCalibration"]["Coefficients"]["Coefficient"]]
+        polynomial_order: int = int(spectrum["EnergyCalibration"]["PolynomialOrder"])
 
-        channels = int(spectrum["NumberOfChannels"])
-        counts = [int(i) for i in spectrum["Spectrum"]["DataPoint"]]
+        channels: int = int(spectrum["NumberOfChannels"])
+        counts: list[int] = [int(i) for i in spectrum["Spectrum"]["DataPoint"]]
         if len(counts) != channels:
             raise ValueError("spectrum length != number of channels")
 
@@ -274,16 +278,15 @@ class RcSpectrum:
         if len(cal) != polynomial_order + 1:
             raise ValueError("Inconsistent calibration polynomial")
 
-        rv = SpectrumLayer(
+        rv: SpectrumLayer = SpectrumLayer(
             spectrum_name=spectrum["SpectrumName"],
             device_model="",
-            serial_number=spectrum.get("SerialNumber", None),
+            serial_number=spectrum.get("SerialNumber", ""),
             calibration=EnergyCalibration(a0=cal[0], a1=cal[1], a2=cal[2]),
             duration=timedelta(seconds=int(spectrum["MeasurementTime"])),
             channels=channels,
             counts=counts,
             comment=spectrum.get("Comment", ""),
-            timestamp=None,
         )
 
         return rv
@@ -311,8 +314,8 @@ class RcSpectrum:
         # older versions of data files don't have start and end times
         if background_spectrum:
             try:
-                start_times = [parse_datetime(s, DATEFMT_T) for s in sp.get("StartTime", None)]
-                end_times = [parse_datetime(s, DATEFMT_T) for s in sp.get("EndTime", None)]
+                start_times: list[datetime] = [parse_datetime(s, DATEFMT_T) for s in sp.get("StartTime", None)]
+                end_times: list[datetime] = [parse_datetime(s, DATEFMT_T) for s in sp.get("EndTime", None)]
                 self.fg_spectrum.timestamp = start_times[0]
                 self.fg_spectrum.duration = end_times[0] - start_times[0]
                 if isinstance(self.bg_spectrum, SpectrumLayer):
@@ -323,22 +326,22 @@ class RcSpectrum:
                 pass
         else:  # no background spectrum in this file
             try:
-                a = parse_datetime(sp.get("StartTime", None), DATEFMT_T)
-                b = parse_datetime(sp.get("EndTime", None), DATEFMT_T)
-                d = b - a
+                a: datetime = parse_datetime(sp.get("StartTime", None), DATEFMT_T)
+                b: datetime = parse_datetime(sp.get("EndTime", None), DATEFMT_T)
+                d: timedelta = b - a
                 self.fg_spectrum.timestamp = a
                 self.fg_spectrum.duration = d
             except (KeyError, TypeError, AttributeError):
                 pass
 
-    def _spec_layer_to_elements(self, bg=False) -> List[str]:
+    def _spec_layer_to_elements(self, bg: bool = False) -> List[str]:
         sl: SpectrumLayer = self.bg_spectrum if bg is True else self.fg_spectrum
-        sc = sl.comment if sl.comment else ""
-        st = sl.timestamp
-        et = sl.timestamp + sl.duration
+        sc: str = sl.comment if sl.comment else ""
+        st: datetime = sl.timestamp
+        et: datetime = sl.timestamp + sl.duration
 
-        b = "Background" if bg else ""
-        rv = [
+        b: str = "Background" if bg else ""
+        rv: list[str] = [
             f"<StartTime>{st.strftime(DATEFMT_T)}</StartTime>",
             f"<EndTime>{et.strftime(DATEFMT_T)}</EndTime>\n",
             f"<{b}EnergySpectrum>",
@@ -364,7 +367,7 @@ class RcSpectrum:
         return rv
 
     def write_file(self, filename: str) -> None:
-        leader = [
+        leader: list[str] = [
             '<?xml version="1.0"?>',
             '<ResultDataFile xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">',
             "<FormatVersion>120920</FormatVersion>",
@@ -372,8 +375,8 @@ class RcSpectrum:
             "<ResultData>",
         ]
 
-        bgname = self.bg_spectrum.spectrum_name if isinstance(self.bg_spectrum, SpectrumLayer) else ""
-        devconfig = [
+        bgname: str = self.bg_spectrum.spectrum_name if isinstance(self.bg_spectrum, SpectrumLayer) else ""
+        devconfig: list[str] = [
             "<DeviceConfigReference>",
             f"<Name>{self.fg_spectrum.device_model}</Name>",
             "</DeviceConfigReference>",
@@ -384,7 +387,7 @@ class RcSpectrum:
             f"<BackgroundSpectrumFile>{bgname}</BackgroundSpectrumFile>",
         ]
 
-        trailer = [
+        trailer: list[str] = [
             "<Visible>true</Visible>",
             "<PulseCollection>",
             "<Format>Base64 encoded binary</Format>",
@@ -401,7 +404,7 @@ class RcSpectrum:
             print("\n".join(self._spec_layer_to_elements(bg=True)))
         print("\n".join(trailer))
 
-    def as_dict(self) -> Dict[str, Any]:
+    def as_dict(self) -> dict[str, Any]:
         """
         Convert an RcSpectrum into a dict that could be safely jsonified with RcJSONEncoder
         That looks like:
@@ -413,7 +416,7 @@ class RcSpectrum:
 
         See `make_layer_from_dict` for more details
         """
-        rv: Dict[str, Any] = {
+        rv: dict[str, Any] = {
             "fg": None,
             "bg": None,
             "note": self.note,
@@ -425,7 +428,7 @@ class RcSpectrum:
 
         return rv
 
-    def make_layer_from_dict(self, d: Dict[str, Any]) -> SpectrumLayer:
+    def make_layer_from_dict(self, d: dict[str, Any]) -> SpectrumLayer:
         """
         Convert a dict into a SpectrumLayer which can then be used in an RcSpectrum.
         The dict must look like this
@@ -445,7 +448,7 @@ class RcSpectrum:
 
         if len(d["counts"]) != d["channels"]:
             raise ValueError("Inconsistent channel count in layer dict")
-        rv = SpectrumLayer(
+        rv: SpectrumLayer = SpectrumLayer(
             spectrum_name=d["spectrum_name"],
             device_model=d["device_model"],
             serial_number=d["serial_number"],
@@ -459,14 +462,14 @@ class RcSpectrum:
 
         return rv
 
-    def from_dict(self, d: Dict[str, Any]):
+    def from_dict(self, d: dict[str, Any]):
         """
         The inverse of `as_dict`. Use this to load a jsonified RcSpectrum
         """
         self.note = d.get("note", "")
         self.fg_spectrum = self.make_layer_from_dict(d["fg"])
 
-        bg = self.make_layer_from_dict(d["bg"])
+        bg: SpectrumLayer = self.make_layer_from_dict(d["bg"])
         if bg:
             self.bg_spectrum = bg
         return self
@@ -479,8 +482,8 @@ class RcSpectrum:
     def count_rate(self, bg: bool = False) -> float:
         if bg and not isinstance(self.bg_spectrum, SpectrumLayer):
             raise ValueError("bg_spectrum is undefined")
-        n = sum(self.bg_spectrum.counts if bg else self.fg_spectrum.counts)
-        t = self.bg_spectrum.duration if bg else self.fg_spectrum.duration
+        n: int = sum(self.bg_spectrum.counts if bg else self.fg_spectrum.counts)
+        t: timedelta = self.bg_spectrum.duration if bg else self.fg_spectrum.duration
         return n / t.total_seconds()
 
 
@@ -541,8 +544,8 @@ class RcSpectrogram(DataclassEncoderMixin):
     def _parse_header_line(self, line: str) -> None:
         if not line.startswith("Spectrogram:"):
             raise ValueError
-        fields = [x.split(": ") for x in line.strip("\n").split("\t")]
-        fields = dict(fields)
+        dictitems: list[list[str]] = [x.split(": ") for x in line.strip("\n").split("\t")]
+        fields: dict[str, str] = dict(dictitems)
         self.name = fields["Spectrogram"]
         self.timestamp = FileTime2DateTime(int(fields["Timestamp"]))
         self.accumulation_time = timedelta(seconds=int(fields["Accumulation time"]))
@@ -559,15 +562,15 @@ class RcSpectrogram(DataclassEncoderMixin):
         spectrogram recording was interrupted and resumed.
         """
 
-        timestamp = DateTime2FileTime(self.timestamp)
-        tstr = format_datetime(self.timestamp)
+        timestamp: int = DateTime2FileTime(self.timestamp)
+        tstr: str = format_datetime(self.timestamp)
 
         self.name = self.name.strip()
         if not self.name:
             # and this version of time just looks like an int... for deduplication
             self.name = f"rcmulti_{self.timestamp.strftime('%Y%m%d%H%M%S')}_{self.serial_number}"
 
-        fields = [
+        fields: list[str] = [
             f"Spectrogram: {self.name}",
             f"Time: {tstr}",
             f"Timestamp: {timestamp}",
@@ -584,7 +587,7 @@ class RcSpectrogram(DataclassEncoderMixin):
             raise ValueError
         raw_data = line.replace("Spectrum:", "").replace(" ", "").strip()
         raw_data = unhexlify(raw_data)
-        fmt = f"<I3f{len(raw_data)//4-4}I"
+        fmt = f"<I3f{len(raw_data) // 4 - 4}I"
         tmp = struct_unpack(fmt, raw_data)
         self.calibration = EnergyCalibration(a0=tmp[1], a1=tmp[2], a2=tmp[3])
         self.historical_spectrum = SpectrogramPoint(td=timedelta(seconds=tmp[0]), counts=tmp[4:])
@@ -619,13 +622,13 @@ class RcSpectrogram(DataclassEncoderMixin):
                     td = timedelta(seconds=counts.pop(0))
                     self.samples.append(SpectrogramPoint(dt=dt, td=td, counts=counts))
 
-    def _make_spectrogram_line(self, l: SpectrogramPoint) -> str:
+    def _make_spectrogram_line(self, sp: SpectrogramPoint) -> str:
         """
         Format a SpectrogramPoint as line for the rcspg
         """
-        rv = [DateTime2FileTime(l.dt), int(l.td.total_seconds())]
-        rv.extend(l.counts)
-        rv = "\t".join([str(x) for x in rv])
+        nums: list[int] = [DateTime2FileTime(sp.dt), int(sp.td.total_seconds())]
+        nums.extend(sp.counts)
+        rv: str = "\t".join([str(x) for x in nums])
         rv = re_sub(r"(\s0)+$", "", rv)
         return rv
 
@@ -702,11 +705,11 @@ class RcN42(DataclassEncoderMixin):
     def __init__(self, filename: str = "") -> None:
         self.serial_number: str = ""
         self.model: str = ""
-        self.header: Dict[str, Any] = {}
+        self.header: dict[str, Any] = {}
         self.uuid: str = ""
         self.spectrum_data: RcSpectrum = RcSpectrum()
-        self.rad_detector_information: Dict[str, Any] = {}
-        self.rad_instrument_information: Dict[str, Any] = {}
+        self.rad_detector_information: dict[str, Any] = {}
+        self.rad_instrument_information: dict[str, Any] = {}
         self._rdi: str = "radiacode-scinitillator-sipm"
 
         self._populate_header()
@@ -722,7 +725,7 @@ class RcN42(DataclassEncoderMixin):
             "RadInstrumentDataCreatorName": "https://github.com/ckuethe/radiacode-tools",
         }
 
-    def _spectrum_layer_from_rad_measurement(self, rm: Dict[str, Any], ecz: Dict[str, Any]) -> SpectrumLayer:
+    def _spectrum_layer_from_rad_measurement(self, rm: dict[str, Any], ecz: dict[str, Any]) -> SpectrumLayer:
         cal = [float(x) for x in ecz[rm["Spectrum"]["@energyCalibrationReference"]].split()]
         counts = [int(x) for x in rm["Spectrum"]["ChannelData"]["#text"].split()]
 
@@ -738,7 +741,7 @@ class RcN42(DataclassEncoderMixin):
             comment="",
         )
 
-    def _rad_measurement_from_spectrum_layer(self, sl: SpectrumLayer, fg: bool) -> Dict[str, Any]:
+    def _rad_measurement_from_spectrum_layer(self, sl: SpectrumLayer, fg: bool) -> dict[str, Any]:
         tag = "fg"
         fb = "Fore"
         if fg is False:
@@ -779,8 +782,17 @@ class RcN42(DataclassEncoderMixin):
             self.serial_number = serial_number
         self.model = f"RadiaCode-{self.serial_number.split('-')[1]}"
 
-        radiacode_ver = importlib.metadata.version("radiacode")
-        rctools_ver = importlib.metadata.version("radiacode-tools")
+        radiacode_ver = ""
+        rctools_ver = ""
+        try:
+            radiacode_ver: str = importlib.metadata.version("radiacode")
+        except AttributeError:
+            pass
+        try:
+            rctools_ver: str = importlib.metadata.version("radiacode-tools")
+        except AttributeError:
+            pass
+
         self.rad_instrument_information = {
             "@id": "radiacode-instrument-info",
             "RadInstrumentManufacturerName": "Radiacode",
@@ -803,15 +815,20 @@ class RcN42(DataclassEncoderMixin):
         if self.model.endswith("G"):
             rdkc = "GaGG"
             rdd = "GaGG:Ce"
+        cv: str = "3"
+        cl: str = "10"
+        if self.model == "RC-110":
+            cv = "3"
+            cl = "14.5"
         self.rad_detector_information = {
             "@id": self._rdi,
             "RadDetectorCategoryCode": "Gamma",
             "RadDetectorKindCode": rdkc,
             "RadDetectorDescription": f"{rdd} scintillator, coupled to SiPM",
-            "RadDetectorLengthValue": {"@units": "mm", "#text": "10"},
-            "RadDetectorWidthValue": {"@units": "mm", "#text": "10"},
-            "RadDetectorDepthValue": {"@units": "mm", "#text": "10"},
-            "RadDetectorVolumeValue": {"@units": "cc", "#text": "1"},
+            "RadDetectorLengthValue": {"@units": "mm", "#text": cl},
+            "RadDetectorWidthValue": {"@units": "mm", "#text": cl},
+            "RadDetectorDepthValue": {"@units": "mm", "#text": cl},
+            "RadDetectorVolumeValue": {"@units": "cc", "#text": cv},
         }
         return True
 

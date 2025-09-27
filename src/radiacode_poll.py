@@ -8,7 +8,7 @@ import os
 import sys
 import warnings
 from argparse import ArgumentParser, Namespace, _MutuallyExclusiveGroup
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from tempfile import mkstemp
 from time import sleep
 from urllib.parse import quote_plus
@@ -186,7 +186,7 @@ def main() -> None:
 
     dev_id: RcHwInfo = get_device_id(dev)
     measurement: radiacode.Spectrum = dev.spectrum()  # Always grab a spectrum to start
-    obs_start: datetime = datetime.utcnow()
+    obs_start: datetime = datetime.now(UTC)
     n42_writer: RcN42 = RcN42()
     sp: RcSpectrum = RcSpectrum()
     if args.want_accumulation:  # are we accumulating measurements over time?

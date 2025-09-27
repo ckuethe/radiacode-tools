@@ -21,7 +21,7 @@ from datetime import datetime
 from json import dumps as jdumps
 from json import loads as jloads
 from queue import Queue
-from signal import SIGHUP, SIGINT, signal
+from signal import SIGHUP, SIGINT, SIGTERM, signal
 from tempfile import mkstemp
 from threading import Barrier, BrokenBarrierError, Lock, Thread, active_count
 from threading import enumerate as list_threads
@@ -161,6 +161,10 @@ def rtdata_worker(rc: RadiaCode, serial_number: str) -> None:
     RadiaCode emits some real-time data (databuf) and as it is available it gets
     logged, in particular dose, count, and their rates. These are used to build
     tracks.
+
+    Caution: this will download whatever's in the data buffer which could be days
+    and days of history. You'll need to sort and filter out events that happened
+    before the current recording session.
     """
     with STDIO_LOCK:
         print(f"Starting rtdata_worker for {serial_number}", file=sys.stderr)
@@ -170,21 +174,22 @@ def rtdata_worker(rc: RadiaCode, serial_number: str) -> None:
         with RC_LOCKS[serial_number]:
             try:
                 db = rc.data_buf()
+            except KeyboardInterrupt:
+                return
             except Exception as e:
+                # FIXME this needs to do some better decoding of the exception
+                # that might mean I need to propagate a better error message up
                 z = str(e.args[0])
-                with STDIO_LOCK:
-                    print(f"rtdata_worker {serial_number} caught exception {z}", file=sys.stderr)
-                if "seq jump" in z or "but have only" in z:
-                    sleep(0.1)
-                    continue
-                else:
-                    raise
+                if "seq jump" not in z:
+                    with STDIO_LOCK:
+                        print(f"rtdata_worker {serial_number} caught exception {z}", file=sys.stderr)
+                continue
 
         for rec in db:
             rtd_type = rec.__class__.__name__  # ick.
             if rtd_type == "Event":
                 continue
-            rtdata_msg = {
+            rtdata_msg: dict[str, Any] = {
                 "monotime": monotonic(),
                 "dt": rec.dt,
                 "serial_number": serial_number,
@@ -222,12 +227,21 @@ def rc_worker(args: Namespace, serial_number: str) -> bool:
     try:
         rc: RadiaCode = RadiaCode(serial_number=serial_number)
     except (usb.core.USBTimeoutError, usb.core.USBError, DeviceNotFound) as e:
+        # device failed to connect. I'm not sure why this happens (maybe power issues) on my
+        # NanoPi, but when it does, I should probably do something like gracefully terminate
+        # the threads associated with the failed device, and carry on...
         with STDIO_LOCK:
             print(
                 f"{serial_number} failed to connect - cable error, device disconnect, bt connected? {e}",
                 file=sys.stderr,
             )
-            CTRL_QUEUE.put(SHUTDOWN_OBJECT)  # if we can't start all threads, shut everything down
+            del RC_LOCKS[serial_number]
+            if args.require_all:
+                print(
+                    f"Missing required device {serial_number} - shutting down",
+                    file=sys.stderr,
+                )
+                CTRL_QUEUE.put(SHUTDOWN_OBJECT)  # if we can't start all threads, shut everything down
         return False
 
     # radiacode will enumerate and give some information like serial number
@@ -242,7 +256,7 @@ def rc_worker(args: Namespace, serial_number: str) -> bool:
                 monotime=monotonic(),
                 dt=datetime.now(tz=UTC),
                 serial_number=serial_number,
-                spectrum=rc.spectrum_accum(),
+                spectrum=rc.spectrum_accum(),  # type: ignore - pylance doesn't understand what I'm doing here
             )
         )
     with STDIO_LOCK:
@@ -254,6 +268,9 @@ def rc_worker(args: Namespace, serial_number: str) -> bool:
     except BrokenBarrierError:
         with STDIO_LOCK:
             print("timeout waiting for all devices to connect", file=sys.stderr)
+            CTRL_QUEUE.put(SHUTDOWN_OBJECT)
+            args.devs.remove(serial_number)
+            THREAD_BARRIER._parties -= 1  # type: ignore - Evil, but there's no other way to adjust this
         return False
 
     rtdata_thread = Thread(
@@ -278,7 +295,10 @@ def rc_worker(args: Namespace, serial_number: str) -> bool:
             # Grab the spectrum...
             with RC_LOCKS[serial_number]:
                 sd = SpecData(
-                    monotime=monotonic(), dt=datetime.now(tz=UTC), serial_number=serial_number, spectrum=rc.spectrum()
+                    monotime=monotonic(),
+                    dt=datetime.now(tz=UTC),
+                    serial_number=serial_number,
+                    spectrum=rc.spectrum(),
                 )
             DATA_QUEUE.put(sd)
             ams.counter_increment(f"num_reports_{serial_number}")
@@ -495,10 +515,11 @@ def main() -> None:
     global ams
     global THREAD_BARRIER
 
+    dev_names = None
     try:
         dev_names = find_radiacode_devices()
     except Exception:
-        dev_names = None
+        pass
     finally:
         if not dev_names:
             print("No devices Found", file=sys.stderr)
@@ -528,8 +549,22 @@ def main() -> None:
     signal(SIGHUP, handle_shutdown_signal)
     # create the threads and store in a list so they can be checked later
     [t.start() for t in thread_list if t.name.startswith("poller-worker")]  # type: ignore[func-returns-value]
-    while active_count() < expected_thread_count:
-        sleep(1)
+    retries = 10
+    threads_waiting = True
+    while threads_waiting:
+        nthreads = active_count()
+        if nthreads >= expected_thread_count:
+            threads_waiting = False
+            break
+        else:
+            with STDIO_LOCK:
+                print(f"waiting for ({expected_thread_count - nthreads}) threads to start")
+            retries -= 1
+            if retries > 0:
+                sleep(1)
+            else:
+                os.killpg(os.getpgrp(), SIGTERM)
+                exit()
 
     # Main process/thread slowly spins waiting for ^C. If interrupt is received, or one of the
     # workers exits, set a shutdown flag which will cause all other threads to gracefully shut

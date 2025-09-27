@@ -25,7 +25,7 @@ from threading import Lock, Thread
 from time import monotonic, process_time, time
 from typing import Any, Dict, List, Optional, Union
 
-Number = Union[int, float]
+Number: type[float | int] = Union[int, float]
 
 # I use these strings so much ...
 C: str = "counter"
@@ -76,7 +76,7 @@ class AppMetrics:
 
     def __init__(
         self, port: int = 8274, local_only: bool = True, appname: str = "", stub: bool = False, safe: bool = True
-    ):
+    ) -> None:
         """
         port: tcp port on which to listen
         local_only: whether or not to bind to localhost or wildcard
@@ -96,7 +96,7 @@ class AppMetrics:
             return
         self._server = AppMetricsServer(app_metrics=self, port=port, local_only=local_only, safe=safe)
 
-    def _set_clocks(self):
+    def _set_clocks(self) -> None:
         """Set the cpu counter elements"""
         self._stats[P]["real"] = monotonic() - self._init_real_time
         self._stats[P]["wall"] = time()
@@ -112,22 +112,22 @@ class AppMetrics:
         self._server._close()
 
     # Counters
-    def counter_create(self, name: str, init_val: Number = 0):
-        return self._create_metric(C, name, init_val)
+    def counter_create(self, name: str, init_val: int | float = 0) -> None:
+        self._create_metric(C, name, init_val)
 
-    def counter_increment(self, name: str, step=1):
+    def counter_increment(self, name: str, step: int | float = 1) -> None:
         with self.am_mutex:
             self._stats[C][name] += step
 
-    def counter_decrement(self, name: str, step: Number = 1):
+    def counter_decrement(self, name: str, step: int | float = 1) -> None:
         with self.am_mutex:
             self._stats[C][name] -= step
 
     # Flags
-    def flag_create(self, name: str, init_val: bool = False):
+    def flag_create(self, name: str, init_val: bool = False) -> None:
         self._create_metric(F, name, init_val)
 
-    def flag_setval(self, name: str, v: bool):
+    def flag_setval(self, name: str, v: bool) -> None:
         with self.am_mutex:
             if name not in self._stats[F]:
                 raise KeyError(f"flag:{name}")
@@ -136,17 +136,17 @@ class AppMetrics:
             else:
                 raise ValueError
 
-    def flag_set(self, name: str):
+    def flag_set(self, name: str) -> None:
         self.flag_setval(name, True)
 
-    def flag_clear(self, name: str):
+    def flag_clear(self, name: str) -> None:
         self.flag_setval(name, False)
 
     # Gauges
-    def gauge_create(self, name: str, init_val: Number = 0):
+    def gauge_create(self, name: str, init_val: int | float = 0) -> None:
         self._create_metric(G, name, init_val)
 
-    def gauge_update(self, name: str, v: Number):
+    def gauge_update(self, name: str, v: int | float) -> None:
         with self.am_mutex:
             if name not in self._stats[G]:
                 raise KeyError(f"gauge:{name}")
@@ -155,7 +155,7 @@ class AppMetrics:
             else:
                 raise ValueError
 
-    def _create_metric(self, mtype: str, name: str, init_val: Any):
+    def _create_metric(self, mtype: str, name: str, init_val: Any) -> None:
         if mtype not in self._mtypes:
             raise ValueError(f"Metric type must be one of {mtype}")
         with self.am_mutex:
@@ -168,20 +168,18 @@ class AppMetrics:
 class AppMetricsBaseReqHandler(BaseHTTPRequestHandler):
     """ """
 
-    def __init__(self, metrics: AppMetrics, *args, **kwargs):
+    def __init__(self, metrics: AppMetrics, *args, **kwargs) -> None:
         self.metrics = metrics
         super().__init__(*args, **kwargs)
 
     def index_html(self) -> str:
-        kz = self.metrics._stats.keys()
-
-        lines = [
+        lines: list[str] = [
             "<html> <body> <tt>",
             '<table id="mtx" border="1" cellpadding="2"><h2>Application Metrics</h2></td>',
         ]
 
         for k in self.metrics._stats:
-            tr = f'<tr><td colspan="2" id="{k}"><b>{k.upper()}</b></tr></td>'
+            tr: str = f'<tr><td colspan="2" id="{k}"><b>{k.upper()}</b></tr></td>'
             lines.append(tr)
             for m in self.metrics._stats[k]:
                 n = m
@@ -248,7 +246,7 @@ class AppMetricsBaseReqHandler(BaseHTTPRequestHandler):
             # in unsafe mode: only "/quitquitquit" is allowed
             # in safe mode: "/quitquitquit?<pid>" is required
             if (self.metrics.safe is False and self.path == qqq) or (
-                (self.metrics.safe is True and self.path == f"{qqq}?{pid}")
+                self.metrics.safe is True and self.path == f"{qqq}?{pid}"
             ):
                 shutdown = True
                 rcode = HTTPStatus.OK
@@ -259,7 +257,7 @@ class AppMetricsBaseReqHandler(BaseHTTPRequestHandler):
                 # copy the statistics so as not to mess with the storage structure
                 errmsg = self.metrics._stats[P].copy()
                 errmsg["httpstatus"] = rcode
-                errmsg["error"] = f"invalid shutdown command; missing or extra PID arg"
+                errmsg["error"] = "invalid shutdown command; missing or extra PID arg"
                 content = jdumps(errmsg, indent=1)
         else:  # anything else, use the default error message
             pass
@@ -284,7 +282,7 @@ class AppMetricsBaseReqHandler(BaseHTTPRequestHandler):
 class AppMetricsServer:
     def __init__(
         self, app_metrics: AppMetrics, port: int = 8274, local_only: bool = True, appname: str = "", safe: bool = True
-    ):
+    ) -> None:
         address = "localhost" if local_only else "0.0.0.0"
         self._server_thread: Optional[Thread] = Thread(
             # deepcode ignore MissingAPI: Thread is joined below..

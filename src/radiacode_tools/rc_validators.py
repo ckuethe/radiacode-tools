@@ -14,7 +14,12 @@ from re import match as re_match
 from typing import Any, Dict, Tuple
 
 from .rc_types import GeoBox, GeoCircle, GeoPoint, TimeRange
-from .rc_utils import _BEGINNING_OF_TIME, _THE_END_OF_DAYS, UTC, localtz, parse_datetime
+from .rc_utils import (  # pyright: ignore[reportPrivateUsage]
+    _BEGINNING_OF_TIME,
+    _THE_END_OF_DAYS,
+    UTC,
+    localtz,
+)
 
 _LAT_MIN: float = -90
 _LAT_MAX: float = 90
@@ -188,7 +193,7 @@ def _geometry(s: str) -> Tuple[int, int]:
     return _positive_int(n[0]), _positive_int(n[1])
 
 
-def _gpsd(s) -> Dict[str, Any] | None:
+def _gpsd(s: str) -> Dict[str, Any] | None:
     m = re_match(r"^gpsd://(?P<host>[a-zA-Z0-9_.-]+)(:(?P<port>\d+))?(?P<device>/.+)?", s)
     if m:
         return m.groupdict()
