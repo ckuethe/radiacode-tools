@@ -12,7 +12,7 @@ import pytest
 
 from radiacode_tools.rc_files import _RCTRK_DEFAULT_NO_SERIAL_NUMBER, RcTrack
 from radiacode_tools.rc_types import RcJSONEncoder
-from radiacode_tools.rc_utils import _BEGINNING_OF_TIME, _BEGINNING_OF_TIME_STR, UTC
+from radiacode_tools.rc_utils import _BEGINNING_OF_TIME, UTC
 
 testdir = pathjoin(dirname(__file__), "data")
 
