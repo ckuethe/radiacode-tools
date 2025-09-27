@@ -18,7 +18,6 @@ from rcspectroplot import (
     get_args,
     load_spectrogram_from_ndjson,
     main,
-    plot_spectrogram,
 )
 
 
