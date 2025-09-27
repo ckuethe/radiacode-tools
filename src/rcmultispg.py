@@ -400,6 +400,7 @@ def gps_worker(args: Namespace) -> None:
                     ams.flag_set("gps_connected")
                     dedup = None
                     while True:
+                        sleep(0.1)
                         line: str = gpsfd.readline().strip()
                         try:
                             if "No such device" in line:
