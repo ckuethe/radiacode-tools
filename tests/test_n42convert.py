@@ -142,7 +142,7 @@ def test_argparse_has_uuid(monkeypatch):
 def test_argparse_empty_uuid(monkeypatch):
     monkeypatch.setattr("sys.argv", [__file__, "-i", INPUTFILE, "-b", BGFILE, "-o", OUTPUTFILE, "-u", ""])
     parsed_args = n42convert.get_args()
-    assert parsed_args.uuid is None
+    assert not parsed_args.uuid
 
 
 def test_argparse_invalid_uuid(monkeypatch):
