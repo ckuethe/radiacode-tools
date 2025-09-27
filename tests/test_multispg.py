@@ -212,7 +212,7 @@ def test_main_fails(monkeypatch):
 
 @pytest.mark.slow
 def test_rc_worker_failed(capsys):
-    args = Namespace(interval=1, prefix="foobar")
+    args = Namespace(interval=1, prefix="foobar", require_all=False)
     rcmultispg.ams = rcmultispg.AppMetrics(stub=True)
     sn = devs[0]
     assert rcmultispg.rc_worker(args, serial_number=sn) is False
