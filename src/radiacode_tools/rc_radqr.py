@@ -170,7 +170,7 @@ def make_qr_payload(
     comments: Optional[str] = "",
     timestamp: Optional[datetime.datetime] = None,
     options: Optional[int] = 0,
-):
+) -> tuple[int, str]:
     """
     Format the payload of the raddata/interspec qrcode
 

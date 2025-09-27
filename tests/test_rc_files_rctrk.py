@@ -12,14 +12,14 @@ import pytest
 
 from radiacode_tools.rc_files import _RCTRK_DEFAULT_NO_SERIAL_NUMBER, RcTrack
 from radiacode_tools.rc_types import RcJSONEncoder
-from radiacode_tools.rc_utils import _BEGINNING_OF_TIME, UTC
+from radiacode_tools.rc_utils import BEGINNING_OF_TIME, UTC
 
 testdir = pathjoin(dirname(__file__), "data")
 
 
 def test_rctrk(monkeypatch):
     tk = RcTrack()
-    tk.add_point(dt=_BEGINNING_OF_TIME, latitude=0.0, longitude=0.0, accuracy=1.0, dose_rate=1.0, count_rate=1.0)
+    tk.add_point(dt=BEGINNING_OF_TIME, latitude=0.0, longitude=0.0, accuracy=1.0, dose_rate=1.0, count_rate=1.0)
     assert str(tk)
 
     mock_ofd = StringIO()
@@ -76,7 +76,7 @@ def test_rctrk_bogus():
 
 def test_rctrk_null(monkeypatch):
     tk = RcTrack()
-    assert tk.timestamp >= _BEGINNING_OF_TIME
+    assert tk.timestamp >= BEGINNING_OF_TIME
 
     mock_ofd = StringIO()
     monkeypatch.setattr("builtins.open", lambda _filename, _mode: mock_ofd)
@@ -145,7 +145,7 @@ def test_rctrkadd_dict_and_timestamp():
     # add an old point with tzinfo, check that timestamp is correctly updated
     tk.add_point_dict(
         {
-            "DateTime": _BEGINNING_OF_TIME,
+            "DateTime": BEGINNING_OF_TIME,
             "Latitude": 0.0,
             "Longitude": 0.0,
             "Accuracy": 1.0,
@@ -153,12 +153,12 @@ def test_rctrkadd_dict_and_timestamp():
             "CountRate": 1.0,
         }
     )
-    assert tk.timestamp == _BEGINNING_OF_TIME
+    assert tk.timestamp == BEGINNING_OF_TIME
 
     # add a point after the oldest point, ensure that timestamp is preserved
     tk.add_point_dict(
         {
-            "DateTime": _BEGINNING_OF_TIME.replace(year=test_year - 1),
+            "DateTime": BEGINNING_OF_TIME.replace(year=test_year - 1),
             "Latitude": 0.0,
             "Longitude": 0.0,
             "Accuracy": 1.0,
@@ -166,4 +166,4 @@ def test_rctrkadd_dict_and_timestamp():
             "CountRate": 1.0,
         }
     )
-    assert tk.timestamp == _BEGINNING_OF_TIME
+    assert tk.timestamp == BEGINNING_OF_TIME

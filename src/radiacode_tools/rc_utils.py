@@ -29,11 +29,11 @@ UTC: timezone = timezone(timedelta(0))
 localtz = datetime.now(timezone.utc).astimezone().tzinfo
 
 # guess what happened here
-_BEGINNING_OF_TIME_STR: str = "1945-07-16T11:29:21Z"
-_BEGINNING_OF_TIME: datetime = datetime.strptime(_BEGINNING_OF_TIME_STR, DATEFMT_TZ).replace(tzinfo=UTC)
+BEGINNING_OF_TIME_STR: str = "1945-07-16T11:29:21Z"
+BEGINNING_OF_TIME: datetime = datetime.strptime(BEGINNING_OF_TIME_STR, DATEFMT_TZ).replace(tzinfo=UTC)
 # https://pumas.nasa.gov/examples/how-many-days-are-year says approximately 365.25 days per year
 # If you're still using python3 in 200 years, that's some serious retrocomputing
-_THE_END_OF_DAYS: datetime = _BEGINNING_OF_TIME + timedelta(days=250 * 365.25)
+THE_END_OF_DAYS: datetime = BEGINNING_OF_TIME + timedelta(days=250 * 365.25)
 
 
 def parse_datetime(ds: str, fmt: str = DATEFMT) -> datetime:

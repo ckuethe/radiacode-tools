@@ -15,8 +15,8 @@ from typing import Any, Dict, Tuple
 
 from .rc_types import GeoBox, GeoCircle, GeoPoint, TimeRange
 from .rc_utils import (  # pyright: ignore[reportPrivateUsage]
-    _BEGINNING_OF_TIME,
-    _THE_END_OF_DAYS,
+    BEGINNING_OF_TIME,
+    THE_END_OF_DAYS,
     UTC,
     localtz,
 )
@@ -59,8 +59,8 @@ def timerange(s: str = "~") -> TimeRange:
     w = s.split("~")
     if len(w) != 2:
         raise ValueError
-    a = _BEGINNING_OF_TIME
-    b = _THE_END_OF_DAYS
+    a = BEGINNING_OF_TIME
+    b = THE_END_OF_DAYS
     if w[0]:
         a = isotime(w[0]).replace(tzinfo=UTC if w[0].endswith("Z") else localtz)
     if w[1]:

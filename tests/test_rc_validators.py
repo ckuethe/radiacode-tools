@@ -7,7 +7,7 @@ import pytest
 
 from radiacode_tools import rc_validators
 from radiacode_tools.rc_types import GeoCircle, GeoPoint, TimeRange
-from radiacode_tools.rc_utils import _BEGINNING_OF_TIME, _BEGINNING_OF_TIME_STR
+from radiacode_tools.rc_utils import BEGINNING_OF_TIME, BEGINNING_OF_TIME_STR
 
 
 def test_positive_float():
@@ -77,9 +77,9 @@ def test_rcsn():
 
 
 def test_isotime():
-    eqval = _BEGINNING_OF_TIME
-    assert eqval == rc_validators.isotime(_BEGINNING_OF_TIME_STR)
-    assert eqval == rc_validators.isotime(_BEGINNING_OF_TIME_STR.replace(" ", "T"))
+    eqval = BEGINNING_OF_TIME
+    assert eqval == rc_validators.isotime(BEGINNING_OF_TIME_STR)
+    assert eqval == rc_validators.isotime(BEGINNING_OF_TIME_STR.replace(" ", "T"))
     with pytest.raises(ValueError):
         _ = rc_validators.isotime("not a real timestamp")
 
@@ -145,7 +145,7 @@ def test_samp_range():
 
 def test_time_range():
     rv = rc_validators.timerange()
-    assert TimeRange(dt_start=rc_validators._BEGINNING_OF_TIME, dt_end=rc_validators._THE_END_OF_DAYS) == rv
+    assert TimeRange(dt_start=rc_validators.BEGINNING_OF_TIME, dt_end=rc_validators.THE_END_OF_DAYS) == rv
 
     with pytest.raises(ValueError):
         rc_validators.timerange("1~2~4")

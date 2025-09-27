@@ -13,7 +13,7 @@ testdir = pathjoin(dirname(__file__), "data")
 testfile = pathjoin(testdir, "broken_arrow_errrr_airplane.ndjson")
 
 import rctrk_from_json
-from radiacode_tools.rc_utils import _BEGINNING_OF_TIME
+from radiacode_tools.rc_utils import BEGINNING_OF_TIME
 
 
 def test_missing_keys():
@@ -43,7 +43,7 @@ def test_parts():
     lines = rctrk_from_json.load_file_lines(args)
     trk = rctrk_from_json.convert_lines_to_track(args, lines)
     assert trk.name == "test"
-    assert trk.timestamp > _BEGINNING_OF_TIME
+    assert trk.timestamp > BEGINNING_OF_TIME
 
 
 @pytest.mark.slow

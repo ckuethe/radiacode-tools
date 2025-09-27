@@ -27,7 +27,7 @@ from radiacode_tools.rc_types import (
     TimeRange,
     TrackPoint,
 )
-from radiacode_tools.rc_utils import _BEGINNING_OF_TIME, _THE_END_OF_DAYS
+from radiacode_tools.rc_utils import BEGINNING_OF_TIME, THE_END_OF_DAYS
 
 
 def test_rangefinder():
@@ -95,8 +95,8 @@ def test_RcHwInfo():
         hw_num=sentinel,
         boot_ver="4.0",
         fw_ver="4.12",
-        boot_date=_BEGINNING_OF_TIME,
-        fw_date=_THE_END_OF_DAYS,
+        boot_date=BEGINNING_OF_TIME,
+        fw_date=THE_END_OF_DAYS,
     )
     d = x.as_dict()
     j = x.json()
@@ -111,7 +111,7 @@ def test_RcHwInfo():
 def test_SGHeader():
     sentinel = "Look at the pretty green glass"
     x = SGHeader(
-        timestamp=_BEGINNING_OF_TIME,
+        timestamp=BEGINNING_OF_TIME,
         duration=timedelta(seconds=3.14159),
         comment=sentinel,
     )
@@ -132,7 +132,7 @@ def test_SpectrogramPoint_invalid_time():
 
 
 def test_SpectrogramPoint():
-    x = SpectrogramPoint(dt=_BEGINNING_OF_TIME, td=3.14159, counts=[1, 2, 3, 4])
+    x = SpectrogramPoint(dt=BEGINNING_OF_TIME, td=3.14159, counts=[1, 2, 3, 4])
     d = x.as_dict()
     j = x.json()
     assert d["_dataclass"] is True
@@ -145,7 +145,7 @@ def test_SpectrogramPoint():
 def test_TrackPoint():
     sentinel = "Look at the pretty green glass"
     x = TrackPoint(
-        dt=_BEGINNING_OF_TIME,
+        dt=BEGINNING_OF_TIME,
         latitude=0,
         longitude=1,
         accuracy=2,
@@ -164,7 +164,7 @@ def test_TrackPoint():
 
 
 def test_TimeRange():
-    x = TimeRange(dt_end=_THE_END_OF_DAYS, dt_start=_BEGINNING_OF_TIME)
+    x = TimeRange(dt_end=THE_END_OF_DAYS, dt_start=BEGINNING_OF_TIME)
     d = x.as_dict()
     j = x.json()
     assert d["_dataclass"] is True
@@ -195,7 +195,7 @@ def test_SpectrumLayer():
         device_model="RC-100",
         serial_number="RC-100-123456",
         calibration=EnergyCalibration(a0=0, a1=1, a2=2),
-        timestamp=_BEGINNING_OF_TIME,
+        timestamp=BEGINNING_OF_TIME,
         duration=123456,
         counts=[1] * 768,
         channels=768,
@@ -214,7 +214,7 @@ def test_SpectrumLayer():
 def test_SpecData():
     x = SpecData(
         monotime=1.7e9,
-        dt=_BEGINNING_OF_TIME,
+        dt=BEGINNING_OF_TIME,
         serial_number="RC-100-123456",
         spectrum=Spectrum(duration=10, a0=1, a1=2, a2=3, counts=[1] * 1024),
     )
@@ -239,7 +239,7 @@ def test_SpecEnergy():
 
 
 def test_RtData():
-    x = RtData(monotime=1.7e9, dt=_THE_END_OF_DAYS, temperature=-273.15, charge_level=100)
+    x = RtData(monotime=1.7e9, dt=THE_END_OF_DAYS, temperature=-273.15, charge_level=100)
     d = x.as_dict()
     j = x.json()
     assert d["_dataclass"] is True
@@ -252,7 +252,7 @@ def test_RtData():
 def test_GpsData():
     x = GpsData(
         monotime=1.7e9,
-        payload=dict(gnss=True, time=_THE_END_OF_DAYS, lat=1, lon=2, mode=3, speed=4, climb=5, track=6, alt=7, epc=0),
+        payload=dict(gnss=True, time=THE_END_OF_DAYS, lat=1, lon=2, mode=3, speed=4, climb=5, track=6, alt=7, epc=0),
     )
     d = x.as_dict()
     j = x.json()
