@@ -36,22 +36,22 @@ class MockRadiaCode:
         self.th232_cps = sum(self.th232) / self.th232_duration
         self.counts = [0] * len(self.th232)
 
-    def fw_signature(self):
+    def fw_signature(self) -> str:
         return self.fw_sig
 
     def fw_version(self):
         return self.fw_ver
 
-    def hw_serial_number(self):
+    def hw_serial_number(self) -> str:
         return self.hsn
 
     def serial_number(self):
         return self.sn
 
-    def base_time(self):
+    def base_time(self) -> datetime:
         return self.conn_time
 
-    def spectrum(self):
+    def spectrum(self) -> Spectrum:
         self.real_time += 10
         m = self.real_time / self.th232_duration
         self.counts = [int(c * m) for c in self.th232]
@@ -63,23 +63,23 @@ class MockRadiaCode:
             counts=self.counts,
         )
 
-    def spectrum_accum(self):
-        return Spectrum(duration=datetime.timedelta(0), a0=self.a0, a1=self.a1, a2=self.a2, counts=[0] * 1024)
+    def spectrum_accum(self) -> Spectrum:
+        return Spectrum(duration=datetime.timedelta(1), a0=self.a0, a1=self.a1, a2=self.a2, counts=[0] * 1023 + [1])
 
-    def spectrum_reset(self):
+    def spectrum_reset(self) -> None:
         self.real_time = 0
         self.counts = [0] * len(self.th232)
 
-    def dose_reset(self):
+    def dose_reset(self) -> None:
         pass
 
-    def set_device_on(self, on: bool):
+    def set_device_on(self, on: bool) -> None:
         pass
 
-    def set_local_time(self, dt: datetime.datetime):
+    def set_local_time(self, dt: datetime.datetime) -> None:
         pass
 
-    def data_buf(self):
+    def data_buf(self) -> list[DoseRateDB | Event | RareData | RawData | RealTimeData]:
         now = test_epoch + datetime.timedelta(seconds=self.real_time)
         records = [
             Event(

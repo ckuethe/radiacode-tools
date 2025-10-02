@@ -19,6 +19,7 @@ import radiacode.types
 from usb import USBError
 
 from radiacode_tools.rc_types import RcJSONEncoder
+from radiacode_tools.rc_validators import rcsn
 
 
 def get_args() -> Namespace:
@@ -33,7 +34,7 @@ def get_args() -> Namespace:
         "-d",
         "--device",
         metavar="STR",
-        type=str,
+        type=rcsn,
         default=None,
         help="Connect to device identified by USB serial-number",
     )
@@ -83,6 +84,18 @@ def get_args() -> Namespace:
     return ap.parse_args()
 
 
+def wait_for_rc_activity(rc: radiacode.RadiaCode, maxwait: float = 10):
+    t = time.time()
+    while True:
+        time.sleep(0.1)
+        if time.time() - t >= maxwait:
+            raise TimeoutError
+        s0: radiacode.Spectrum = rc.spectrum_accum()
+        s1: radiacode.Spectrum = rc.spectrum()
+        if any([s0.duration.total_seconds(), sum(s0.counts), s1.duration.total_seconds(), sum(s1.counts)]):
+            return
+
+
 def main() -> None:
     args = get_args()
     logging.basicConfig(level=logging.DEBUG)
@@ -104,11 +117,7 @@ def main() -> None:
     # If you try poll you just get all zeroes.
     rc.set_device_on(True)
 
-    while True:
-        s = rc.spectrum_accum()
-        if s.duration.total_seconds() or sum(s.counts):
-            break
-        time.sleep(0.1)
+    wait_for_rc_activity(rc)
 
     fn = "/dev/stdout"
     copy_to_stdout = False
@@ -121,6 +130,7 @@ def main() -> None:
         copy_to_stdout = args.stdout
 
     sync_timer: int = 0
+    last_message_time: datetime.datetime = datetime.datetime(1970, 1, 1)
     with open(fn, "w") as ofd:
         while True:
             now = datetime.datetime.now().replace(microsecond=0)
@@ -144,11 +154,15 @@ def main() -> None:
                     # I hate the name "dt", so change it so something more descriptive
                     decoded["message_time"] = decoded.pop("dt", None)
 
-                    mtd: datetime.timedelta = decoded["host_time"] - decoded["message_time"]
-                    if mtd.total_seconds() < 5:
+                    host_to_device_time_delta: datetime.timedelta = decoded["host_time"] - decoded["message_time"]
+                    if host_to_device_time_delta.total_seconds() < 5:
                         sync_timer += 1
                     else:
-                        sync_timer = 0
+                        if decoded["message_time"] > last_message_time:
+                            last_message_time = decoded["message_time"]
+                            sync_timer = 0
+                        else:
+                            sync_timer += 1
                     # Don't need all the very insignificant digits
                     if "count_rate" in decoded:
                         decoded["count_rate"] = round(decoded["count_rate"], 3)
