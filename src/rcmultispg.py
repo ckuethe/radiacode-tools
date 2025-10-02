@@ -45,7 +45,7 @@ ams: AppMetrics = AppMetrics(stub=True)
 MIN_POLL_INTERVAL: float = 0.5
 RC_LOCKS: Dict[str, Lock] = dict()  # prevent rtdata polling and spectrum polling from stomping on each other
 STDIO_LOCK: Lock = Lock()  # Prevent stdio corruption
-THREAD_BARRIER: Barrier = Barrier(0)
+THREAD_BARRIER: Barrier = Barrier(1)
 
 # Queues and stuff
 DATA_QUEUE: Queue[Any] = Queue()  # Global so I can use them in signal handlers
