@@ -36,6 +36,10 @@ def test_argparse_default(monkeypatch):
     a = rctrk_from_json.get_args()
     assert a.input == testfile
 
+    monkeypatch.setattr("sys.argv", [__file__, "-i", testfile, "-s", "invalid-serial-number"])
+    with pytest.raises(SystemExit):
+        rctrk_from_json.get_args()
+
 
 @pytest.mark.slow
 def test_parts():

@@ -11,13 +11,13 @@ spectrograms that the radiacode app might use
 
 import json
 from argparse import ArgumentParser, Namespace
-from os.path import basename, dirname
+from os.path import basename, dirname, realpath
 from os.path import join as pathjoin
-from os.path import realpath
 from typing import Any, Dict, Iterable
 
 from radiacode_tools.rc_files import RcTrack
 from radiacode_tools.rc_utils import DATEFMT_TZ, parse_datetime
+from radiacode_tools.rc_validators import rcsn
 
 
 def get_args() -> Namespace:
@@ -41,7 +41,7 @@ def get_args() -> Namespace:
     ap.add_argument(
         "-s",
         "--serial-number",
-        type=str,
+        type=rcsn,
         metavar="STR",
         help="Select a given device from a multi-device trace [autodetected]",
     )
@@ -63,7 +63,7 @@ def get_args() -> Namespace:
 
     _dev_stdin = "/dev/stdin"
     _dev_stdout = "/dev/stdout"
-    rv = ap.parse_args()
+    rv: Namespace = ap.parse_args()
     if rv.input in ["-", "", None]:
         rv.input = _dev_stdin
 
