@@ -91,9 +91,15 @@ def test_get_args_numeric_nobg(monkeypatch):
 
 
 def test_get_args_fail(monkeypatch):
+    # not summary rate
     monkeypatch.setattr("sys.argv", [__file__, "-a", f_a, "-b", f_b, "-g", f_bg])
     with pytest.raises(SystemExit):
         deadtime.get_args()
+
+    # invalid interval
+    monkeypatch.setattr("sys.argv", [__file__, "-a", f_a, "-b", f_b, "-c", f_ab, "-i", 0])
+    with pytest.raises(SystemExit):
+        deadtime.get_args() is None
 
 
 def test_compute_deadtime_bg_fail():

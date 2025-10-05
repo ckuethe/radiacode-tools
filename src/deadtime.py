@@ -10,6 +10,7 @@ from typing import Dict
 
 from radiacode_tools.rc_files import RcSpectrum
 from radiacode_tools.rc_types import DTstats, Number
+from radiacode_tools.rc_validators import positive_float
 
 
 def get_args() -> Namespace:
@@ -25,7 +26,9 @@ def get_args() -> Namespace:
     ap.add_argument("-b", "--second", type=str, required=True, metavar="RCXML_OR_NUM")
     ap.add_argument("-c", "--combined", type=str, required=True, metavar="RCXML_OR_NUM")
     ap.add_argument("-g", "--background", type=str, required=False, metavar="RCXML_OR_NUM")
-    ap.add_argument("-i", "--interval", type=float, required=False, default=1.0, metavar="TIME", help="[%(default)ss]")
+    ap.add_argument(
+        "-i", "--interval", type=positive_float, required=False, default=1.0, metavar="TIME", help="[%(default)ss]"
+    )
     return ap.parse_args()
 
 
@@ -101,8 +104,8 @@ def print_deadtime(rates: Dict[str, Number]) -> DTstats:
     "Given a dict of a,b,ab,bg rates, print the computed deadtime."
     dt = compute_deadtime(**rates)
     print(rates)
-    print(f"dead time at {dt.dt_cps:.1f}cps: {dt.dt_us*1e6:.1f}us")
-    print(f"lost count/sec: {dt.lost_cps:.1f} loss_fraction: {100*dt.loss_fraction:.1f}%")
+    print(f"dead time at {dt.dt_cps:.1f}cps: {dt.dt_us * 1e6:.1f}us")
+    print(f"lost count/sec: {dt.lost_cps:.1f} loss_fraction: {100 * dt.loss_fraction:.1f}%")
     return dt
 
 
