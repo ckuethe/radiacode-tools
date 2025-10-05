@@ -10,6 +10,18 @@ from radiacode_tools.rc_types import GeoCircle, GeoPoint, TimeRange
 from radiacode_tools.rc_utils import BEGINNING_OF_TIME, BEGINNING_OF_TIME_STR
 
 
+def test_non_negative_float():
+    v = 1.0
+    assert v == rc_validators.non_negative_float(str(v))
+    assert v == rc_validators.non_negative_float(int(v))
+    assert v == rc_validators.non_negative_float(v)
+    assert 0.0 == rc_validators.non_negative_float("0.0")
+    with pytest.raises(ValueError):
+        _ = rc_validators.non_negative_float("-1.0")
+    with pytest.raises(ValueError):
+        _ = rc_validators.non_negative_float("string")
+
+
 def test_positive_float():
     v = 1.0
     assert v == rc_validators.positive_float(str(v))

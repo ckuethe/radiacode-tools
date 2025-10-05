@@ -177,6 +177,14 @@ def positive_int(s: str) -> int:
     return int(rv)
 
 
+def non_negative_float(s: str) -> float:
+    "check that a string can be converted into a non-negative float"
+    rv = float(s)
+    if rv >= 0:
+        return rv
+    raise ValueError()
+
+
 def positive_float(s: str) -> float:
     "check that a string can be converted into a positive float"
     rv = float(s)
