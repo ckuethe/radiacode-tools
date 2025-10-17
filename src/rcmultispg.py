@@ -35,7 +35,7 @@ from radiacode.transports.usb import DeviceNotFound  # type: ignore
 from radiacode_tools.appmetrics import AppMetrics  # type: ignore
 from radiacode_tools.rc_types import GpsData, RcJSONEncoder, RtData, SpecData
 from radiacode_tools.rc_utils import UTC, find_radiacode_devices
-from radiacode_tools.rc_validators import gpsd
+from radiacode_tools.rc_validators import gpsd, non_negative_float
 
 ams: AppMetrics = AppMetrics(stub=True)
 
@@ -45,12 +45,21 @@ ams: AppMetrics = AppMetrics(stub=True)
 MIN_POLL_INTERVAL: float = 0.5
 RC_LOCKS: Dict[str, Lock] = dict()  # prevent rtdata polling and spectrum polling from stomping on each other
 STDIO_LOCK: Lock = Lock()  # Prevent stdio corruption
-THREAD_BARRIER: Barrier = Barrier(1)
+# Set up a throwaway Barrier, with more parties than you can connect over usb, and an impossibly short
+# timeout. This should crash the program if it's not properly reinitialized to a reasonable number of
+# parties with a reasonable timeout... since you can't Barrier(0) any more
+THREAD_BARRIER: Barrier = Barrier(256, action=lambda x: RuntimeError("Uninitialized Barrier"), timeout=1e-6)
 
 # Queues and stuff
 DATA_QUEUE: Queue[Any] = Queue()  # Global so I can use them in signal handlers
 CTRL_QUEUE: Queue[Any] = Queue()
 SHUTDOWN_OBJECT: object = object()
+
+
+# There are enough things being written to stderr that this is a worthwhile abstraction
+def stderr_print(s: str, **kwargs) -> None:
+    with STDIO_LOCK:
+        print(s, file=sys.stderr, **kwargs)
 
 
 def tbar(wait_time=None) -> None:
@@ -66,20 +75,13 @@ def tbar(wait_time=None) -> None:
 
 def handle_shutdown_signal(_signum=None, _stackframe=None) -> None:
     "Signal handler to trigger clean shutdown"
-    with STDIO_LOCK:
-        print("\ngot shutdown signal", file=sys.stderr)
+    stderr_print("\ngot shutdown signal")
     CTRL_QUEUE.put(SHUTDOWN_OBJECT)
     DATA_QUEUE.put(SHUTDOWN_OBJECT)
 
 
 def get_args() -> Namespace:
     "The usual argparse stuff"
-
-    def gte_zero(s):
-        f = float(s)
-        if f < 0.0:
-            raise ValueError("value cannot be less than 0")
-        return f
 
     ap = ArgumentParser(description="Poll all connected RadiaCode PSRDs and produce spectrograms")
     ap.add_argument(
@@ -102,7 +104,7 @@ def get_args() -> Namespace:
     ap.add_argument(
         "-i",
         "--interval",
-        type=gte_zero,
+        type=non_negative_float,
         metavar="FLOAT",
         default=5.0,
         help="Polling interval in seconds [%(default).1fs]",
@@ -148,7 +150,7 @@ def get_args() -> Namespace:
     )
     rv = ap.parse_args()
     if rv.interval < MIN_POLL_INTERVAL:
-        print(f"increasing poll interval to {MIN_POLL_INTERVAL}s", file=sys.stderr)
+        stderr_print(f"increasing poll interval to {MIN_POLL_INTERVAL}s")
         rv.interval = MIN_POLL_INTERVAL
 
     # post-processing stages.
@@ -166,14 +168,16 @@ def rtdata_worker(rc: RadiaCode, serial_number: str) -> None:
     and days of history. You'll need to sort and filter out events that happened
     before the current recording session.
     """
-    with STDIO_LOCK:
-        print(f"Starting rtdata_worker for {serial_number}", file=sys.stderr)
+    stderr_print(f"Starting rtdata_worker for {serial_number}")
     db = []
     while CTRL_QUEUE.qsize() == 0:  # don't even need to read the item
         sleep(1)
         with RC_LOCKS[serial_number]:
             try:
                 db = rc.data_buf()
+            except usb.core.USBError:
+                stderr_print(f"rtdata_worker {serial_number} caught USBError, outtahere")
+                break
             except KeyboardInterrupt:
                 return
             except Exception as e:
@@ -181,8 +185,7 @@ def rtdata_worker(rc: RadiaCode, serial_number: str) -> None:
                 # that might mean I need to propagate a better error message up
                 z = str(e.args[0])
                 if "seq jump" not in z:
-                    with STDIO_LOCK:
-                        print(f"rtdata_worker {serial_number} caught exception {z}", file=sys.stderr)
+                    stderr_print(f"rtdata_worker {serial_number} caught exception {z}")
                 continue
 
         for rec in db:
@@ -208,8 +211,7 @@ def rtdata_worker(rc: RadiaCode, serial_number: str) -> None:
                     ams.gauge_update(f"{field}_{serial_number}", rtdata_msg[field])
 
             DATA_QUEUE.put(RtData(**rtdata_msg))
-    with STDIO_LOCK:
-        print(f"Exiting rtdata_worker {serial_number}", file=sys.stderr)
+    stderr_print(f"Exiting rtdata_worker {serial_number}")
     return
 
 
@@ -259,8 +261,7 @@ def rc_worker(args: Namespace, serial_number: str) -> bool:
                 spectrum=rc.spectrum_accum(),  # type: ignore - pylance doesn't understand what I'm doing here
             )
         )
-    with STDIO_LOCK:
-        print(f"{serial_number} Connected ", file=sys.stderr)
+    stderr_print(f"{serial_number} Connected ")
 
     # wait for all threads to connect to their devices
     try:
@@ -286,8 +287,7 @@ def rc_worker(args: Namespace, serial_number: str) -> bool:
         if args.reset_dose:
             rc.dose_reset()
 
-    with STDIO_LOCK:
-        print(f"{serial_number} sampling", file=sys.stderr)
+    stderr_print(f"{serial_number} sampling")
 
     samples = 0
     while CTRL_QUEUE.qsize() == 0:  # don't even need to read the item
@@ -303,22 +303,19 @@ def rc_worker(args: Namespace, serial_number: str) -> bool:
             DATA_QUEUE.put(sd)
             ams.counter_increment(f"num_reports_{serial_number}")
             ams.gauge_update(f"count_{serial_number}", sum(sd.spectrum.counts))
-            with STDIO_LOCK:
-                print(f"\rn:{samples}", end="", flush=True, file=sys.stderr)
-                samples += 1
+            stderr_print(f"\rn:{samples}", end="", flush=True)
+            samples += 1
             sleep(args.interval)
             tbar()
         except (usb.core.USBError, BrokenBarrierError):
             # once running though, don't take down all the other threads
             THREAD_BARRIER.abort()
+            # decrease thread counter?
 
     if args.poweroff:
         rc.set_device_on(False)
 
-    with STDIO_LOCK:
-        print(
-            f"{serial_number} data collection stop - {samples} records, {samples * args.interval:.1f}s", file=sys.stderr
-        )
+    stderr_print(f"{serial_number} data collection stop - {samples} records, {samples * args.interval:.1f}s")
 
     return True
 
@@ -328,8 +325,7 @@ def log_worker(args: Namespace) -> None:
     Handle realtime logging of measurements so you don't have to wait for a spectrogram
     file to be written, and the reader threads don't have to wait on disk.
     """
-    with STDIO_LOCK:
-        print(f"starting log_worker for: {' '.join(args.devs)}", file=sys.stderr)
+    stderr_print(f"starting log_worker for: {' '.join(args.devs)}")
 
     log_fds: Dict[str, TextIO] = {}  # {d: None for d in args.devs}
     start_time = time()
@@ -370,8 +366,7 @@ def log_worker(args: Namespace) -> None:
                     print(enc.encode(msg), file=log_fds[sn], flush=True)
 
             else:
-                with STDIO_LOCK:
-                    print(f"ignored {msg}", file=sys.stderr)
+                stderr_print(f"ignored {msg}")
                 pass  # who put this junk here?
 
         sleep(MIN_POLL_INTERVAL)
@@ -381,8 +376,7 @@ def log_worker(args: Namespace) -> None:
         if sn in log_fds:
             if log_fds[sn] != sys.stdout:
                 log_fds[sn].close()
-    with STDIO_LOCK:
-        print("log worker shutting down", file=sys.stderr)
+    stderr_print("log worker shutting down")
     return
 
 
@@ -468,12 +462,11 @@ def gps_worker(args: Namespace) -> None:
             with STDIO_LOCK:
                 # if e.errno != 111:  # FIXME is ECONNREFUSED always 111? Is there a macro?
                 if "Connection refused" not in exstr:
-                    print(f"caught exception {exstr} in gps thread, reconnecting", file=sys.stderr)
+                    stderr_print(f"caught exception {exstr} in gps thread, reconnecting")
             sleep(1)
     # end reconnect loop
 
-    with STDIO_LOCK:
-        print("gps worker shutting down", file=sys.stderr)
+    stderr_print("gps worker shutting down")
     ams.flag_clear("gps_connected")
     return  # clean exit
 
@@ -511,25 +504,25 @@ def create_threads(args: Namespace) -> Tuple[int, List[Thread]]:
 
 
 def main() -> None:
-    args = get_args()
+    args: Namespace = get_args()
     global ams
     global THREAD_BARRIER
 
     dev_names = None
     try:
-        dev_names = find_radiacode_devices()
+        dev_names: list[str] = find_radiacode_devices()
     except Exception:
         pass
     finally:
         if not dev_names:
-            print("No devices Found", file=sys.stderr)
+            stderr_print("No devices Found")
             sys.exit(1)
 
     ams = AppMetrics(port=6853, local_only=False, appname="rcmultispg")
-    missing = set(args.devs).difference(set(dev_names))
+    missing: set[str] = set(args.devs).difference(set(dev_names))
     if missing:
         if args.require_all:
-            print(f"Some devices are missing: {' '.join(list(missing))}", file=sys.stderr)
+            stderr_print(f"Some devices are missing: {' '.join(list(missing))}")
             sys.exit(1)
         else:
             # Well then, some devices were present, some were requested
@@ -576,8 +569,7 @@ def main() -> None:
     finally:
         CTRL_QUEUE.put(SHUTDOWN_OBJECT)
         DATA_QUEUE.put(SHUTDOWN_OBJECT)
-        with STDIO_LOCK:
-            print("Stopping threads", file=sys.stderr)
+        stderr_print("Stopping threads")
 
     # Clean up
     ams.close()
@@ -592,8 +584,7 @@ def main() -> None:
         except RuntimeError:
             pass
 
-        with STDIO_LOCK:
-            print(f"{[t.name for t in list_threads()]}", file=sys.stderr)
+        stderr_print(f"{[t.name for t in list_threads()]}")
         sleep(0.5)
 
 

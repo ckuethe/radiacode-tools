@@ -179,13 +179,13 @@ def test_create_threads():
     assert threadz[0].name == "log-worker"
 
     # it's not important for this test that the gps thread actually connects to gpsd.
-    assert threadz[0].is_alive() == True
+    assert threadz[0].is_alive()
     assert threadz[1].name == "gps-worker"
 
     # and we're not even going to start the poller threads
     for i, d in enumerate(devs):
         assert threadz[i + 2].name == f"poller-worker-{d}"
-        assert threadz[i + 2].is_alive() == False
+        assert not threadz[i + 2].is_alive()
 
     # Nicely shut down the two running threads
     rcmultispg.CTRL_QUEUE.put(rcmultispg.SHUTDOWN_OBJECT)
