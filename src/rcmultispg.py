@@ -208,7 +208,8 @@ def rtdata_worker(rc: RadiaCode, serial_number: str) -> None:
             )
             for field in ["dose", "count", "dose_rate", "count_rate"]:
                 if field in rtdata_msg and rtdata_msg[field] is not None:
-                    ams.gauge_update(f"{field}_{serial_number}", rtdata_msg[field])
+                    mult = 1e4 if "dose" in field else 1.0
+                    ams.gauge_update(f"{field}_{serial_number}", rtdata_msg[field] * mult)
 
             DATA_QUEUE.put(RtData(**rtdata_msg))
     stderr_print(f"Exiting rtdata_worker {serial_number}")
