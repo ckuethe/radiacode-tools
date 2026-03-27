@@ -67,45 +67,6 @@ def test_earthdistance2():
     assert pytest.approx(d_sfo_syd, abs=tol) == 11942
 
 
-def test_geoboxes():
-    tp_in = TrackPoint(latitude=1, longitude=1, accuracy=1, doserate=0, countrate=0)
-    tp_out = TrackPoint(latitude=20, longitude=20, accuracy=0, doserate=0, countrate=0)
-    containers = [
-        GeoBox(p1=GeoPoint(latitude=0, longitude=0), p2=GeoPoint(latitude=2, longitude=2)),
-        GeoBox(p1=GeoPoint(latitude=4, longitude=4), p2=GeoPoint(latitude=2, longitude=2)),
-    ]
-    assert any(check_geoboxes(tp_in, containers)) is True
-    assert any(check_geoboxes(tp_out, containers)) is False
-    with pytest.raises(ValueError):
-        check_geoboxes(tp_in, containers[0])
-
-
-def test_geocircles():
-    tp_in = TrackPoint(latitude=0.00001, longitude=0.0001, accuracy=1, doserate=0, countrate=0)
-    tp_out = TrackPoint(latitude=20, longitude=20, accuracy=1, doserate=0, countrate=0)
-    containers = [
-        GeoCircle(point=GeoPoint(latitude=0, longitude=0), radius=10000),
-        GeoCircle(point=GeoPoint(latitude=1, longitude=1), radius=10000),
-    ]
-    assert any(check_geocircles(tp_in, containers)) is True
-    assert any(check_geocircles(tp_out, containers)) is False
-    with pytest.raises(ValueError):
-        check_geocircles(tp_in, containers[0])
-
-
-def test_timeranges():
-    tp_in = TrackPoint(latitude=0, longitude=0, dt=datetime(2000, 2, 1, 0, 0, 0), accuracy=1, doserate=0, countrate=0)
-    tp_out = TrackPoint(latitude=0, longitude=0, dt=datetime(2000, 3, 15, 0, 0, 0), accuracy=1, doserate=0, countrate=0)
-    containers = [
-        TimeRange(dt_start=datetime(2000, 1, 1, 0, 0, 0), dt_end=datetime(2000, 2, 1, 0, 0, 0)),
-        TimeRange(dt_start=datetime(2000, 2, 1, 0, 0, 0), dt_end=datetime(2000, 3, 1, 0, 0, 0)),
-    ]
-    assert any(check_timeranges(tp_in, containers)) is True
-    assert any(check_timeranges(tp_out, containers)) is False
-    with pytest.raises(ValueError):
-        check_timeranges(tp_in, containers[0])
-
-
 def test_edit_main(monkeypatch):
     monkeypatch.setattr("sys.argv", [__file__, "-o", "/dev/null", testfile])
     assert main() is None

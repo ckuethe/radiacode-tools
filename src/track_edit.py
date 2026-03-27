@@ -10,6 +10,8 @@ from math import atan2, cos, pow, radians, sin, sqrt
 from textwrap import dedent
 from typing import List, Tuple
 
+import pandas as pd
+
 from radiacode_tools.rc_files import RcTrack
 from radiacode_tools.rc_types import GeoBox, GeoCircle, TimeRange, TrackPoint
 from radiacode_tools.rc_utils import localtz
@@ -206,34 +208,64 @@ def check_geocircle(member: TrackPoint, container: GeoCircle) -> bool:
     )
 
 
-def check_timeranges(member: TrackPoint, container: List[TimeRange]) -> List[bool]:
+def check_timeranges(df: pd.DataFrame, container: List[TimeRange]) -> pd.Series:
     if not isinstance(container, list):  # pyright: ignore reportUnnecessaryIsInstance
         raise ValueError("container must be a list")
-    return [check_timerange(member, tr) for tr in container]
+    result = pd.Series([False] * len(df), index=df.index)
+    for tr in container:
+        mask = (df["DateTime"] >= tr.dt_start) & (df["DateTime"] < tr.dt_end)
+        result = result | mask
+    return result
 
 
-def check_geoboxes(member: TrackPoint, container: List[GeoBox]) -> List[bool]:
+def check_geoboxes(df: pd.DataFrame, container: List[GeoBox]) -> pd.Series:
     if not isinstance(container, list):  # pyright: ignore reportUnnecessaryIsInstance
         raise ValueError("container must be a list")
-    return [check_geobox(member, gb) for gb in container]
+    result = pd.Series([False] * len(df), index=df.index)
+    for gb in container:
+        min_lat = min(gb.p1.latitude, gb.p2.latitude)
+        max_lat = max(gb.p1.latitude, gb.p2.latitude)
+        min_lon = min(gb.p1.longitude, gb.p2.longitude)
+        max_lon = max(gb.p1.longitude, gb.p2.longitude)
+        mask = (
+            (df["Latitude"] >= min_lat)
+            & (df["Latitude"] <= max_lat)
+            & (df["Longitude"] >= min_lon)
+            & (df["Longitude"] <= max_lon)
+        )
+        result = result | mask
+    return result
 
 
-def check_geocircles(member: TrackPoint, container: List[GeoCircle]) -> List[bool]:
+def check_geocircles(df: pd.DataFrame, container: List[GeoCircle]) -> pd.Series:
     if not isinstance(container, list):  # pyright: ignore reportUnnecessaryIsInstance
         raise ValueError("container must be a list")
-    return [check_geocircle(member, gc) for gc in container]
+    from math import asin, cos, radians, sin, sqrt
+
+    result = pd.Series([False] * len(df), index=df.index)
+    R = 6371e3
+    for gc in container:
+        center_lat_rad = radians(gc.point.latitude)
+        center_lon_rad = radians(gc.point.longitude)
+        lat_rad = radians(df["Latitude"].values)
+        lon_rad = radians(df["Longitude"].values)
+        d_lat = lat_rad - center_lat_rad
+        d_lon = lon_rad - center_lon_rad
+        a = sin(d_lat / 2) ** 2 + cos(center_lat_rad) * cos(lat_rad) * sin(d_lon / 2) ** 2
+        c = 2 * asin(sqrt(a))
+        distances = R * c
+        mask = distances <= gc.radius
+        result = result | mask
+    return result
 
 
 def edit_track(args: Namespace, track: RcTrack) -> Tuple[int, int]:
     """
-    Iterate over the points in an RcTrack, and remove unwanted ones
-    by subjecting them to a set of tests for exclusion based on time,
-    presence inside a rectangular area, or distance from a location.
+    Filter points in an RcTrack based on include/exclude criteria for time ranges,
+    rectangular areas, and circular regions.
 
-    The filter deletes from the end because this function will shorten
-    the track by popping elements from the list of points. Once a point
-    has survived filtering it is not referred to again and its index
-    can change without ill effect.
+    The filter modifies the track in place by keeping or removing points that
+    match the specified criteria.
 
     Returns a tuple of (before_len,after_len), and modifies the input track
     """
@@ -242,40 +274,28 @@ def edit_track(args: Namespace, track: RcTrack) -> Tuple[int, int]:
         args.track_name = f"{track.name} (edit)"
     track.name = args.track_name
 
-    before_len: int = len(track.points)
-    for i in range(before_len - 1, -1, -1):
-        if args.include_time_range:
-            is_included_time: list[bool] = check_timeranges(track.points[i], args.include_time_range)
-            if not any(is_included_time):
-                track.points.pop(i)
-                continue
-        if args.exclude_time_range:
-            is_excluded_time: list[bool] = check_timeranges(track.points[i], args.exclude_time_range)
-            if any(is_excluded_time):
-                track.points.pop(i)
-                continue
-        if args.include_geo:
-            is_included_geo: list[bool] = check_geoboxes(track.points[i], args.include_geo)
-            if not any(is_included_geo):
-                track.points.pop(i)
-                continue
-        if args.exclude_geo:
-            is_excluded_geo: list[bool] = check_geoboxes(track.points[i], args.exclude_geo)
-            if any(is_excluded_geo):
-                track.points.pop(i)
-                continue
-        if args.include_radius:
-            is_included_radius: list[bool] = check_geocircles(track.points[i], args.include_radius)
-            if not any(is_included_radius):
-                track.points.pop(i)
-                continue
-        if args.exclude_radius:
-            is_excluded_radius: list[bool] = check_geocircles(track.points[i], args.exclude_radius)
-            if any(is_excluded_radius):
-                track.points.pop(i)
-                continue
+    before_len: int = len(track.df)
 
-    after_len: int = len(track.points)
+    for include_tr in args.include_time_range:
+        track.filter_by_timerange(include_tr.dt_start, include_tr.dt_end, inclusive_end=False)
+    for exclude_tr in args.exclude_time_range:
+        track.filter_by_timerange_inverse(exclude_tr.dt_start, exclude_tr.dt_end, inclusive_end=False)
+
+    for include_gb in args.include_geo:
+        track.filter_by_geobox(
+            include_gb.p1.latitude, include_gb.p1.longitude, include_gb.p2.latitude, include_gb.p2.longitude
+        )
+    for exclude_gb in args.exclude_geo:
+        track.filter_by_geobox_inverse(
+            exclude_gb.p1.latitude, exclude_gb.p1.longitude, exclude_gb.p2.latitude, exclude_gb.p2.longitude
+        )
+
+    for include_rc in args.include_radius:
+        track.filter_by_geocircle(include_rc.point.latitude, include_rc.point.longitude, include_rc.radius)
+    for exclude_rc in args.exclude_radius:
+        track.filter_by_geocircle_inverse(exclude_rc.point.latitude, exclude_rc.point.longitude, exclude_rc.radius)
+
+    after_len: int = len(track.df)
     return (before_len, after_len)
 
 
@@ -296,10 +316,13 @@ def main() -> None:
     edit_len: tuple[int, int] = edit_track(args, track)
 
     print(f"edit results: {edit_len[0]} -> {edit_len[1]} points")
-    T_start: datetime = track.points[0].dt.astimezone(localtz)
-    T_end: datetime = track.points[-1].dt.astimezone(localtz)
-    duration: timedelta = T_end - T_start
-    print(f"track times: {T_start} -> {T_end}, duration={duration}")
+    if len(track.df) > 0:
+        T_start: datetime = track.df.iloc[0]["DateTime"].astimezone(localtz)
+        T_end: datetime = track.df.iloc[-1]["DateTime"].astimezone(localtz)
+        duration: timedelta = T_end - T_start
+        print(f"track times: {T_start} -> {T_end}, duration={duration}")
+    else:
+        print("track times: no points remaining")
 
     track.write_file(args.output)
 

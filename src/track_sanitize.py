@@ -6,10 +6,14 @@
 
 import os
 from argparse import ArgumentParser, Namespace
+from datetime import datetime
 from hashlib import sha256 as hf
+
+import pandas as pd
 
 from radiacode_tools.rc_files import RcTrack
 from radiacode_tools.rc_types import RangeFinder
+from radiacode_tools.rc_utils import localtz
 from radiacode_tools.rc_validators import isotime, rcsn
 
 
@@ -127,10 +131,14 @@ def get_args() -> Namespace:
 
 
 def reverse_route(track: RcTrack) -> None:
-    timestamps = [x.dt for x in track.points]  # type: ignore
-    track.points.reverse()  # reverse items in place
-    for i in range(len(track.points)):
-        track.points[i].dt = timestamps[i]  # type: ignore
+    # Reverse the order of points while keeping original timestamps
+    # This matches the old behavior where timestamps are restored to their original indices
+    # after reversing the point list
+    timestamps = track.df["DateTime"].tolist()
+    new_df = track.df.iloc[::-1].copy()
+    new_df["DateTime"] = timestamps
+    track._df = new_df
+    track._points_cache = None
 
 
 def sanitize(args: Namespace, track: RcTrack) -> None:
@@ -144,13 +152,15 @@ def sanitize(args: Namespace, track: RcTrack) -> None:
     lat_range = RangeFinder("Lat")
     lon_range = RangeFinder("Lon")
 
-    header_text = f"{track.name} {track.serialnumber} {track.comment} {track.points[0].dt}"
+    start_dt = track.df.iloc[0]["DateTime"]
+    header_text = f"{track.name} {track.serialnumber} {track.comment} {start_dt}"
     header_hash = hf(header_text.encode(), usedforsecurity=False)
 
-    for point in track.points:
-        header_hash.update(str(point).encode())
-        lat_range.update(point.latitude)
-        lon_range.update(point.longitude)
+    for _, row in track.df.iterrows():
+        point_str = f"TrackPoint(dt={row['DateTime']}, latitude={row['Latitude']}, longitude={row['Longitude']}, accuracy={row['Accuracy']}, doserate={row['DoseRate']}, countrate={row['CountRate']})"
+        header_hash.update(point_str.encode())
+        lat_range.update(row["Latitude"])
+        lon_range.update(row["Longitude"])
 
     if args.allow_unsanitized_comment is False:
         track.comment = args.comment
@@ -158,9 +168,8 @@ def sanitize(args: Namespace, track: RcTrack) -> None:
     if args.allow_unsanitized_serial is False:
         track.serialnumber = args.serial_number
 
-    start_timestamp = track.points[0].dt
     if args.allow_unsanitized_time:
-        args.start_time = start_timestamp
+        args.start_time = start_dt
 
     if args.allow_unsanitized_name is False:
         track.name = f"{args.prefix}{header_hash.hexdigest()[:32]}"
@@ -169,13 +178,25 @@ def sanitize(args: Namespace, track: RcTrack) -> None:
         args.base_latitude = lat_range.min_val
         args.base_longitude = lon_range.min_val
 
-    for i, tp in enumerate(track.points):
-        track.points[i].dt = tp.dt - start_timestamp + args.start_time
-        track.points[i].latitude = round(tp.latitude - lat_range.min_val + args.base_latitude, 7)
-        track.points[i].longitude = round(tp.longitude - lon_range.min_val + args.base_longitude, 7)
+    # Create new DataFrame with sanitized values
+    new_df = track.df.copy()
+    # Convert datetime to timedelta from start, then add new start time
+    time_deltas = new_df["DateTime"] - start_dt
+    new_df["DateTime"] = args.start_time + time_deltas
+    new_df["Latitude"] = new_df["Latitude"] - lat_range.min_val + args.base_latitude
+    new_df["Longitude"] = new_df["Longitude"] - lon_range.min_val + args.base_longitude
+    new_df["Latitude"] = new_df["Latitude"].round(7)
+    new_df["Longitude"] = new_df["Longitude"].round(7)
 
     if args.reverse_route:
-        reverse_route(track)
+        # Save original times before reversing
+        original_times = new_df["DateTime"].tolist()
+        new_df = new_df.iloc[::-1].copy()
+        # Restore original times to their new positions
+        new_df["DateTime"] = original_times
+
+    track._df = new_df
+    track._points_cache = None
 
 
 def main() -> None:
