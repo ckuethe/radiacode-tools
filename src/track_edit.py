@@ -240,19 +240,20 @@ def check_geoboxes(df: pd.DataFrame, container: List[GeoBox]) -> pd.Series:
 def check_geocircles(df: pd.DataFrame, container: List[GeoCircle]) -> pd.Series:
     if not isinstance(container, list):  # pyright: ignore reportUnnecessaryIsInstance
         raise ValueError("container must be a list")
-    from math import asin, cos, radians, sin, sqrt
+    import numpy as np
+    from math import sqrt
 
     result = pd.Series([False] * len(df), index=df.index)
     R = 6371e3
     for gc in container:
-        center_lat_rad = radians(gc.point.latitude)
-        center_lon_rad = radians(gc.point.longitude)
-        lat_rad = radians(df["Latitude"].values)
-        lon_rad = radians(df["Longitude"].values)
+        center_lat_rad = np.radians(gc.point.latitude)
+        center_lon_rad = np.radians(gc.point.longitude)
+        lat_rad = np.radians(df["Latitude"].values)
+        lon_rad = np.radians(df["Longitude"].values)
         d_lat = lat_rad - center_lat_rad
         d_lon = lon_rad - center_lon_rad
-        a = sin(d_lat / 2) ** 2 + cos(center_lat_rad) * cos(lat_rad) * sin(d_lon / 2) ** 2
-        c = 2 * asin(sqrt(a))
+        a = np.sin(d_lat / 2) ** 2 + np.cos(center_lat_rad) * np.cos(lat_rad) * np.sin(d_lon / 2) ** 2
+        c = 2 * np.arcsin(np.sqrt(a))
         distances = R * c
         mask = distances <= gc.radius
         result = result | mask

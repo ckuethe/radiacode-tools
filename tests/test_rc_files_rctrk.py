@@ -16,6 +16,7 @@ from radiacode_tools.rc_utils import BEGINNING_OF_TIME, UTC
 
 testdir = pathjoin(dirname(__file__), "data")
 
+testfile = pathjoin(testdir, "walk.rctrk")
 
 def test_rctrk(monkeypatch):
     tk = RcTrack()
@@ -167,3 +168,241 @@ def test_rctrkadd_dict_and_timestamp():
         }
     )
     assert tk.timestamp == BEGINNING_OF_TIME
+
+
+def test_rctrack_df_property():
+    """Test that df property returns the internal DataFrame"""
+    from radiacode_tools.rc_files import RcTrack
+    import pandas as pd
+    
+    track = RcTrack(testfile)
+    df = track.df
+    
+    assert isinstance(df, pd.DataFrame)
+    assert len(df) == len(track.points)
+    assert "DateTime" in df.columns
+    assert "Latitude" in df.columns
+    assert "Longitude" in df.columns
+
+
+def test_rctrack_df_direct_modification():
+    """Test direct DataFrame modification"""
+    from radiacode_tools.rc_files import RcTrack
+    import pandas as pd
+    
+    track = RcTrack(testfile)
+    original_len = len(track.df)
+    
+    track.df.loc[len(track.df)] = {
+        "DateTime": datetime(2023, 1, 1, tzinfo=UTC),
+        "Latitude": 0,
+        "Longitude": 0,
+        "Accuracy": 10,
+        "DoseRate": 0.1,
+        "CountRate": 10,
+        "Flags": "E"
+    }
+    
+    assert len(track.df) == original_len + 1
+
+
+def test_rctrack_filter_by_timerange():
+    """Test filter_by_timerange method"""
+    from radiacode_tools.rc_files import RcTrack
+    
+    track = RcTrack(testfile)
+    original_len = len(track.df)
+    
+    if original_len > 0:
+        first_dt = track.df.iloc[0]["DateTime"]
+        last_dt = track.df.iloc[-1]["DateTime"]
+        
+        track.filter_by_timerange(first_dt, last_dt, inclusive_end=False)
+        
+        assert len(track.df) <= original_len
+
+
+def test_rctrack_filter_by_timerange_inverse():
+    """Test filter_by_timerange_inverse method"""
+    from radiacode_tools.rc_files import RcTrack
+    
+    track = RcTrack(testfile)
+    original_len = len(track.df)
+    
+    track.filter_by_timerange_inverse(datetime(2000, 1, 1, tzinfo=UTC), datetime(2001, 1, 1, tzinfo=UTC))
+    
+    assert len(track.df) == original_len
+
+
+def test_rctrack_filter_by_geobox():
+    """Test filter_by_geobox method"""
+    from radiacode_tools.rc_files import RcTrack
+    
+    track = RcTrack(testfile)
+    original_len = len(track.df)
+    
+    if original_len > 0:
+        min_lat = track.df["Latitude"].min()
+        max_lat = track.df["Latitude"].max()
+        min_lon = track.df["Longitude"].min()
+        max_lon = track.df["Longitude"].max()
+        
+        track.filter_by_geobox(min_lat, min_lon, max_lat, max_lon)
+        
+        assert len(track.df) <= original_len
+
+
+def test_rctrack_filter_by_geobox_inverse():
+    """Test filter_by_geobox_inverse method"""
+    from radiacode_tools.rc_files import RcTrack
+    
+    track = RcTrack(testfile)
+    original_len = len(track.df)
+    
+    track.filter_by_geobox_inverse(100, 100, 101, 101)
+    
+    assert len(track.df) == original_len
+
+
+def test_rctrack_filter_by_geocircle():
+    """Test filter_by_geocircle method"""
+    from radiacode_tools.rc_files import RcTrack
+    
+    track = RcTrack(testfile)
+    original_len = len(track.df)
+    
+    if original_len > 0:
+        center_lat = track.df.iloc[0]["Latitude"]
+        center_lon = track.df.iloc[0]["Longitude"]
+        
+        track.filter_by_geocircle(center_lat, center_lon, 1000000)
+        
+        assert len(track.df) <= original_len
+
+
+def test_rctrack_filter_by_geocircle_inverse():
+    """Test filter_by_geocircle_inverse method"""
+    from radiacode_tools.rc_files import RcTrack
+    
+    track = RcTrack(testfile)
+    original_len = len(track.df)
+    
+    track.filter_by_geocircle_inverse(100, 100, 1000)
+    
+    assert len(track.df) == original_len
+
+
+def test_rctrack_points_property_new_list():
+    """Test that points property returns a new list each time"""
+    from radiacode_tools.rc_files import RcTrack
+    
+    track = RcTrack(testfile)
+    
+    points1 = track.points
+    points2 = track.points
+    
+    assert points1 is not points2
+    assert len(points1) == len(points2)
+    assert points1 == points2
+
+
+def test_rctrack_points_empty_track():
+    """Test points property on empty track"""
+    from radiacode_tools.rc_files import RcTrack
+    
+    track = RcTrack()
+    
+    points = track.points
+    
+    assert points == []
+    assert isinstance(points, list)
+
+
+def test_rctrack_points_contains_trackpoint():
+    """Test that points contain TrackPoint objects"""
+    from radiacode_tools.rc_files import RcTrack
+    from radiacode_tools.rc_types import TrackPoint
+    
+    track = RcTrack(testfile)
+    
+    points = track.points
+    
+    if len(points) > 0:
+        assert isinstance(points[0], TrackPoint)
+
+
+def test_rctrack_add_point_dataframe_growth():
+    """Test that add_point properly grows the DataFrame"""
+    from radiacode_tools.rc_files import RcTrack
+    from datetime import datetime
+    
+    track = RcTrack()
+    initial_len = len(track.df)
+    
+    track.add_point(
+        dt=datetime(2023, 1, 1, tzinfo=UTC),
+        latitude=1.0,
+        longitude=2.0,
+        accuracy=5,
+        dose_rate=0.1,
+        count_rate=10
+    )
+    
+    assert len(track.df) == initial_len + 1
+
+
+def test_rctrack_empty_track_properties():
+    """Test properties on empty track"""
+    from radiacode_tools.rc_files import RcTrack
+    
+    track = RcTrack()
+    
+    assert len(track.df) == 0
+    assert track.points == []
+    assert track.name == ""
+    assert track.serialnumber == "Unknown Device"
+    assert track.comment == ""
+
+
+def test_rctrack_name_serial_comment_properties():
+    """Test name, serialnumber, and comment properties"""
+    from radiacode_tools.rc_files import RcTrack
+    
+    track = RcTrack()
+    
+    track.name = "test_name"
+    track.serialnumber = "RC-100-123456"
+    track.comment = "test_comment"
+    
+    assert track.name == "test_name"
+    assert track.serialnumber == "RC-100-123456"
+    assert track.comment == "test_comment"
+
+
+def test_rctrack_multiple_points_order():
+    """Test that multiple points are stored in correct order"""
+    from radiacode_tools.rc_files import RcTrack
+    from datetime import datetime
+    
+    track = RcTrack()
+    
+    track.add_point(dt=datetime(2023, 1, 1, tzinfo=UTC), latitude=1, longitude=1, accuracy=5, dose_rate=0.1, count_rate=10)
+    track.add_point(dt=datetime(2023, 1, 2, tzinfo=UTC), latitude=2, longitude=2, accuracy=5, dose_rate=0.2, count_rate=20)
+    track.add_point(dt=datetime(2023, 1, 3, tzinfo=UTC), latitude=3, longitude=3, accuracy=5, dose_rate=0.3, count_rate=30)
+    
+    assert len(track.df) == 3
+    assert track.df.iloc[0]["Latitude"] == 1
+    assert track.df.iloc[1]["Latitude"] == 2
+    assert track.df.iloc[2]["Latitude"] == 3
+
+
+def test_rctrack_df_columns():
+    """Test that DataFrame has expected columns"""
+    from radiacode_tools.rc_files import RcTrack
+    
+    track = RcTrack(testfile)
+    
+    expected_columns = {"DateTime", "Latitude", "Longitude", "Accuracy", "DoseRate", "CountRate", "Comment"}
+    actual_columns = set(track.df.columns)
+    
+    assert expected_columns.issubset(actual_columns)

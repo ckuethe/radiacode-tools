@@ -214,7 +214,10 @@ def main() -> None:
         tk._df = downsample_dataframe(tk.df, args.downsample)
 
     # Update timezone for all points
-    tk.df["DateTime"] = tk.df["DateTime"].dt.tz_localize(localtz, ambiguous=True, nonexistent="shift_forward")
+    if tk.df["DateTime"].dt.tz is None:
+        tk.df["DateTime"] = tk.df["DateTime"].dt.tz_localize(localtz, ambiguous=True, nonexistent="shift_forward")
+    else:
+        tk.df["DateTime"] = tk.df["DateTime"].dt.tz_convert(localtz)
 
     if args.min_count_rate or args.max_count_rate:
         mask = pd.Series([True] * len(tk.df), index=tk.df.index)
