@@ -12,6 +12,8 @@ from json import loads as jloads
 
 import pytest
 
+import usb.core
+
 import rcmultispg
 from radiacode_tools.rc_types import GpsData, RtData, SpecData, Spectrum
 
@@ -240,11 +242,41 @@ def test_rc_rtdata_worker(capsys):
     dev.serial_number = sn
     rcmultispg.RC_LOCKS[sn] = threading.Lock()
     rcmultispg.ams = rcmultispg.AppMetrics(stub=True)
+    session = rcmultispg.RcSession(sn, dev)
 
     _reset_queues()
     _create_metrics(sn)
     _thread_shutdown_after()
 
-    assert rcmultispg.rtdata_worker(dev, serial_number=sn) is None
-    o, e = capsys.readouterr()
+    assert rcmultispg.rtdata_worker(session, serial_number=sn) is None
+    _o, e = capsys.readouterr()
     assert f"rtdata_worker for {sn}" in e
+
+
+@pytest.mark.slow
+def test_rc_worker_reconnects(capsys, monkeypatch):
+    sn = devs[0]
+    args = Namespace(interval=1, prefix="foobar", devs=[sn], reset_spectrum=False, reset_dose=False, poweroff=False)
+    rcmultispg.THREAD_BARRIER = rcmultispg.Barrier(1)
+    rcmultispg.ams = rcmultispg.AppMetrics(stub=True)
+
+    class FlakyMock(MockRadiaCode):
+        def __init__(self, *a, **kw):
+            super().__init__(*a, **kw)
+            self.failures = 0
+
+        def spectrum(self) -> Spectrum:
+            if self.failures == 0:
+                self.failures += 1
+                raise usb.core.USBError("simulated disconnect")
+            return super().spectrum()
+
+    monkeypatch.setattr(rcmultispg, "RadiaCode", FlakyMock)
+
+    _reset_queues()
+    _thread_shutdown_after()
+
+    # first spectrum read raises USBError -> rc_worker should transparently
+    # reconnect (construct a fresh device) and keep going, returning True
+    assert rcmultispg.rc_worker(args, serial_number=sn) is True
+    assert f"{sn} reconnected" in capsys.readouterr().err

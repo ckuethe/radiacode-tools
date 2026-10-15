@@ -158,7 +158,45 @@ def get_args() -> Namespace:
     return rv
 
 
-def rtdata_worker(rc: RadiaCode, serial_number: str) -> None:
+class RcSession:
+    """A shared, reconnectable handle to a single RadiaCode device.
+
+    Both the spectrum poller (rc_worker) and the realtime data poller (rtdata_worker)
+    read their device handle from the single ``rc`` attribute. When the USB device is
+    unplugged mid-read, rc_worker replaces that handle in place (under
+    RC_LOCKS[serial_number]) so both threads transparently resume against the
+    reattached device without either thread having to exit.
+    """
+
+    def __init__(self, serial_number: str, rc: RadiaCode):
+        self.serial_number = serial_number
+        self.rc = rc
+
+    def reconnect(self) -> bool:
+        """Re-establish the USB connection, retrying until success or shutdown.
+
+        The caller must hold RC_LOCKS[serial_number]. Returns False if shutdown
+        was requested (CTRL_QUEUE non-empty) while we were waiting for the device.
+        """
+        stderr_print(f"{self.serial_number} disconnected - reconnecting")
+        try:
+            self.rc.close()
+        except Exception:  # the handle is dead, just discard it  # noqa: S110 - intentional
+            pass
+        while CTRL_QUEUE.qsize() == 0:
+            try:
+                rc: RadiaCode = RadiaCode(serial_number=self.serial_number)
+                rc.set_device_on(True)
+                self.rc = rc
+                stderr_print(f"{self.serial_number} reconnected")
+                return True
+            except (usb.core.USBTimeoutError, usb.core.USBError, DeviceNotFound) as e:
+                stderr_print(f"{self.serial_number} reconnect failed: {e}")
+                sleep(1)
+        return False
+
+
+def rtdata_worker(session: RcSession, serial_number: str) -> None:
     """
     RadiaCode emits some real-time data (databuf) and as it is available it gets
     logged, in particular dose, count, and their rates. These are used to build
@@ -174,10 +212,12 @@ def rtdata_worker(rc: RadiaCode, serial_number: str) -> None:
         sleep(1)
         with RC_LOCKS[serial_number]:
             try:
-                db = rc.data_buf()
+                db = session.rc.data_buf()
             except usb.core.USBError:
-                stderr_print(f"rtdata_worker {serial_number} caught USBError, outtahere")
-                break
+                # device dropped mid-read; rc_worker is swapping in a fresh handle
+                # via RcSession.reconnect(), so just keep polling until it does
+                stderr_print(f"rtdata_worker {serial_number} caught USBError, waiting for reconnect")
+                continue
             except KeyboardInterrupt:
                 return
             except Exception as e:
@@ -275,18 +315,20 @@ def rc_worker(args: Namespace, serial_number: str) -> bool:
             THREAD_BARRIER._parties -= 1  # type: ignore - Evil, but there's no other way to adjust this
         return False
 
+    session = RcSession(serial_number, rc)
+
     rtdata_thread = Thread(
         target=rtdata_worker,
-        args=(rc, serial_number),
+        args=(session, serial_number),
         name=f"rtdata-worker-{serial_number}",
     )
     rtdata_thread.start()
 
     with RC_LOCKS[serial_number]:
         if args.reset_spectrum:
-            rc.spectrum_reset()
+            session.rc.spectrum_reset()
         if args.reset_dose:
-            rc.dose_reset()
+            session.rc.dose_reset()
 
     stderr_print(f"{serial_number} sampling")
 
@@ -299,7 +341,7 @@ def rc_worker(args: Namespace, serial_number: str) -> bool:
                     monotime=monotonic(),
                     dt=datetime.now(tz=UTC),
                     serial_number=serial_number,
-                    spectrum=rc.spectrum(),
+                    spectrum=session.rc.spectrum(),
                 )
             DATA_QUEUE.put(sd)
             ams.counter_increment(f"num_reports_{serial_number}")
@@ -308,13 +350,20 @@ def rc_worker(args: Namespace, serial_number: str) -> bool:
             samples += 1
             sleep(args.interval)
             tbar()
-        except (usb.core.USBError, BrokenBarrierError):
-            # once running though, don't take down all the other threads
+        except usb.core.USBError:
+            # device was unplugged mid-read; try to reattach rather than killing
+            # this thread, and don't take down the other device threads
+            with RC_LOCKS[serial_number]:
+                ok = session.reconnect()
+            if not ok:
+                break
+        except BrokenBarrierError:
+            # lost synchronization with the other device threads irrecoverably
             THREAD_BARRIER.abort()
-            # decrease thread counter?
+            break
 
     if args.poweroff:
-        rc.set_device_on(False)
+        session.rc.set_device_on(False)
 
     stderr_print(f"{serial_number} data collection stop - {samples} records, {samples * args.interval:.1f}s")
 
