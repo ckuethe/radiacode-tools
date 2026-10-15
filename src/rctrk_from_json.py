@@ -11,8 +11,9 @@ spectrograms that the radiacode app might use
 
 import json
 from argparse import ArgumentParser, Namespace
-from os.path import basename, dirname, realpath
+from os.path import basename, dirname
 from os.path import join as pathjoin
+from os.path import realpath
 from typing import Any, Dict, Iterable
 
 from radiacode_tools.rc_files import RcTrack
@@ -90,7 +91,7 @@ def load_file_lines(args: Namespace) -> Dict[str, Dict[str, Any]]:
                 args.serial_number = rec["serial_number"]
                 print(f"Set serial number to {args.serial_number}")
 
-            if "calibration" in rec:  # spectrum, not relevant for tracks
+            if "calibration" in rec or rec.get("type") == "SpecData":  # spectrum, not relevant for tracks
                 continue
 
             if args.serial_number and "serial_number" in rec and rec["serial_number"] != args.serial_number:
@@ -102,16 +103,23 @@ def load_file_lines(args: Namespace) -> Dict[str, Dict[str, Any]]:
             # arriving during one particular second belongs to that second... thus the
             # fromtimestamp(int(x)) or .replace('.000Z', 'Z')
 
-            if "gnss" in rec:
+            if rec.get("type") == "GpsData":
+                rec = rec["payload"]
+
+            if "gnss" in rec:  # old-style gps date
                 if rec["gnss"] is False:  # no useful data, skip it
                     continue
-                rec["datetime"] = parse_datetime(rec["time"].replace(".000Z", "Z"), DATEFMT_TZ)
+                # there's gotta be a better way...
+                rec["datetime"] = parse_datetime(rec["time"].replace(".000Z", "Z").replace(".999Z", "Z"), DATEFMT_TZ)
                 timekey = str(rec["datetime"])
                 db[timekey] = rec
                 continue
             else:
-                # FIXME - this reveals the need to include host time in all the messages, in case there is clock drift
-                rec["rctime"] = rec.pop("time")
+                if "dt" in rec:  # ick.
+                    rec["rctime"] = rec.pop("dt")
+                else:
+                    # FIXME - this reveals the need to include host time in all the messages, in case there is clock drift
+                    rec["rctime"] = rec.pop("time")
                 _ = {k: rec.pop(k) for k in list(rec.keys()) if rec[k] is None}  # strip null/empty/None values
 
                 if timekey:
@@ -155,7 +163,7 @@ def main() -> None:
     args: Namespace = get_args()
     db = load_file_lines(args)
     trk: RcTrack = convert_lines_to_track(args, db)
-    print(f"Created track with {len(trk.points)} points")
+    print(f"Created track with {len(trk.df)} points")
     trk.write_file(args.output)
 
 

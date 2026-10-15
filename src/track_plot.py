@@ -11,6 +11,7 @@ from datetime import datetime
 from math import log10, sqrt
 from typing import Any, Dict, List
 
+import pandas as pd
 import plotly.express
 
 # Load the RadiaCode tools
@@ -123,6 +124,24 @@ def downsample_trackpoints(l: List[TrackPoint], factor=4) -> List[TrackPoint]:
     return rv
 
 
+def downsample_dataframe(df, factor=4):
+    "Downsample the DataFrame by averaging"
+    rv = []
+    for i in range(0, len(df), factor):
+        chunk = df.iloc[i : i + factor]
+        if len(chunk) > 0:
+            row = {
+                "DateTime": datetime.fromtimestamp(chunk["DateTime"].astype("int64").mean() / 1e9, localtz),
+                "Latitude": chunk["Latitude"].mean(),
+                "Longitude": chunk["Longitude"].mean(),
+                "Accuracy": chunk["Accuracy"].mean(),
+                "DoseRate": chunk["DoseRate"].mean(),
+                "CountRate": chunk["CountRate"].mean(),
+            }
+            rv.append(row)
+    return pd.DataFrame(rv)
+
+
 def map_ctr(bbx: Dict[str, Any]) -> Dict[str, float]:
     "Normally I'd use a GeoPoint for this, but scatter_mapbox wants a dict"
     return {
@@ -159,16 +178,14 @@ def _infer_plot_format_from_fn(fn: str) -> str | None:
 def render_plotly(tk: RcTrack, args: Namespace, bbx: Dict[str, Any]):
     zoom = osm_zoom(bbx)
     fig = plotly.express.scatter_map(
-        tk.points,
-        lat="latitude",
-        lon="longitude",
-        hover_name="dt",
+        tk.df,
+        lat="Latitude",
+        lon="Longitude",
+        hover_name="DateTime",
         zoom=zoom,
         center=map_ctr(bbx),
-        color="doserate",
+        color="DoseRate",
         color_continuous_scale=args.palette,
-        # opacity=0.25,
-        # size="countrate",
         width=args.geometry[0],
         height=args.geometry[1],
     )
@@ -194,24 +211,29 @@ def main() -> None:
     tk = RcTrack(args.input_file)
 
     if args.downsample >= 2:
-        tk.points = downsample_trackpoints(tk.points, args.downsample)
+        tk._df = downsample_dataframe(tk.df, args.downsample)
 
-    # FIXME would a pandas dataframe or parquet be better? would their filters be faster?
-    for i in range(len(tk.points)):
-        tk.points[1].dt = tk.points[i].dt.replace(tzinfo=localtz)
+    # Update timezone for all points
+    if tk.df["DateTime"].dt.tz is None:
+        tk.df["DateTime"] = tk.df["DateTime"].dt.tz_localize(localtz, ambiguous=True, nonexistent="shift_forward")
+    else:
+        tk.df["DateTime"] = tk.df["DateTime"].dt.tz_convert(localtz)
 
     if args.min_count_rate or args.max_count_rate:
-        for i in range(len(tk.points) - 1, -1, -1):
-            if (args.min_count_rate and tk.points[i].countrate < args.min_count_rate) or (
-                args.max_count_rate and tk.points[i].countrate > args.max_count_rate
-            ):
-                tk.points.pop(i)
+        mask = pd.Series([True] * len(tk.df), index=tk.df.index)
+        if args.min_count_rate:
+            mask = mask & (tk.df["CountRate"] >= args.min_count_rate)
+        if args.max_count_rate:
+            mask = mask & (tk.df["CountRate"] <= args.max_count_rate)
+        tk._df = tk.df[mask]
 
-    for i in range(len(tk.points) - 1, -1, -1):
-        if tk.points[i].accuracy > 15:
-            tk.points.pop(i)
+    mask = tk.df["Accuracy"] <= 15
+    tk._df = tk.df[mask]
 
-    bounding_box = tracklist_range_probe(tk.points)
+    bounding_box = {
+        "latitude": (tk.df["Latitude"].min(), tk.df["Latitude"].max()),
+        "longitude": (tk.df["Longitude"].min(), tk.df["Longitude"].max()),
+    }
 
     if "plotly" == args.renderer:
         render_plotly(tk, args, bounding_box)

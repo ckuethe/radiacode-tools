@@ -288,6 +288,7 @@ class AppMetricsBaseReqHandler(BaseHTTPRequestHandler):
         rcode = HTTPStatus.BAD_REQUEST  # assume something is amiss unless we prove otherwise
         content: str = '{"error": "bad request"}'
         content_type: str = "application/json"
+        payload = self.rfile.read()  # figure out how to check the contents of the hidden token
         if self.path == self._q:
             shutdown = True
             rcode = HTTPStatus.OK

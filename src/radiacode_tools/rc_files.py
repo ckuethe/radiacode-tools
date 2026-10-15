@@ -28,6 +28,8 @@ from struct import unpack as struct_unpack
 from typing import Any, List, Optional, Union
 from uuid import uuid4
 
+import pandas as pd
+
 import xmltodict
 
 from .rc_types import (
@@ -60,7 +62,8 @@ class RcTrack:
     "Radiacode Track (.rctrk) interface"
 
     def __init__(self, filename: str = "") -> None:
-        self._clear_data()
+        self._df: Optional[pd.DataFrame] = None
+        self._points_cache: Optional[List[TrackPoint]] = None
         self._columns = ["DateTime", "Latitude", "Longitude", "Accuracy", "DoseRate", "CountRate", "Comment"]
         self.filename = filename
         self.timestamp: datetime = _outtatime
@@ -68,11 +71,175 @@ class RcTrack:
         self.serialnumber: str = ""
         self.comment: str = ""
         self.flags: str = ""
-        self.points: List[TrackPoint] = []
 
         self._clear_data()
         if filename:
             self.load_file(filename)
+
+    @property
+    def df(self) -> pd.DataFrame:
+        """Return the internal DataFrame for fast operations"""
+        return self._ensure_df()
+
+    @property
+    def points(self) -> List[TrackPoint]:
+        """Return track points as a list of TrackPoint objects.
+        Note: This converts the entire DataFrame and may be slow for large tracks.
+        For better performance, use the df property to access the DataFrame directly."""
+        df = self._ensure_df()
+        return [
+            TrackPoint(
+                dt=row["DateTime"],
+                latitude=row["Latitude"],
+                longitude=row["Longitude"],
+                accuracy=row["Accuracy"],
+                doserate=row["DoseRate"],
+                countrate=row["CountRate"],
+                comment=row["Comment"] if pd.notna(row["Comment"]) else "",
+            )
+            for _, row in df.iterrows()
+        ]
+
+    def filter_by_timerange(self, dt_start: datetime, dt_end: datetime, inclusive_end: bool = False) -> None:
+        """Keep only points within the specified time range"""
+        df = self._ensure_df()
+        if len(df) == 0:
+            return
+        mask = (df["DateTime"] >= dt_start) & (df["DateTime"] < dt_end)
+        if inclusive_end:
+            mask = (df["DateTime"] >= dt_start) & (df["DateTime"] <= dt_end)
+        self._df = df[mask]
+        self._points_cache = None
+        if len(self._df) > 0:
+            self.timestamp = self._df["DateTime"].min()
+
+    def filter_by_geobox(self, lat1: float, lon1: float, lat2: float, lon2: float) -> None:
+        """Keep only points within the specified bounding box"""
+        df = self._ensure_df()
+        if len(df) == 0:
+            return
+        min_lat = min(lat1, lat2)
+        max_lat = max(lat1, lat2)
+        min_lon = min(lon1, lon2)
+        max_lon = max(lon1, lon2)
+        mask = (
+            (df["Latitude"] >= min_lat)
+            & (df["Latitude"] <= max_lat)
+            & (df["Longitude"] >= min_lon)
+            & (df["Longitude"] <= max_lon)
+        )
+        self._df = df[mask]
+        self._points_cache = None
+        if len(self._df) > 0:
+            self.timestamp = self._df["DateTime"].min()
+
+    def filter_by_geocircle(self, center_lat: float, center_lon: float, radius_m: float) -> None:
+        """Keep only points within the specified radius of a center point"""
+        import numpy as np
+
+        df = self._ensure_df()
+        if len(df) == 0:
+            return
+        R = 6371e3
+        center_lat_rad = np.radians(center_lat)
+        center_lon_rad = np.radians(center_lon)
+        lat_rad = np.radians(df["Latitude"].values)
+        lon_rad = np.radians(df["Longitude"].values)
+        d_lat = lat_rad - center_lat_rad
+        d_lon = lon_rad - center_lon_rad
+        a = np.sin(d_lat / 2) ** 2 + np.cos(center_lat_rad) * np.cos(lat_rad) * np.sin(d_lon / 2) ** 2
+        c = 2 * np.arcsin(np.sqrt(a))
+        distances = R * c
+        mask = distances <= radius_m
+        self._df = df[mask]
+        self._points_cache = None
+        if len(self._df) > 0:
+            self.timestamp = self._df["DateTime"].min()
+
+    def filter_by_geocircle_inverse(self, center_lat: float, center_lon: float, radius_m: float) -> None:
+        """Remove points within the specified radius of a center point (keep outside)"""
+        import numpy as np
+
+        df = self._ensure_df()
+        if len(df) == 0:
+            return
+        R = 6371e3
+        center_lat_rad = np.radians(center_lat)
+        center_lon_rad = np.radians(center_lon)
+        lat_rad = np.radians(df["Latitude"].values)
+        lon_rad = np.radians(df["Longitude"].values)
+        d_lat = lat_rad - center_lat_rad
+        d_lon = lon_rad - center_lon_rad
+        a = np.sin(d_lat / 2) ** 2 + np.cos(center_lat_rad) * np.cos(lat_rad) * np.sin(d_lon / 2) ** 2
+        c = 2 * np.arcsin(np.sqrt(a))
+        distances = R * c
+        mask = distances > radius_m
+        self._df = df[mask]
+        self._points_cache = None
+        if len(self._df) > 0:
+            self.timestamp = self._df["DateTime"].min()
+
+    def filter_by_timerange_inverse(self, dt_start: datetime, dt_end: datetime, inclusive_end: bool = False) -> None:
+        """Remove points within the specified time range (keep outside)"""
+        df = self._ensure_df()
+        if len(df) == 0:
+            return
+        mask = (df["DateTime"] < dt_start) | (df["DateTime"] >= dt_end)
+        if inclusive_end:
+            mask = (df["DateTime"] < dt_start) | (df["DateTime"] > dt_end)
+        self._df = df[mask]
+        self._points_cache = None
+        if len(self._df) > 0:
+            self.timestamp = self._df["DateTime"].min()
+
+    def filter_by_geobox_inverse(self, lat1: float, lon1: float, lat2: float, lon2: float) -> None:
+        """Remove points within the specified bounding box (keep outside)"""
+        df = self._ensure_df()
+        if len(df) == 0:
+            return
+        min_lat = min(lat1, lat2)
+        max_lat = max(lat1, lat2)
+        min_lon = min(lon1, lon2)
+        max_lon = max(lon1, lon2)
+        mask = (
+            (df["Latitude"] < min_lat)
+            | (df["Latitude"] > max_lat)
+            | (df["Longitude"] < min_lon)
+            | (df["Longitude"] > max_lon)
+        )
+        self._df = df[mask]
+        self._points_cache = None
+        if len(self._df) > 0:
+            self.timestamp = self._df["DateTime"].min()
+
+    def filter_by_geocircle_inverse(self, center_lat: float, center_lon: float, radius_m: float) -> None:
+        """Remove points within the specified radius of a center point (keep outside)"""
+        import numpy as np
+
+        df = self._ensure_df()
+        if len(df) == 0:
+            return
+        R = 6371e3
+        center_lat_rad = np.radians(center_lat)
+        center_lon_rad = np.radians(center_lon)
+        lat_rad = np.radians(df["Latitude"].values)
+        lon_rad = np.radians(df["Longitude"].values)
+        d_lat = lat_rad - center_lat_rad
+        d_lon = lon_rad - center_lon_rad
+        a = np.sin(d_lat / 2) ** 2 + np.cos(center_lat_rad) * np.cos(lat_rad) * np.sin(d_lon / 2) ** 2
+        c = 2 * np.arcsin(np.sqrt(a))
+        distances = R * c
+        mask = distances > radius_m
+        self._df = df[mask]
+        self._points_cache = None
+        if len(self._df) > 0:
+            self.timestamp = self._df["DateTime"].min()
+
+    def _ensure_df(self) -> pd.DataFrame:
+        """Initialize DataFrame on first access"""
+        if self._df is None:
+            self._df = pd.DataFrame(columns=self._columns)  # type: ignore
+        return self._df
 
     def _clear_data(self) -> None:
         "Clear out the header, in preparation for loading"
@@ -81,16 +248,18 @@ class RcTrack:
         self.serialnumber = _RCTRK_DEFAULT_NO_SERIAL_NUMBER
         self.comment = ""
         self.flags = _RCTRK_DEFAULT_FLAGS
-        self.points = []
+        self._df = None
+        self._points_cache = None
 
     def as_dict(self) -> dict[str, Any]:
         "Convert the internal state into a format that could be easily jsonified"
+        df = self._ensure_df()
         rv: dict[str, Any] = {
             "name": self.name,
             "serialnumber": self.serialnumber,
             "comment": self.comment,
             "flags": self.flags,
-            "points": [self._format_trackpoint(x) for x in self.points],
+            "points": df.to_dict("records"),
         }
         return rv
 
@@ -105,13 +274,13 @@ class RcTrack:
             "flags": str,
             "points": [
                 {
-                    "dt": datetime(),
-                    "latitude": float(),
-                    "longitude": float(),
-                    "accuracy": float(),
-                    "doserate": float(),
-                    "countrate": float(),
-                    "comment": str(),
+                    "DateTime": datetime(),
+                    "Latitude": float(),
+                    "Longitude": float(),
+                    "Accuracy": float(),
+                    "DoseRate": float(),
+                    "CountRate": float(),
+                    "Comment": str(),
                 },
                 ...
             ]
@@ -127,86 +296,72 @@ class RcTrack:
         self.comment = d["comment"]
         self.flags = d["flags"]
 
-        self.points = [
-            TrackPoint(
-                dt=p["dt"],
-                latitude=p["latitude"],
-                longitude=p["longitude"],
-                accuracy=p["accuracy"],
-                doserate=p["doserate"],
-                countrate=p["countrate"],
-                comment=p["comment"],
-            )
-            for p in d["points"]
-        ]
+        self._df = pd.DataFrame(d["points"], columns=self._columns)
+        self._points_cache = None
         return True
-
-    def _format_trackpoint(self, tp: TrackPoint) -> dict[str, Any]:
-        "render a trackpoint as a simple dict"
-        # fz = [None] + list(tp._asdict().values())
-        rv: dict[str, Any] = {"filetime": -1}
-        rv.update(tp.__dict__)
-        rv["filetime"] = DateTime2FileTime(rv["dt"])
-        # rv["datetime"] = format_datetime(rv["dt"], DATEFMT_TZ)
-        return rv
 
     def write_file(self, filename: str) -> None:
         "Write the in-memory representation to filesystem"
+        df = self._ensure_df()
         if not self.name:
             self.name = f"Track {self.timestamp.replace(tzinfo=None, microsecond=0)}"
         with open(filename, "wt") as ofd:
             print("Track: " + "\t".join([self.name, self.serialnumber, self.comment, self.flags]), file=ofd)
-            # Patch column names in output file.
             print("\t".join(["Timestamp", "Time"] + self._columns[1:]), file=ofd)
-            line = "{filetime}\t{dt}\t{latitude}\t{longitude}\t{accuracy}\t{doserate}\t{countrate}\t{comment}"
-            for p in self.points:
-                print(line.format_map(self._format_trackpoint(p)), file=ofd)
+            for _, row in df.iterrows():
+                filetime = DateTime2FileTime(row["DateTime"])
+                dt_str = row["DateTime"].strftime("%Y-%m-%d %H:%M:%S")
+                comment = row["Comment"] if pd.notna(row["Comment"]) else ""
+                print(
+                    f"{filetime}\t{dt_str}\t{row['Latitude']}\t{row['Longitude']}\t{row['Accuracy']}\t{row['DoseRate']}\t{row['CountRate']}\t{comment}",
+                    file=ofd,
+                )
 
     def load_file(self, filename: str) -> None:
         "Load a track from the filesystem"
         with open(filename, "rt") as ifd:
             self._clear_data()
-            nf: int = len(self._columns)
-            for n, line in enumerate(ifd):
-                if n == 0:
-                    if not line.startswith("Track:"):
-                        raise ValueError("This doesn't look like a valid track - missing header")
-                    self.name, self.serialnumber, self.comment, self.flags = line.split("\t")
-                    self.name = self.name.split(": ", 1)[1]
-                    self.flags = self.flags.strip()
-                    continue
-                if n == 1:
-                    if not line.startswith("Timestamp"):
-                        raise ValueError("This doesn't look like a valid track - missing column signature")
-                    continue
-                fields: List[Any] = line.split("\t")
-                if len(fields) != nf + 1:
-                    raise ValueError(f"Incorrect number of values on line {n + 1}")
-                fields[1] = FileTime2DateTime(fields[0]).replace(
-                    tzinfo=UTC
-                )  # filetime is higher resolution than YYYY-mm-dd HH:MM:SS
-                for i in range(2, 7):
-                    fields[i] = float(fields[i])
-                fields[-1] = fields[-1].rstrip("\n")
-                self.points.append(
-                    TrackPoint(
-                        dt=fields[1],
-                        latitude=fields[2],
-                        longitude=fields[3],
-                        accuracy=fields[4],
-                        doserate=fields[5],
-                        countrate=fields[6],
-                        comment=fields[7],
-                    )
-                )
+
+            header_lines = [ifd.readline() for _ in range(2)]
+
+            if not header_lines[0].startswith("Track:"):
+                raise ValueError("This doesn't look like a valid track - missing header")
+
+            self.name, self.serialnumber, self.comment, self.flags = header_lines[0].split("\t")
+            self.name = self.name.split(": ", 1)[1].strip()
+            self.flags = self.flags.strip()
+
+            if not header_lines[1].startswith("Timestamp"):
+                raise ValueError("This doesn't look like a valid track - missing column signature")
+
+            df = pd.read_csv(
+                ifd,
+                sep="\t",
+                header=None,
+                names=["Timestamp", "Time", "Latitude", "Longitude", "Accuracy", "DoseRate", "CountRate", "Comment"],
+                dtype={
+                    "Latitude": float,
+                    "Longitude": float,
+                    "Accuracy": float,
+                    "DoseRate": float,
+                    "CountRate": float,
+                    "Comment": str,
+                },
+                skiprows=0,
+            )
+
+            df["DateTime"] = df["Timestamp"].apply(FileTime2DateTime)
+            self._df = df[self._columns]
+            self._points_cache = None
+
+            if len(self._df) > 0:
+                self.timestamp = self._df["DateTime"].min()  # type: ignore
 
     def add_point_dict(self, d: dict[str, Any]) -> None:
         """
         Add a track point from a dict with the following keys
 
         ["DateTime", "Latitude", "Longitude", "Accuracy", "DoseRate", "CountRate", "Comment"]
-
-        Spelling counts - that's the way they are in the .rcspg header
         """
         self.add_point(
             dt=d["DateTime"],
@@ -228,24 +383,75 @@ class RcTrack:
         count_rate: float,
         comment: str = "",
     ) -> None:
-        "Wrapper around TrackPoint, but accepts a DateTime which is more useful"
-        self.points.append(
-            TrackPoint(
-                dt=dt,
-                latitude=latitude,
-                longitude=longitude,
-                accuracy=accuracy,
-                doserate=dose_rate,
-                countrate=count_rate,
-                comment=comment,
-            )
+        "Add a point to the track using DateTime"
+        new_row = pd.DataFrame(
+            {
+                "DateTime": [dt],
+                "Latitude": [latitude],
+                "Longitude": [longitude],
+                "Accuracy": [accuracy],
+                "DoseRate": [dose_rate],
+                "CountRate": [count_rate],
+                "Comment": [comment],
+            }
         )
-        if len(self.points) < 2:
+
+        if self._df is None:
+            self._df = new_row
+        else:
+            self._df = pd.concat([self._df, new_row], ignore_index=True)
+
+        self._points_cache = None
+
+        if len(self._df) < 2:
             if dt.tzinfo is None:
-                raise TypeError("offset-aware datetime required")  # similar to the comparison below
+                raise TypeError("offset-aware datetime required")
             self.timestamp = dt
         else:
             self.timestamp = min(self.timestamp, dt)
+
+    def add_points(self, points: List[dict[str, Any]]) -> None:
+        """
+        Add multiple points efficiently using batch operations.
+
+        Each point should be a dict with keys:
+        ["DateTime", "Latitude", "Longitude", "Accuracy", "DoseRate", "CountRate", "Comment"]
+        """
+        if not points:
+            return
+
+        data = {col: [] for col in self._columns}
+        min_dt = None
+
+        for p in points:
+            data["DateTime"].append(p["DateTime"])
+            data["Latitude"].append(p["Latitude"])
+            data["Longitude"].append(p["Longitude"])
+            data["Accuracy"].append(p["Accuracy"])
+            data["DoseRate"].append(p["DoseRate"])
+            data["CountRate"].append(p["CountRate"])
+            data["Comment"].append(p.get("Comment", ""))
+
+            if min_dt is None:
+                min_dt = p["DateTime"]
+            else:
+                min_dt = min(min_dt, p["DateTime"])
+
+        new_df = pd.DataFrame(data, columns=self._columns)
+
+        if self._df is None:
+            self._df = new_df
+        else:
+            self._df = pd.concat([self._df, new_df], ignore_index=True)
+
+        self._points_cache = None
+
+        if len(self._df) < 2:
+            if min_dt.tzinfo is None:
+                raise TypeError("offset-aware datetime required")
+            self.timestamp = min_dt
+        else:
+            self.timestamp = min(self.timestamp, min_dt)
 
 
 class RcSpectrum:
