@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# coding: utf-8
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syn=python
 # SPDX-License-Identifier: MIT
 
@@ -126,19 +125,19 @@ def test_reverse_route():
     """Test reverse_route function"""
     from radiacode_tools.rc_files import RcTrack
     from track_sanitize import reverse_route
-    
+
     track = RcTrack(testfile)
     original_df = track.df.copy()
     original_times = original_df["DateTime"].tolist()
-    
+
     reverse_route(track)
-    
+
     reversed_df = track.df
     assert len(reversed_df) == len(original_df)
-    
+
     assert reversed_df.iloc[0]["Latitude"] == original_df.iloc[-1]["Latitude"]
     assert reversed_df.iloc[0]["Longitude"] == original_df.iloc[-1]["Longitude"]
-    
+
     assert reversed_df.iloc[0]["DateTime"] == original_times[0]
     assert reversed_df.iloc[-1]["DateTime"] == original_times[-1]
 
@@ -147,26 +146,27 @@ def test_reverse_route_empty():
     """Test reverse_route with empty track"""
     from radiacode_tools.rc_files import RcTrack
     from track_sanitize import reverse_route
-    
+
     track = RcTrack()
     assert len(track.df) == 0
-    
+
     reverse_route(track)
     assert len(track.df) == 0
 
 
 def test_sanitize_all_sanitization_options():
     """Test sanitize with all sanitization options enabled"""
-    from radiacode_tools.rc_files import RcTrack
-    from track_sanitize import sanitize
     from argparse import Namespace
     from datetime import datetime
-    
+
+    from radiacode_tools.rc_files import RcTrack
+    from track_sanitize import sanitize
+
     track = RcTrack(testfile)
     original_name = track.name
     original_comment = track.comment
     original_serial = track.serialnumber
-    
+
     args = Namespace(
         prefix="sanitized_",
         serial_number="RC-100-314159",
@@ -182,11 +182,11 @@ def test_sanitize_all_sanitization_options():
         allow_unsanitized_time=False,
         force_overwrite=False,
         stdout=False,
-        files=[testfile]
+        files=[testfile],
     )
-    
+
     sanitize(args, track)
-    
+
     assert track.name != original_name
     assert track.comment != original_comment
     assert track.serialnumber != original_serial
@@ -194,11 +194,12 @@ def test_sanitize_all_sanitization_options():
 
 def test_sanitize_preserve_all():
     """Test sanitize with all preservation options enabled"""
-    from radiacode_tools.rc_files import RcTrack
-    from track_sanitize import sanitize
     from argparse import Namespace
     from datetime import datetime
-    
+
+    from radiacode_tools.rc_files import RcTrack
+    from track_sanitize import sanitize
+
     track = RcTrack(testfile)
     original_name = track.name
     original_comment = track.comment
@@ -206,7 +207,7 @@ def test_sanitize_preserve_all():
     original_times = track.df["DateTime"].tolist()
     original_lats = track.df["Latitude"].tolist()
     original_lons = track.df["Longitude"].tolist()
-    
+
     args = Namespace(
         prefix="sanitized_",
         serial_number="RC-100-314159",
@@ -222,11 +223,11 @@ def test_sanitize_preserve_all():
         allow_unsanitized_time=True,
         force_overwrite=False,
         stdout=False,
-        files=[testfile]
+        files=[testfile],
     )
-    
+
     sanitize(args, track)
-    
+
     assert track.name == original_name
     assert track.comment == original_comment
     assert track.serialnumber == original_serial
@@ -234,15 +235,16 @@ def test_sanitize_preserve_all():
 
 def test_sanitize_reverse_route():
     """Test sanitize with reverse_route enabled"""
-    from radiacode_tools.rc_files import RcTrack
-    from track_sanitize import sanitize
     from argparse import Namespace
     from datetime import datetime
-    
+
+    from radiacode_tools.rc_files import RcTrack
+    from track_sanitize import sanitize
+
     track = RcTrack(testfile)
     original_df = track.df.copy()
     original_times = original_df["DateTime"].tolist()
-    
+
     args = Namespace(
         prefix="sanitized_",
         serial_number="RC-100-314159",
@@ -258,14 +260,14 @@ def test_sanitize_reverse_route():
         allow_unsanitized_time=False,
         force_overwrite=False,
         stdout=False,
-        files=[testfile]
+        files=[testfile],
     )
-    
+
     sanitize(args, track)
-    
+
     # Check that the track has the same number of points
     assert len(track.df) == len(original_df)
-    
+
     # Check that timestamps are at consistent positions (after sanitization and reversal)
     # Note: The current implementation converts timestamps to be relative to new start time
     # and then reverses, so the original_times are converted times

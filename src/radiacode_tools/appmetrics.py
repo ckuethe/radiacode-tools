@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# coding: utf-8
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syn=python
 # Author: Chris Kuethe <chris.kuethe@gmail.com> , https://github.com/ckuethe/radiacode-tools
 # SPDX-License-Identifier: MIT
@@ -23,7 +22,7 @@ from os import getpgrp, getppid, killpg
 from signal import SIGHUP
 from threading import Lock, Thread
 from time import monotonic, process_time, time
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Union
 
 Number: type[float | int] = Union[int, float]
 
@@ -72,7 +71,7 @@ class AppMetrics:
         ams.gauge_update("my_gauge", get_some_value())
     """
 
-    _mtypes: List[str] = [C, F, G]
+    _mtypes: list[str] = [C, F, G]
 
     def __init__(
         self, port: int = 8274, local_only: bool = True, appname: str = "", stub: bool = False, safe: bool = True
@@ -85,7 +84,7 @@ class AppMetrics:
         """
         self._stub = False
         self.am_mutex: Lock = Lock()
-        self._stats: Dict[str, Any] = {P: {"pid": getppid(), "appname": appname}, C: {}, F: {}, G: {}}
+        self._stats: dict[str, Any] = {P: {"pid": getppid(), "appname": appname}, C: {}, F: {}, G: {}}
         self._init_real_time = monotonic()
         self._wall_time = time()
         self._init_proc_time = process_time()
@@ -102,7 +101,7 @@ class AppMetrics:
         self._stats[P]["wall"] = time()
         self._stats[P]["proc"] = process_time() - self._init_proc_time
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         "return a copy of the latest statistics."
         with self.am_mutex:
             self._set_clocks()
@@ -112,14 +111,14 @@ class AppMetrics:
         self._server._close()
 
     # Counters
-    def counter_create(self, name: str, init_val: int | float = 0) -> None:
+    def counter_create(self, name: str, init_val: float = 0) -> None:
         self._create_metric(C, name, init_val)
 
-    def counter_increment(self, name: str, step: int | float = 1) -> None:
+    def counter_increment(self, name: str, step: float = 1) -> None:
         with self.am_mutex:
             self._stats[C][name] += step
 
-    def counter_decrement(self, name: str, step: int | float = 1) -> None:
+    def counter_decrement(self, name: str, step: float = 1) -> None:
         with self.am_mutex:
             self._stats[C][name] -= step
 
@@ -143,10 +142,10 @@ class AppMetrics:
         self.flag_setval(name, False)
 
     # Gauges
-    def gauge_create(self, name: str, init_val: int | float = 0) -> None:
+    def gauge_create(self, name: str, init_val: float = 0) -> None:
         self._create_metric(G, name, init_val)
 
-    def gauge_update(self, name: str, v: int | float) -> None:
+    def gauge_update(self, name: str, v: float) -> None:
         with self.am_mutex:
             if name not in self._stats[G]:
                 raise KeyError(f"gauge:{name}")
@@ -312,7 +311,6 @@ class AppMetricsBaseReqHandler(BaseHTTPRequestHandler):
 
     def log_message(self, format: str, *args: Any) -> None:
         "Intentional log suppression"
-        pass
 
 
 class AppMetricsServer:
@@ -320,14 +318,14 @@ class AppMetricsServer:
         self, app_metrics: AppMetrics, port: int = 8274, local_only: bool = True, appname: str = "", safe: bool = True
     ) -> None:
         address = "localhost" if local_only else "0.0.0.0"
-        self._server_thread: Optional[Thread] = Thread(
+        self._server_thread: Thread | None = Thread(
             # deepcode ignore MissingAPI: Thread is joined below..
             target=self._make_http_thread,
             args=((address, port), app_metrics),
             daemon=True,
             name="varz_server",
         )
-        self._server: Optional[HTTPServer] = None
+        self._server: HTTPServer | None = None
         self.port = port
         self._server_thread.start()
 

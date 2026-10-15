@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# coding: utf-8
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syn=python
 # Author: Chris Kuethe <chris.kuethe@gmail.com> , https://github.com/ckuethe/radiacode-tools
 # SPDX-License-Identifier: MIT
@@ -12,7 +11,7 @@ utility library, rather than being imported from and between scripts.
 from datetime import datetime, timedelta, timezone
 from re import Match
 from re import search as re_search
-from typing import Any, List
+from typing import Any
 
 from radiacode import RadiaCode
 
@@ -64,13 +63,13 @@ def DateTime2FileTime(dt: datetime) -> int:
     return UnixTime2FileTime(dt.replace(tzinfo=UTC).timestamp())
 
 
-def stringify(a: List[Any], c: str = " ") -> str:
+def stringify(a: list[Any], c: str = " ") -> str:
     "Make a string out of a list of things, nicer than str(list(...))"
     return c.join([f"{x}" for x in a])
 
 
 def get_dose_from_spectrum(
-    counts: List[int],
+    counts: list[int],
     cal: EnergyCalibration,
     d: float = 4.51,
     v: float = 1.0,
@@ -96,7 +95,7 @@ def get_dose_from_spectrum(
     return uSv
 
 
-def find_radiacode_devices() -> List[str]:
+def find_radiacode_devices() -> list[str]:
     "List all the radiacode devices detected"
     # defer import until someone calls this function
     from usb.core import find as usb_find

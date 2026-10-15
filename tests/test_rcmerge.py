@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# coding: utf-8
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syn=python
 # SPDX-License-Identifier: MIT
 
@@ -247,12 +246,7 @@ def test_best_anchor_none():
 
 def test_read_file_skips_blank_and_garbage(tmp_path):
     p = tmp_path / "junk.ndjson"
-    p.write_text(
-        '{"_type": "SpecData", "monotime": 1}\n'
-        "\n"
-        "this is not json\n"
-        '{"_type": "RtData", "monotime": 2}\n'
-    )
+    p.write_text('{"_type": "SpecData", "monotime": 1}\n\nthis is not json\n{"_type": "RtData", "monotime": 2}\n')
     recs = rcmerge._read_file(str(p))
     assert [r["monotime"] for r in recs] == [1, 2]
 
@@ -303,13 +297,21 @@ def test_rebase_anchor_fallback():
     # two sessions, monotime reset, neither has a usable real-time anchor:
     # the rebase falls back to a 1.0s gap
     f1 = [
-        {"_type": "SpecData", "monotime": 10.0, "serial_number": SERIAL,
-         "spectrum": {"duration": 1, "a0": 1, "a1": 2, "a2": 3, "counts": [5]}},
+        {
+            "_type": "SpecData",
+            "monotime": 10.0,
+            "serial_number": SERIAL,
+            "spectrum": {"duration": 1, "a0": 1, "a1": 2, "a2": 3, "counts": [5]},
+        },
         {"_type": "RtData", "monotime": 11.0, "serial_number": SERIAL},
     ]
     f2 = [
-        {"_type": "SpecData", "monotime": 2.0, "serial_number": SERIAL,
-         "spectrum": {"duration": 1, "a0": 1, "a1": 2, "a2": 3, "counts": [0]}},
+        {
+            "_type": "SpecData",
+            "monotime": 2.0,
+            "serial_number": SERIAL,
+            "spectrum": {"duration": 1, "a0": 1, "a1": 2, "a2": 3, "counts": [0]},
+        },
         {"_type": "RtData", "monotime": 3.0, "serial_number": SERIAL},
     ]
     stream, bridge_dur = rcmerge._rebase([f1, f2], [[0]], SERIAL, (1.0, 2.0, 3.0))
@@ -327,16 +329,24 @@ def test_build_output_no_records():
 
 def test_build_output_gps_first_record():
     gps = {"_type": "GpsData", "monotime": 1.0, "payload": {"time": "2026-01-01T00:00:00Z", "gnss": True, "mode": 3}}
-    spec = {"_type": "SpecData", "monotime": 2.0, "serial_number": SERIAL,
-            "spectrum": {"duration": 1, "a0": 1, "a1": 2, "a2": 3, "counts": [5]}}
+    spec = {
+        "_type": "SpecData",
+        "monotime": 2.0,
+        "serial_number": SERIAL,
+        "spectrum": {"duration": 1, "a0": 1, "a1": 2, "a2": 3, "counts": [5]},
+    }
     out = rcmerge._build_output(SERIAL, [[gps, spec]])
     assert out[0]["dt"] == "2026-01-01T00:00:00Z"
 
 
 def test_build_output_gps_first_no_time(tmp_path):
     gps = {"_type": "GpsData", "monotime": 1.0, "payload": {"time": None, "gnss": True, "mode": 3}}
-    spec = {"_type": "SpecData", "monotime": 2.0, "serial_number": SERIAL,
-            "spectrum": {"duration": 1, "a0": 1, "a1": 2, "a2": 3, "counts": [5]}}
+    spec = {
+        "_type": "SpecData",
+        "monotime": 2.0,
+        "serial_number": SERIAL,
+        "spectrum": {"duration": 1, "a0": 1, "a1": 2, "a2": 3, "counts": [5]},
+    }
     out = rcmerge._build_output(SERIAL, [[gps, spec]])
     assert out[0]["dt"] == ""
 
@@ -348,4 +358,3 @@ def test_main_default_output(tmp_path, monkeypatch):
     monkeypatch.setattr("sys.argv", [__file__] + paths)
     assert rcmerge.main() is None
     assert (tmp_path / f"merged_{SERIAL}.ndjson").exists()
-

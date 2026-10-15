@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# coding: utf-8
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syn=python
 # Author: Chris Kuethe <chris.kuethe@gmail.com> , https://github.com/ckuethe/radiacode-tools
 # SPDX-License-Identifier: MIT
@@ -26,7 +25,7 @@ from tempfile import mkstemp
 from threading import Barrier, BrokenBarrierError, Lock, Thread, active_count
 from threading import enumerate as list_threads
 from time import gmtime, monotonic, sleep, strftime, time
-from typing import Any, Dict, List, TextIO, Tuple
+from typing import Any, TextIO
 
 import usb.core  # type: ignore
 from radiacode import RadiaCode  # type: ignore
@@ -43,7 +42,7 @@ ams: AppMetrics = AppMetrics(stub=True)
 # I assume that means 2Hz internal data update rate, which also tracks with
 # search mode producing up to 2 measurements per second.
 MIN_POLL_INTERVAL: float = 0.5
-RC_LOCKS: Dict[str, Lock] = dict()  # prevent rtdata polling and spectrum polling from stomping on each other
+RC_LOCKS: dict[str, Lock] = dict()  # prevent rtdata polling and spectrum polling from stomping on each other
 STDIO_LOCK: Lock = Lock()  # Prevent stdio corruption
 # Set up a throwaway Barrier, with more parties than you can connect over usb, and an impossibly short
 # timeout. This should crash the program if it's not properly reinitialized to a reasonable number of
@@ -377,7 +376,7 @@ def log_worker(args: Namespace) -> None:
     """
     stderr_print(f"starting log_worker for: {' '.join(args.devs)}")
 
-    log_fds: Dict[str, TextIO] = {}  # {d: None for d in args.devs}
+    log_fds: dict[str, TextIO] = {}  # {d: None for d in args.devs}
     start_time = time()
     time_string = strftime("%Y%m%d%H%M%S", gmtime(start_time))
 
@@ -403,11 +402,7 @@ def log_worker(args: Namespace) -> None:
                     print("log_worker detected SHUTDOWN_OBJECT, scheduling shutdown")
                 continue
 
-            elif isinstance(msg, SpecData):
-                fd = log_fds[msg.serial_number]
-                print(enc.encode(msg), file=fd, flush=True)
-
-            elif isinstance(msg, RtData):
+            elif isinstance(msg, SpecData) or isinstance(msg, RtData):
                 fd = log_fds[msg.serial_number]
                 print(enc.encode(msg), file=fd, flush=True)
 
@@ -417,7 +412,7 @@ def log_worker(args: Namespace) -> None:
 
             else:
                 stderr_print(f"ignored {msg}")
-                pass  # who put this junk here?
+                # who put this junk here?
 
         sleep(MIN_POLL_INTERVAL)
 
@@ -427,7 +422,6 @@ def log_worker(args: Namespace) -> None:
             if log_fds[sn] != sys.stdout:
                 log_fds[sn].close()
     stderr_print("log worker shutting down")
-    return
 
 
 def gps_worker(args: Namespace) -> None:
@@ -468,7 +462,7 @@ def gps_worker(args: Namespace) -> None:
                         line: str = gpsfd.readline().strip()
                         try:
                             if "No such device" in line:
-                                raise IOError("GPSD is confused")
+                                raise OSError("GPSD is confused")
                             x = jloads(line)
                             if x["class"] == "SKY":
                                 try:
@@ -521,8 +515,8 @@ def gps_worker(args: Namespace) -> None:
     return  # clean exit
 
 
-def create_threads(args: Namespace) -> Tuple[int, List[Thread]]:
-    thread_list: List[Thread] = []
+def create_threads(args: Namespace) -> tuple[int, list[Thread]]:
+    thread_list: list[Thread] = []
     thread_count = 0
 
     # file deepcode ignore MissingAPI: all threads will be cleaned at the bottom of main()

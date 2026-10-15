@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
-# coding: utf-8
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syn=python
 # Author: Chris Kuethe <chris.kuethe@gmail.com> , https://github.com/ckuethe/radiacode-tools
 # SPDX-License-Identifier: MIT
 
 from argparse import ArgumentParser, Namespace
 from math import pow, sqrt
-from typing import Dict
 
 from radiacode_tools.rc_files import RcSpectrum
 from radiacode_tools.rc_types import DTstats, Number
@@ -36,7 +34,7 @@ def get_rate_from_spectrum(fn: str) -> float:
     return RcSpectrum(fn).count_rate()
 
 
-def load_spectra(args) -> Dict[str, float]:
+def load_spectra(args) -> dict[str, float]:
     rv = {}
 
     try:
@@ -100,7 +98,7 @@ def compute_deadtime(*, a: Number, b: Number, ab: Number, bg: Number = 0) -> DTs
     return DTstats(lost_cps=lost_counts, loss_fraction=loss_fraction, dt_us=tau, dt_cps=ab)
 
 
-def print_deadtime(rates: Dict[str, Number]) -> DTstats:
+def print_deadtime(rates: dict[str, Number]) -> DTstats:
     "Given a dict of a,b,ab,bg rates, print the computed deadtime."
     dt = compute_deadtime(**rates)
     print(rates)

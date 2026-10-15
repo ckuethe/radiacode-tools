@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# coding: utf-8
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syn=python
 # Author: Chris Kuethe <chris.kuethe@gmail.com> , https://github.com/ckuethe/radiacode-tools
 # SPDX-License-Identifier: MIT
@@ -142,7 +141,7 @@ def gps_worker(args: Namespace) -> None:
                             print("0 100", flush=True, file=ofd)
                             break
                     # End of read loop
-            except (socket.error, TimeoutError) as e:
+            except (OSError, TimeoutError) as e:
                 # any other exception will cause this to error out and exit
                 if args.verbose:
                     print(f"Reattempting connection after exception: {e}")

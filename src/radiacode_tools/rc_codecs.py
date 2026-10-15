@@ -1,16 +1,14 @@
 #!/usr/bin/env python3
-# coding: utf-8
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syn=python
 # Author: Chris Kuethe <chris.kuethe@gmail.com> , https://github.com/ckuethe/radiacode-tools
 # SPDX-License-Identifier: MIT
 
 import struct
-from typing import Union
 
 _B45C = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ $%*+-./:"  # defined in RFC9285
 
 
-def b45_encode(s: Union[str, bytearray]) -> str:
+def b45_encode(s: str | bytearray) -> str:
     "Encode a string or bytearray into a base45 ASCII *string*"
     rv: list[str] = []
     if isinstance(s, str):

@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# coding: utf-8
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syn=python
 # SPDX-License-Identifier: MIT
 
@@ -13,7 +12,7 @@ testdir = pathjoin(dirname(__file__), "data")
 testfile = pathjoin(testdir, "walk.rctrk")
 
 from radiacode_tools.rc_files import RcTrack
-from radiacode_tools.rc_types import GeoBox, GeoCircle, GeoPoint, TimeRange, TrackPoint
+from radiacode_tools.rc_types import GeoBox, GeoCircle, GeoPoint, TimeRange
 from track_edit import (
     check_geoboxes,
     check_geocircles,
@@ -179,17 +178,13 @@ def test_edit_track_exclude_geobox_none(monkeypatch):
 
 def test_check_timeranges_dataframe():
     """Test check_timeranges with DataFrame input"""
-    from track_edit import check_timeranges
-    from radiacode_tools.rc_types import TimeRange
     import pandas as pd
-    
-    df = pd.DataFrame({
-        "DateTime": [datetime(2023, 1, 1), datetime(2023, 1, 2), datetime(2023, 1, 3)]
-    })
-    
+
+    df = pd.DataFrame({"DateTime": [datetime(2023, 1, 1), datetime(2023, 1, 2), datetime(2023, 1, 3)]})
+
     tr1 = TimeRange(dt_start=datetime(2023, 1, 1), dt_end=datetime(2023, 1, 2))
     tr2 = TimeRange(dt_start=datetime(2023, 1, 2), dt_end=datetime(2023, 1, 3))
-    
+
     result = check_timeranges(df, [tr1, tr2])
     assert len(result) == 3
     assert result.iloc[0] == True
@@ -199,19 +194,14 @@ def test_check_timeranges_dataframe():
 
 def test_check_geoboxes_dataframe():
     """Test check_geoboxes with DataFrame input"""
-    from track_edit import check_geoboxes
-    from radiacode_tools.rc_types import GeoBox, GeoPoint
     import pandas as pd
-    
-    df = pd.DataFrame({
-        "Latitude": [0, 0.5, 2],
-        "Longitude": [0, 0.5, 2]
-    })
-    
+
+    df = pd.DataFrame({"Latitude": [0, 0.5, 2], "Longitude": [0, 0.5, 2]})
+
     p1 = GeoPoint(latitude=0, longitude=0)
     p2 = GeoPoint(latitude=1, longitude=1)
     gb = GeoBox(p1=p1, p2=p2)
-    
+
     result = check_geoboxes(df, [gb])
     assert len(result) == 3
     assert result.iloc[0] == True
@@ -221,18 +211,13 @@ def test_check_geoboxes_dataframe():
 
 def test_check_geocircles_dataframe():
     """Test check_geocircles with DataFrame input"""
-    from track_edit import check_geocircles
-    from radiacode_tools.rc_types import GeoCircle, GeoPoint
     import pandas as pd
-    
-    df = pd.DataFrame({
-        "Latitude": [0, 10, 20],
-        "Longitude": [0, 10, 20]
-    })
-    
+
+    df = pd.DataFrame({"Latitude": [0, 10, 20], "Longitude": [0, 10, 20]})
+
     center = GeoPoint(latitude=0, longitude=0)
     gc = GeoCircle(point=center, radius=1000000)
-    
+
     result = check_geocircles(df, [gc])
     assert len(result) == 3
     assert result.iloc[0] == True
@@ -242,14 +227,14 @@ def test_check_geocircles_dataframe():
 
 def test_edit_track_include_exclude_combined():
     """Test edit_track with both include and exclude filters"""
-    from radiacode_tools.rc_files import RcTrack
-    from radiacode_tools.rc_types import TimeRange, GeoBox, GeoPoint
-    from track_edit import edit_track, get_args
     from argparse import Namespace
-    
+
+    from radiacode_tools.rc_files import RcTrack
+    from track_edit import edit_track
+
     track = RcTrack(testfile)
     before_len = len(track.df)
-    
+
     args = Namespace(
         include_time_range=[],
         exclude_time_range=[],
@@ -259,9 +244,9 @@ def test_edit_track_include_exclude_combined():
         exclude_radius=[],
         track_name="combined_test",
         output="/dev/null",
-        filename=testfile
+        filename=testfile,
     )
-    
+
     a, b = edit_track(args, track)
     assert a == b
     assert b > 0

@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# coding: utf-8
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syn=python
 # Author: Chris Kuethe <chris.kuethe@gmail.com> , https://github.com/ckuethe/radiacode-tools
 # SPDX-License-Identifier: MIT
@@ -11,10 +10,10 @@ spectrograms that the radiacode app might use
 
 import json
 from argparse import ArgumentParser, Namespace
-from os.path import basename, dirname
+from collections.abc import Iterable
+from os.path import basename, dirname, realpath
 from os.path import join as pathjoin
-from os.path import realpath
-from typing import Any, Dict, Iterable
+from typing import Any
 
 from radiacode_tools.rc_files import RcTrack
 from radiacode_tools.rc_utils import DATEFMT_TZ, parse_datetime
@@ -80,12 +79,12 @@ def get_args() -> Namespace:
     return rv
 
 
-def load_file_lines(args: Namespace) -> Dict[str, Dict[str, Any]]:
+def load_file_lines(args: Namespace) -> dict[str, dict[str, Any]]:
     with open(args.input) as ifd:
-        db: Dict[str, Dict[str, Any]] = {}
+        db: dict[str, dict[str, Any]] = {}
         timekey = ""
         for line in ifd:
-            rec: Dict[str, Any] = json.loads(line)
+            rec: dict[str, Any] = json.loads(line)
             # Pick up the first serial number we see
             if args.serial_number is None and "serial_number" in rec:
                 args.serial_number = rec["serial_number"]
@@ -133,7 +132,7 @@ def keys_missing(required: Iterable[str], have: Iterable[str]) -> bool:
     return True if missing else False
 
 
-def convert_lines_to_track(args: Namespace, lines: Dict[str, Dict[str, Any]]) -> RcTrack:
+def convert_lines_to_track(args: Namespace, lines: dict[str, dict[str, Any]]) -> RcTrack:
     trk: RcTrack = RcTrack()
     req_keys: set[str] = {"datetime", "lat", "lon", "dose_rate", "epc", "count_rate"}
 

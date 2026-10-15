@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# coding: utf-8
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syn=python
 # SPDX-License-Identifier: MIT
 
@@ -85,7 +84,7 @@ def test_cal_file(monkeypatch):
     assert calibrate.make_fit(chan, energy, args) == expected_fit
 
     rsq = calibrate.rsquared(chan, energy, pf)
-    assert pytest.approx(rsq, rel=1e-5) == expected_rsq  #
+    assert pytest.approx(rsq, rel=1e-5) == expected_rsq
 
     monkeypatch.setattr("sys.argv", [__file__, "-f", cal_file])
     assert calibrate.main() is None

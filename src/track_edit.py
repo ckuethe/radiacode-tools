@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# coding: utf-8
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syn=python
 # Author: Chris Kuethe <chris.kuethe@gmail.com> , https://github.com/ckuethe/radiacode-tools
 # SPDX-License-Identifier: MIT
@@ -8,7 +7,6 @@ from argparse import ArgumentParser, Namespace, RawDescriptionHelpFormatter
 from datetime import datetime, timedelta
 from math import atan2, cos, pow, radians, sin, sqrt
 from textwrap import dedent
-from typing import List, Tuple
 
 import pandas as pd
 
@@ -208,7 +206,7 @@ def check_geocircle(member: TrackPoint, container: GeoCircle) -> bool:
     )
 
 
-def check_timeranges(df: pd.DataFrame, container: List[TimeRange]) -> pd.Series:
+def check_timeranges(df: pd.DataFrame, container: list[TimeRange]) -> pd.Series:
     if not isinstance(container, list):  # pyright: ignore reportUnnecessaryIsInstance
         raise ValueError("container must be a list")
     result = pd.Series([False] * len(df), index=df.index)
@@ -218,7 +216,7 @@ def check_timeranges(df: pd.DataFrame, container: List[TimeRange]) -> pd.Series:
     return result
 
 
-def check_geoboxes(df: pd.DataFrame, container: List[GeoBox]) -> pd.Series:
+def check_geoboxes(df: pd.DataFrame, container: list[GeoBox]) -> pd.Series:
     if not isinstance(container, list):  # pyright: ignore reportUnnecessaryIsInstance
         raise ValueError("container must be a list")
     result = pd.Series([False] * len(df), index=df.index)
@@ -237,11 +235,11 @@ def check_geoboxes(df: pd.DataFrame, container: List[GeoBox]) -> pd.Series:
     return result
 
 
-def check_geocircles(df: pd.DataFrame, container: List[GeoCircle]) -> pd.Series:
+def check_geocircles(df: pd.DataFrame, container: list[GeoCircle]) -> pd.Series:
     if not isinstance(container, list):  # pyright: ignore reportUnnecessaryIsInstance
         raise ValueError("container must be a list")
+
     import numpy as np
-    from math import sqrt
 
     result = pd.Series([False] * len(df), index=df.index)
     R = 6371e3
@@ -260,7 +258,7 @@ def check_geocircles(df: pd.DataFrame, container: List[GeoCircle]) -> pd.Series:
     return result
 
 
-def edit_track(args: Namespace, track: RcTrack) -> Tuple[int, int]:
+def edit_track(args: Namespace, track: RcTrack) -> tuple[int, int]:
     """
     Filter points in an RcTrack based on include/exclude criteria for time ranges,
     rectangular areas, and circular regions.

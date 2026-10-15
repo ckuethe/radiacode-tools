@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# coding: utf-8
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syn=python
 # Author: Chris Kuethe <chris.kuethe@gmail.com> , https://github.com/ckuethe/radiacode-tools
 # SPDX-License-Identifier: MIT
@@ -11,7 +10,7 @@ utility library, rather than being imported from and between scripts.
 
 from datetime import datetime, timedelta
 from re import match as re_match
-from typing import Any, Dict, Tuple
+from typing import Any
 
 from .rc_types import GeoBox, GeoCircle, GeoPoint, TimeRange
 from .rc_utils import (  # pyright: ignore[reportPrivateUsage]
@@ -116,7 +115,7 @@ def geocircle(s: str) -> GeoCircle:
     raise ValueError
 
 
-def duration_range(s: str = "~") -> Tuple[int, int]:
+def duration_range(s: str = "~") -> tuple[int, int]:
     """
     Argparse helpter to validate some time ranges, returning a pair of floating point seconds
 
@@ -143,7 +142,7 @@ def duration_range(s: str = "~") -> Tuple[int, int]:
     return int(a), int(b)
 
 
-def samp_range(s: str = "~") -> Tuple[int, int]:
+def samp_range(s: str = "~") -> tuple[int, int]:
     "Check that a string of the form 'start~end' can be converted into two non-negative integers"
     w = s.split("~")
     if 2 != len(w):
@@ -193,7 +192,7 @@ def positive_float(s: str) -> float:
     raise ValueError()
 
 
-def geometry(s: str) -> Tuple[int, int]:
+def geometry(s: str) -> tuple[int, int]:
     "check a geometry string of 'WxH' where W and H are positive integers"
     n = s.strip().split("x")
     if len(n) != 2:
@@ -201,7 +200,7 @@ def geometry(s: str) -> Tuple[int, int]:
     return positive_int(n[0]), positive_int(n[1])
 
 
-def gpsd(s: str) -> Dict[str, Any] | None:
+def gpsd(s: str) -> dict[str, Any] | None:
     m = re_match(r"^gpsd://(?P<host>[a-zA-Z0-9_.-]+)(:(?P<port>\d+))?(?P<device>/.+)?", s)
     if m:
         return m.groupdict()

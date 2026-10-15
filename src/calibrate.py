@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# coding: utf-8
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syn=python
 # Author: Chris Kuethe <chris.kuethe@gmail.com> , https://github.com/ckuethe/radiacode-tools
 # SPDX-License-Identifier: MIT
@@ -7,9 +6,10 @@
 import json
 import os
 from argparse import ArgumentParser, Namespace
+from collections.abc import Iterable
 from sys import exit
 from tempfile import mkstemp
-from typing import Iterable, NoReturn
+from typing import NoReturn
 
 from numpy import corrcoef
 from numpy.polynomial import Polynomial

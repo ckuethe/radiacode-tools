@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# coding: utf-8
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syn=python
 # Author: Chris Kuethe <chris.kuethe@gmail.com> , https://github.com/ckuethe/radiacode-tools
 # SPDX-License-Identifier: MIT
@@ -44,14 +43,14 @@ import json
 import re
 from argparse import ArgumentParser, Namespace
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from radiacode_tools.rc_types import RcJSONEncoder
 
 _SERIAL_RE = re.compile(r"(RC-\d{3}[A-Z]?-\d{6})")
 
 
-def _iso_to_epoch(s: Optional[str]) -> Optional[float]:
+def _iso_to_epoch(s: str | None) -> float | None:
     "Parse an ISO-8601 UTC timestamp (with or without a trailing 'Z') into epoch seconds"
     if not s:
         return None
@@ -61,7 +60,7 @@ def _iso_to_epoch(s: Optional[str]) -> Optional[float]:
         return None
 
 
-def _best_anchor(records: List[Dict[str, Any]]) -> Optional[Tuple[float, float]]:
+def _best_anchor(records: list[dict[str, Any]]) -> tuple[float, float] | None:
     """
     Return a (monotime, real_time_epoch) reference point for a recording session.
 
@@ -81,9 +80,9 @@ def _best_anchor(records: List[Dict[str, Any]]) -> Optional[Tuple[float, float]]
     return None
 
 
-def _read_file(path: str) -> List[Dict[str, Any]]:
+def _read_file(path: str) -> list[dict[str, Any]]:
     "Read a single ndjson file into a list of record dicts, skipping blank or corrupt lines"
-    records: List[Dict[str, Any]] = []
+    records: list[dict[str, Any]] = []
     with open(path) as fd:
         for line in fd:
             line = line.strip()
@@ -96,7 +95,7 @@ def _read_file(path: str) -> List[Dict[str, Any]]:
     return records
 
 
-def _first_serial(records: List[Dict[str, Any]]) -> Optional[str]:
+def _first_serial(records: list[dict[str, Any]]) -> str | None:
     "The serial number of the first SpecData record in a file"
     for rec in records:
         if rec.get("_type") == "SpecData":
@@ -104,7 +103,7 @@ def _first_serial(records: List[Dict[str, Any]]) -> Optional[str]:
     return None
 
 
-def _validate(paths: List[str], files: List[List[Dict[str, Any]]]) -> str:
+def _validate(paths: list[str], files: list[list[dict[str, Any]]]) -> str:
     "Enforce single-device merges and reject files whose name/content serial disagrees"
     serials: set[str] = set()
     for path, records in zip(paths, files):
@@ -116,15 +115,13 @@ def _validate(paths: List[str], files: List[List[Dict[str, Any]]]) -> str:
             raise ValueError(f"{path}: no SpecData records found")
         serials.add(serial)
         if match.group(1) != serial:
-            raise ValueError(
-                f"{path}: filename serial {match.group(1)!r} != first spectrum serial {serial!r}"
-            )
+            raise ValueError(f"{path}: filename serial {match.group(1)!r} != first spectrum serial {serial!r}")
     if len(serials) > 1:
         raise ValueError(f"cannot merge files from multiple devices: {sorted(serials)}")
     return serials.pop()
 
 
-def _vec_add(a: List[int], b: List[int]) -> List[int]:
+def _vec_add(a: list[int], b: list[int]) -> list[int]:
     "Elementwise sum of two count vectors (a is zero-padded to b's length)"
     if len(a) < len(b):
         a = a + [0] * (len(b) - len(a))
@@ -134,21 +131,21 @@ def _vec_add(a: List[int], b: List[int]) -> List[int]:
     return out
 
 
-def _vec_sub(a: List[int], b: List[int]) -> List[int]:
+def _vec_sub(a: list[int], b: list[int]) -> list[int]:
     "Elementwise difference a-b of two count vectors"
     if len(b) > len(a):
         b = b[: len(a)]
     return [x - y for x, y in zip(a, b)]
 
 
-def _vec_clamp_ge0(v: List[int]) -> List[int]:
+def _vec_clamp_ge0(v: list[int]) -> list[int]:
     "Clamp every element to be >= 0"
     return [max(x, 0) for x in v]
 
 
-def _sum_counts(records: List[Dict[str, Any]]) -> Optional[List[int]]:
+def _sum_counts(records: list[dict[str, Any]]) -> list[int] | None:
     "Elementwise sum of the counts of every SpecData record; None if none found"
-    out: Optional[List[int]] = None
+    out: list[int] | None = None
     for rec in records:
         if rec.get("_type") != "SpecData":
             continue
@@ -160,7 +157,9 @@ def _sum_counts(records: List[Dict[str, Any]]) -> Optional[List[int]]:
     return out
 
 
-def _split_file(records: List[Dict[str, Any]]) -> Tuple[List[int], List[Dict[str, Any]], List[int], float, Tuple[float, float, float]]:
+def _split_file(
+    records: list[dict[str, Any]],
+) -> tuple[list[int], list[dict[str, Any]], list[int], float, tuple[float, float, float]]:
     """
     Split a file into its pieces:
     - line1: the accumulated spectrum (first SpecData record)
@@ -190,12 +189,12 @@ def _split_file(records: List[Dict[str, Any]]) -> Tuple[List[int], List[Dict[str
 
 def _make_spec(
     serial: str,
-    counts: List[int],
+    counts: list[int],
     duration: float,
     monotime: float,
     dt_iso: str,
-    cal: Tuple[float, float, float],
-) -> Dict[str, Any]:
+    cal: tuple[float, float, float],
+) -> dict[str, Any]:
     "Build a synthetic SpecData record (used for line1, line2, and bridges)"
     return {
         "dt": dt_iso,
@@ -215,7 +214,7 @@ def _make_spec(
     }
 
 
-def _compute_bridges(ordered: List[List[Dict[str, Any]]]) -> List[Optional[List[int]]]:
+def _compute_bridges(ordered: list[list[dict[str, Any]]]) -> list[list[int] | None]:
     """
     For each gap between consecutive files, bridge = clamp(S_next - S_this - Si_this, 0).
     S is the accumulated spectrum at the start of a file (line1) and Si is the
@@ -223,7 +222,7 @@ def _compute_bridges(ordered: List[List[Dict[str, Any]]]) -> List[Optional[List[
     counts accumulated on the device while it was disconnected between files.
     """
     metas = [_split_file(f) for f in ordered]
-    bridges: List[Optional[List[int]]] = []
+    bridges: list[list[int] | None] = []
     for i in range(len(ordered) - 1):
         S_i, _, Si_i, _, _ = metas[i]
         S_next, _, _, _, _ = metas[i + 1]
@@ -248,11 +247,11 @@ def _rebase(ordered, bridges, serial, cal):
     the last measurement of one file and the first measurement of the next.
     Returns the stream and the total elapsed time covered by the bridges.
     """
-    stream: List[Dict[str, Any]] = []
+    stream: list[dict[str, Any]] = []
     total_bridge_dur: float = 0.0
-    prev_last_mt: Optional[float] = None
-    prev_last_global: Optional[float] = None
-    prev_anchor: Optional[Tuple[float, float]] = None
+    prev_last_mt: float | None = None
+    prev_last_global: float | None = None
+    prev_anchor: tuple[float, float] | None = None
     prev_first_dt_iso: str = ""
     offset: float = 0.0
     first_file = True
@@ -304,7 +303,7 @@ def _rebase(ordered, bridges, serial, cal):
     return stream, total_bridge_dur
 
 
-def _build_output(serial: str, files: List[List[Dict[str, Any]]]) -> List[Dict[str, Any]]:
+def _build_output(serial: str, files: list[list[dict[str, Any]]]) -> list[dict[str, Any]]:
     "Build the merged ndjson record list for a single device"
     files = [f for f in files if f]
     if not files:
@@ -314,6 +313,7 @@ def _build_output(serial: str, files: List[List[Dict[str, Any]]]) -> List[Dict[s
     def _order_key(records):
         anchor = _best_anchor(records)
         return (anchor[1] if anchor else 0.0, _first_serial(records) or "")
+
     ordered = sorted(files, key=_order_key)
 
     for records in ordered:
@@ -324,7 +324,7 @@ def _build_output(serial: str, files: List[List[Dict[str, Any]]]) -> List[Dict[s
 
     # total accumulated spectrum = first file's accumulated snapshot + every
     # per-sample increment + every gap bridge
-    total_counts: List[int] = list(metas[0][0])  # S of the first file
+    total_counts: list[int] = list(metas[0][0])  # S of the first file
     for i in range(len(ordered)):
         total_counts = _vec_add(total_counts, metas[i][2])  # + Si_i
     for b in bridges:
@@ -357,9 +357,7 @@ def _build_output(serial: str, files: List[List[Dict[str, Any]]]) -> List[Dict[s
 
 def get_args() -> Namespace:
     "The usual argparse stuff"
-    ap = ArgumentParser(
-        description="Merge several rcmultispg ndjson logs into a single continuous recording"
-    )
+    ap = ArgumentParser(description="Merge several rcmultispg ndjson logs into a single continuous recording")
     ap.add_argument("files", nargs="+", metavar="FILE", help="rcmultispg ndjson log files to merge")
     ap.add_argument(
         "-o",
