@@ -76,6 +76,9 @@ class MockRadiaCode:
     def set_device_on(self, on: bool) -> None:
         pass
 
+    def close(self) -> None:
+        pass
+
     def set_local_time(self, dt: datetime.datetime) -> None:
         pass
 
