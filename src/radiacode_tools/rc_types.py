@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# coding: utf-8
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syn=python
 # Author: Chris Kuethe <chris.kuethe@gmail.com> , https://github.com/ckuethe/radiacode-tools
 # SPDX-License-Identifier: MIT
@@ -8,10 +7,11 @@
 All the special data types used elsewhere
 """
 
+from collections.abc import Iterable
 from dataclasses import dataclass, field, is_dataclass
 from datetime import MINYEAR, datetime, timedelta
 from json import JSONEncoder
-from typing import Any, Dict, Iterable, List, Tuple, Union
+from typing import Any, Union
 
 from radiacode.types import Enum as RadiacodeEnum
 from radiacode.types import Spectrum as RadiacodeSpectrum
@@ -19,7 +19,7 @@ from radiacode.types import Spectrum as RadiacodeSpectrum
 Number = Union[int, float]
 
 # preferred color palette choices for plotting
-palettes: List[str] = ["jet", "plasma", "magma", "rainbow", "thermal", "turbo", "viridis"]
+palettes: list[str] = ["jet", "plasma", "magma", "rainbow", "thermal", "turbo", "viridis"]
 
 # there's enough time conversion it's worth having common definitions of the formats
 DATEFMT: str = "%Y-%m-%d %H:%M:%S"
@@ -72,7 +72,7 @@ class DataclassEncoderMixin:
     - json() like a __repr__, but in json
     """
 
-    def as_dict(self, hide_dataclass: bool = False) -> Dict[str, Any]:
+    def as_dict(self, hide_dataclass: bool = False) -> dict[str, Any]:
         rv = {x: getattr(self, x) for x in sorted(self.__dataclass_fields__.keys())}  # type: ignore
         if hide_dataclass is False:
             rv["_dataclass"] = True
@@ -82,7 +82,7 @@ class DataclassEncoderMixin:
     def json(self, **kwargs):
         return RcJSONEncoder(**kwargs).encode(self)
 
-    def values(self) -> Tuple:
+    def values(self) -> tuple:
         return tuple(self.as_dict(hide_dataclass=True).values())
 
 
@@ -130,7 +130,7 @@ class EnergyCalibration(DataclassEncoderMixin):
 # Used primarily by rcmulispg to geotag measurements
 @dataclass(kw_only=True)
 class GpsData(DataclassEncoderMixin):
-    payload: Dict[str, Any] = field(default_factory=dict)
+    payload: dict[str, Any] = field(default_factory=dict)
     monotime: float
 
 
@@ -186,7 +186,7 @@ class SpectrumLayer(DataclassEncoderMixin):
     duration: timedelta = timedelta(0)
     comment: str = ""
     channels: int
-    counts: List[int]
+    counts: list[int]
     calibration: EnergyCalibration
 
 
@@ -222,7 +222,7 @@ class SGHeader(DataclassEncoderMixin):
 # "time" is kinda vague here; it could be either a timestamp of the sample or the duration
 @dataclass(kw_only=True)
 class SpectrogramPoint(DataclassEncoderMixin):
-    counts: List[int]
+    counts: list[int]
     td: timedelta
     dt: datetime = _outtatime
 
@@ -255,7 +255,7 @@ class RangeFinder:
         self.min_val = x if self.min_val is None else min(x, self.min_val)
         self.max_val = x if self.max_val is None else max(x, self.max_val)
 
-    def get(self) -> Tuple[Any, Any]:
+    def get(self) -> tuple[Any, Any]:
         return (self.min_val, self.max_val)
 
     def __str__(self):

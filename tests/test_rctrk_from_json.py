@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# coding: utf-8
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syn=python
 # SPDX-License-Identifier: MIT
 
@@ -58,30 +57,23 @@ def test_main(monkeypatch):
 
 def test_load_file_lines_spectrum_data():
     """Test load_file_lines skips spectrum data"""
-    import json
     import tempfile
-    from rctrk_from_json import load_file_lines
     from argparse import Namespace
-    from radiacode_tools.rc_utils import UTC
-    
+
+    from rctrk_from_json import load_file_lines
+
     # Create test data with GpsData and RealTimeData
-    data = '''{"type": "GpsData", "payload": {"time": "2023-01-01T00:00:00Z", "lat": 1.0, "lon": 2.0, "epc": 5, "gnss": true, "serial_number": "RC-100-123456"}}
+    data = """{"type": "GpsData", "payload": {"time": "2023-01-01T00:00:00Z", "lat": 1.0, "lon": 2.0, "epc": 5, "gnss": true, "serial_number": "RC-100-123456"}}
 {"type": "RealTimeData", "dt": "2023-01-01T00:00:00Z", "dose_rate": 0.1, "count_rate": 10, "serial_number": "RC-100-123456"}
-'''
-    
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+"""
+
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
         f.write(data)
         f.flush()
-        
-        args = Namespace(
-            input=f.name,
-            output=None,
-            serial_number=None,
-            name=None,
-            comment=""
-        )
-        
+
+        args = Namespace(input=f.name, output=None, serial_number=None, name=None, comment="")
+
         result = load_file_lines(args)
-        
+
         # Should have 1 entry with merged data
         assert len(result) >= 1

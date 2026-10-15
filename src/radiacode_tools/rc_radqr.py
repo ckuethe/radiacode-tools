@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# coding: utf-8
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syn=python
 # Author: Chris Kuethe <chris.kuethe@gmail.com> , https://github.com/ckuethe/radiacode-tools
 # SPDX-License-Identifier: MIT
@@ -8,7 +7,7 @@ import base64
 import datetime
 import re
 import zlib
-from typing import Any, Optional, Tuple
+from typing import Any
 from urllib.parse import unquote_plus
 
 from dateutil.parser import parse as dateparse
@@ -35,7 +34,7 @@ def extract_metadata(uri: str, debug=False) -> dict[str, Any]:
     m = re.match(
         r"^(RADDATA|INTERSPEC)://G(?P<specver>\d)/(?P<options>[0-9a-f]{1,2})(?P<n_uris>[0-9a-f])(?P<n_spectra>[0-9a-f])/(?P<data>.+)",
         uri,
-        re.I | re.S | re.M,
+        re.IGNORECASE | re.DOTALL | re.MULTILINE,
     )
     if m is None:
         raise ValueError("Unable to parse URL")
@@ -73,13 +72,13 @@ def parse_payload_fields(msg: bytes, debug=False) -> dict[str, Any]:
 
     This function does no quality checks, it just tries to
     """
-    fields_data, spec_data = re.search(b"^([A-Z]:.*?)(?: S:)(.*)$", msg, re.M | re.I | re.S | re.DOTALL).groups()
+    fields_data, spec_data = re.search(b"^([A-Z]:.*?)(?: S:)(.*)$", msg, re.MULTILINE | re.IGNORECASE | re.DOTALL | re.DOTALL).groups()
     rv = dict()
 
     if debug:
         print(f"raw fields: {fields_data}")
 
-    ml = re.split("( ?[A-Z]: ?)", " " + fields_data.decode(), re.M | re.S)[1:]
+    ml = re.split("( ?[A-Z]: ?)", " " + fields_data.decode(), re.MULTILINE | re.DOTALL)[1:]
 
     if debug:
         print(f"split fields: {ml}")
@@ -162,14 +161,14 @@ def make_qr_payload(
     lr_times: list[float | int],
     spectrum: list[int],
     calibration: list[float] = None,
-    deviations: Optional[list[Tuple[Number, Number]]] = None,
-    mclass: Optional[str] = "",
-    location: Optional[Tuple[Number, Number]] = None,
-    detector_model: Optional[str] = "",
-    neutron_count: Optional[int] = None,
-    comments: Optional[str] = "",
-    timestamp: Optional[datetime.datetime] = None,
-    options: Optional[int] = 0,
+    deviations: list[tuple[Number, Number]] | None = None,
+    mclass: str | None = "",
+    location: tuple[Number, Number] | None = None,
+    detector_model: str | None = "",
+    neutron_count: int | None = None,
+    comments: str | None = "",
+    timestamp: datetime.datetime | None = None,
+    options: int | None = 0,
 ) -> tuple[int, str]:
     """
     Format the payload of the raddata/interspec qrcode

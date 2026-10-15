@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# coding: utf-8
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syn=python
 # Author: Chris Kuethe <chris.kuethe@gmail.com> , https://github.com/ckuethe/radiacode-tools
 # SPDX-License-Identifier: MIT
@@ -182,7 +181,7 @@ def main() -> None:
                     print(jdata, file=ofd, flush=True)
                     if copy_to_stdout:
                         print(jdata, flush=True)
-            except (KeyboardInterrupt, USBError, IOError):
+            except (OSError, KeyboardInterrupt, USBError):
                 break
             except ValueError as e:
                 # something else went wrong, but let's try continue
@@ -194,7 +193,6 @@ def main() -> None:
             if args.exit_after_sync and sync_timer > 10:
                 break
             time.sleep(0.5)
-    return
 
 
 if __name__ == "__main__":

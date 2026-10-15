@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# coding: utf-8
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syn=python
 # Author: Chris Kuethe <chris.kuethe@gmail.com> , https://github.com/ckuethe/radiacode-tools
 # SPDX-License-Identifier: MIT
@@ -25,11 +24,10 @@ from hashlib import sha256
 from re import sub as re_sub
 from struct import pack as struct_pack
 from struct import unpack as struct_unpack
-from typing import Any, List, Optional, Union
+from typing import Any, Union
 from uuid import uuid4
 
 import pandas as pd
-
 import xmltodict
 
 from .rc_types import (
@@ -62,8 +60,8 @@ class RcTrack:
     "Radiacode Track (.rctrk) interface"
 
     def __init__(self, filename: str = "") -> None:
-        self._df: Optional[pd.DataFrame] = None
-        self._points_cache: Optional[List[TrackPoint]] = None
+        self._df: pd.DataFrame | None = None
+        self._points_cache: list[TrackPoint] | None = None
         self._columns = ["DateTime", "Latitude", "Longitude", "Accuracy", "DoseRate", "CountRate", "Comment"]
         self.filename = filename
         self.timestamp: datetime = _outtatime
@@ -82,7 +80,7 @@ class RcTrack:
         return self._ensure_df()
 
     @property
-    def points(self) -> List[TrackPoint]:
+    def points(self) -> list[TrackPoint]:
         """Return track points as a list of TrackPoint objects.
         Note: This converts the entire DataFrame and may be slow for large tracks.
         For better performance, use the df property to access the DataFrame directly."""
@@ -410,7 +408,7 @@ class RcTrack:
         else:
             self.timestamp = min(self.timestamp, dt)
 
-    def add_points(self, points: List[dict[str, Any]]) -> None:
+    def add_points(self, points: list[dict[str, Any]]) -> None:
         """
         Add multiple points efficiently using batch operations.
 
@@ -458,8 +456,8 @@ class RcSpectrum:
     "Radiacode Spectrum (.xml)"
 
     def __init__(self, filename: str = "") -> None:
-        self.fg_spectrum: Optional[SpectrumLayer] = None
-        self.bg_spectrum: Optional[SpectrumLayer] = None
+        self.fg_spectrum: SpectrumLayer | None = None
+        self.bg_spectrum: SpectrumLayer | None = None
         self.note: str = ""
 
         if filename:
@@ -540,7 +538,7 @@ class RcSpectrum:
             except (KeyError, TypeError, AttributeError):
                 pass
 
-    def _spec_layer_to_elements(self, bg: bool = False) -> List[str]:
+    def _spec_layer_to_elements(self, bg: bool = False) -> list[str]:
         sl: SpectrumLayer = self.bg_spectrum if bg is True else self.fg_spectrum
         sc: str = sl.comment if sl.comment else ""
         st: datetime = sl.timestamp
@@ -556,14 +554,12 @@ class RcSpectrum:
             f"<SpectrumName><![CDATA[{sl.spectrum_name}]]></SpectrumName>",
             f"<Comment>{sc}</Comment>",
             f"<SerialNumber>{sl.serial_number}</SerialNumber>",
-            #
             "<EnergyCalibration>",
             "<PolynomialOrder>2</PolynomialOrder>",
             "<Coefficients>",
             *[f"\t<Coefficient>{k}</Coefficient>" for k in sl.calibration.__dict__.values()],
             "</Coefficients>",
             "</EnergyCalibration>",
-            #
             f"<MeasurementTime>{int(sl.duration.total_seconds())}</MeasurementTime>",
             "<Spectrum>",
             *[f"\t<DataPoint>{k}</DataPoint>" for k in sl.counts],
@@ -722,15 +718,15 @@ class RcSpectrogram(DataclassEncoderMixin):
 
         # abusing Optional a little bit but this lets me declare the existence of
         # instance variables while not actually setting them to a valid value
-        self.calibration: Optional[EnergyCalibration] = None
+        self.calibration: EnergyCalibration | None = None
         # abusing this type a little bit, but it's not that wrong.
         # Some kind of timing indicaton, and a list of counts. In this case
         # that's total integration time for the historical spectrum.
-        self.historical_spectrum: Optional[SpectrogramPoint] = None
+        self.historical_spectrum: SpectrogramPoint | None = None
         # saving spectra so that differences can be computed
-        self.previous_spectrum: Optional[SpectrogramPoint] = None
+        self.previous_spectrum: SpectrogramPoint | None = None
         # and this is what it's really for: counts at a particular time.
-        self.samples: List[SpectrogramPoint] = list()
+        self.samples: list[SpectrogramPoint] = list()
         if filename:
             self.load_file(filename)
 
@@ -842,7 +838,7 @@ class RcSpectrogram(DataclassEncoderMixin):
         self.calibration = calibration
 
     def add_point(
-        self, counts: List[int], timestamp: Optional[TimeStampish] = None, duration: Optional[TimeDurationish] = None
+        self, counts: list[int], timestamp: TimeStampish | None = None, duration: TimeDurationish | None = None
     ) -> bool:
         """
         Add a datapoint to the spectrogram.

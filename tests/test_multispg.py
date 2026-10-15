@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# coding: utf-8
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syn=python
 # SPDX-License-Identifier: MIT
 
@@ -11,7 +10,6 @@ from collections import namedtuple
 from json import loads as jloads
 
 import pytest
-
 import usb.core
 
 import rcmultispg
@@ -207,7 +205,7 @@ def test_main_fails(monkeypatch):
         rcmultispg.main()
 
     monkeypatch.setattr("sys.argv", [__file__, "-i", "1"])
-    monkeypatch.setattr("usb.core.find", lambda: [])
+    monkeypatch.setattr("usb.core.find", list)
     with pytest.raises(SystemExit):
         rcmultispg.main()
 

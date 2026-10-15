@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# coding: utf-8
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syn=python
 # Author: Chris Kuethe <chris.kuethe@gmail.com> , https://github.com/ckuethe/radiacode-tools
 # SPDX-License-Identifier: MIT
@@ -21,9 +20,10 @@ from tqdm.auto import tqdm  # type: ignore
 from radiacode_tools.rc_files import RcN42, RcSpectrum
 from radiacode_tools.rc_types import EnergyCalibration, RcHwInfo, SpectrumLayer
 from radiacode_tools.rc_utils import (
+    get_device_id,
     get_dose_from_spectrum,  # FIXME - use the right D and V for device model
+    probe_radiacode_devices,
 )
-from radiacode_tools.rc_utils import get_device_id, probe_radiacode_devices
 from radiacode_tools.rc_validators import positive_float
 
 

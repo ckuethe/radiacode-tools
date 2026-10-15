@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# coding: utf-8
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syn=python
 # Author: Chris Kuethe <chris.kuethe@gmail.com> , https://github.com/ckuethe/radiacode-tools
 # SPDX-License-Identifier: MIT
@@ -9,7 +8,7 @@ import os
 from argparse import ArgumentParser, Namespace
 from datetime import datetime
 from math import log10, sqrt
-from typing import Any, Dict, List
+from typing import Any
 
 import pandas as pd
 import plotly.express
@@ -70,16 +69,16 @@ def rangefinder(l, a=None):
     return (min(l), max(l))
 
 
-def mean(l: List[Number]) -> float:
+def mean(l: list[Number]) -> float:
     return sum(l) / len(l)
 
 
-def _dcf(dc) -> List[str]:
+def _dcf(dc) -> list[str]:
     "dataclass fields. There's gotta be a better way..."
     return list(dc.__dict__.keys())
 
 
-def tracklist_range_probe(l: List[TrackPoint]):
+def tracklist_range_probe(l: list[TrackPoint]):
     "Find the range of all the fields in a list of TrackPoints"
     ranges = {"len": len(l)}
     for f in _dcf(l[0]):
@@ -93,10 +92,10 @@ def tracklist_range_probe(l: List[TrackPoint]):
     return ranges
 
 
-def downsample_trackpoints(l: List[TrackPoint], factor=4) -> List[TrackPoint]:
+def downsample_trackpoints(l: list[TrackPoint], factor=4) -> list[TrackPoint]:
     "Downsample the list by averaging"
     rv = []
-    samples: List[TrackPoint] = []
+    samples: list[TrackPoint] = []
 
     def _sl2tp(samples):
         "Sample List to TrackPoint"
@@ -142,7 +141,7 @@ def downsample_dataframe(df, factor=4):
     return pd.DataFrame(rv)
 
 
-def map_ctr(bbx: Dict[str, Any]) -> Dict[str, float]:
+def map_ctr(bbx: dict[str, Any]) -> dict[str, float]:
     "Normally I'd use a GeoPoint for this, but scatter_mapbox wants a dict"
     return {
         "lat": sum(bbx["latitude"]) / 2,
@@ -150,7 +149,7 @@ def map_ctr(bbx: Dict[str, Any]) -> Dict[str, float]:
     }
 
 
-def osm_zoom(bbx: Dict[str, Any]) -> int:
+def osm_zoom(bbx: dict[str, Any]) -> int:
     "Estimate the OpenStreetMap zoom level from the bounding box of the track"
     # https://wiki.openstreetmap.org/wiki/Zoom_levels
     # experimentally derived coefficients that work well for me. Plug them into
@@ -175,7 +174,7 @@ def _infer_plot_format_from_fn(fn: str) -> str | None:
     return "png"
 
 
-def render_plotly(tk: RcTrack, args: Namespace, bbx: Dict[str, Any]):
+def render_plotly(tk: RcTrack, args: Namespace, bbx: dict[str, Any]):
     zoom = osm_zoom(bbx)
     fig = plotly.express.scatter_map(
         tk.df,
@@ -197,7 +196,7 @@ def render_plotly(tk: RcTrack, args: Namespace, bbx: Dict[str, Any]):
         fig.show()
 
 
-def render_hvplot(tk: RcTrack, args: Namespace, bbx: Dict[str, Any]):
+def render_hvplot(tk: RcTrack, args: Namespace, bbx: dict[str, Any]):
     # https://hvplot.holoviz.org/user_guide/Geographic_Data.html
     # https://hvplot.holoviz.org/getting_started/installation.html
     # https://examples.holoviz.org/gallery/opensky/opensky.html
