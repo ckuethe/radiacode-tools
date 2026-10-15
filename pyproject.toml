@@ -45,6 +45,7 @@ dependencies = [
 rccalibrate = "calibrate:main"
 rcdeadtime = "deadtime:main"
 rcmultispg = "rcmultispg:main"
+rcmerge = "rcmerge:main"
 rcspg_from_json = "rcspg_from_json:main"
 rctrk_from_json = "rctrk_from_json:main"
 rcsanitize = "track_sanititze:main"
