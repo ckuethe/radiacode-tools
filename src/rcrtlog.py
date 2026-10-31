@@ -21,6 +21,24 @@ from radiacode_tools.rc_types import RcJSONEncoder
 from radiacode_tools.rc_validators import rcsn
 
 
+def _decode_record_flags(flags: radiacode.types.RecordFlags) -> dict[str, Any]:
+    return {
+        "value": flags.value,
+        "save_to_database": flags.save_to_database,
+        "old_data": flags.old_data,
+        "range_current": flags.range_current,
+        "power_source": flags.power_source,
+        "temp_status": flags.temp_status,
+    }
+
+
+def _decode_rt_flags(flags: radiacode.types.RealTimeFlags) -> dict[str, Any]:
+    return {
+        "value": flags.value,
+        "set": flags.set,
+    }
+
+
 def get_args() -> Namespace:
     ap = ArgumentParser(
         description="Download and stream the contents of the device Data Buffer",
@@ -163,17 +181,18 @@ def main() -> None:
                         else:
                             sync_timer += 1
                     # Don't need all the very insignificant digits
-                    if "count_rate" in decoded:
+                    if decoded.get("count_rate") is not None:
                         decoded["count_rate"] = round(decoded["count_rate"], 3)
-                    if "dose_rate" in decoded:
+                    if decoded.get("dose_rate") is not None:
                         decoded["dose_rate"] = float(f"{decoded['dose_rate']:.4g}")
 
-                    # flags are more easier to read/decode in hex rather than decimal
-                    # eventually I will figure out what the flags actually mean.
-                    if "flags" in decoded:
-                        decoded["flags"] = f"{decoded['flags']:04x}"
-                    if "real_time_flags" in decoded:
-                        decoded["real_time_flags"] = f"{decoded['real_time_flags']:04x}"
+                    # flags are typed bitmasks now; decode them into readable
+                    # named fields so the historical-data and other bits are
+                    # obvious, rather than dumping a raw hex value.
+                    if isinstance(decoded.get("flags"), radiacode.types.RecordFlags):
+                        decoded["flags"] = _decode_record_flags(decoded["flags"])
+                    if isinstance(decoded.get("real_time_flags"), radiacode.types.RealTimeFlags):
+                        decoded["real_time_flags"] = _decode_rt_flags(decoded["real_time_flags"])
 
                     if isinstance(msg, radiacode.types.Event) and msg.event == radiacode.types.EventId.TEXT_MESSAGE:
                         decoded["text"] = rc.text_message().strip()
