@@ -22,6 +22,7 @@ from typing import Any
 import usb.core  # type: ignore
 from radiacode import RadiaCode  # type: ignore
 from radiacode.transports.usb import DeviceNotFound  # type: ignore
+from radiacode.types import VSFR
 
 from radiacode_tools.rc_types import RcHwInfo
 from radiacode_tools.rc_utils import find_radiacode_devices, get_device_id
@@ -74,6 +75,12 @@ def get_args() -> Namespace:
         help="print what would happen without touching any device",
     )
     ap.add_argument(
+        "--no-beep",
+        default=False,
+        action="store_true",
+        help="do not beep when the detector connects",
+    )
+    ap.add_argument(
         "--no-poweroff",
         default=False,
         action="store_true",
@@ -106,6 +113,9 @@ def reset_device(args: Namespace, serial_number: str) -> None:
         # turn the detector on before doing anything
         rc.set_device_on(True)
         print(f"{serial_number}: powered on")
+
+        if not args.no_beep:
+            rc.write_request(VSFR.PLAY_SIGNAL, b"\x01")
 
         if not args.keep_spectrum:
             rc.spectrum_reset()
