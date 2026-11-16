@@ -115,19 +115,11 @@ def reset_device(args: Namespace, serial_number: str) -> None:
         print(f"{serial_number}: powered on")
 
         if not args.no_beep:
-            rc.write_request(VSFR.PLAY_SIGNAL, b"\x01")
-
-        if not args.keep_spectrum:
-            rc.spectrum_reset()
-            print(f"{serial_number}: spectrum reset")
-        else:
-            print(f"{serial_number}: spectrum kept")
-
-        if not args.keep_dose:
-            rc.dose_reset()
-            print(f"{serial_number}: dose reset")
-        else:
-            print(f"{serial_number}: dose kept")
+            try:
+                rc.beep()
+            except AttributeError:
+                print("old radiacode library, sending hand-rolled beep()")
+                rc.write_request(VSFR.PLAY_SIGNAL, b"\x01")
 
         if not args.keep_databuf:
             # reading the data buffer drains it; the events are discarded.
@@ -143,6 +135,18 @@ def reset_device(args: Namespace, serial_number: str) -> None:
             print(f"{serial_number}: data buffer read and discarded ({total_events} events)")
         else:
             print(f"{serial_number}: data buffer kept")
+
+        if not args.keep_spectrum:
+            rc.spectrum_reset()
+            print(f"{serial_number}: spectrum reset")
+        else:
+            print(f"{serial_number}: spectrum kept")
+
+        if not args.keep_dose:
+            rc.dose_reset()
+            print(f"{serial_number}: dose reset")
+        else:
+            print(f"{serial_number}: dose kept")
 
         if not args.no_poweroff:
             rc.set_device_on(False)
